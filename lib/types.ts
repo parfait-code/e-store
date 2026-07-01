@@ -558,3 +558,123 @@ export interface ShipmentFormInput {
   order_id?: string;
   estimated_delivery_at?: string;
 }
+
+export interface Basket {
+  id: string;
+  userId: number;
+  items: {
+    id: string;
+    productId: number;
+    variantId: string | null;
+    quantity: number;
+    product: Product;
+    variant: Variant | null;
+  }[];
+}
+
+export interface ProductReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  user: { id: number; username: string; firstName: string; lastName: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductReviewsResponse {
+  product_id: number;
+  average_rating: number;
+  total_reviews: number;
+  reviews: ProductReview[];
+}
+
+export interface PromotionPublic {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  images: string[];
+  status: PromotionStatus;
+  isActive: boolean;
+  startDate: string;
+  endDate: string;
+  discounts: {
+    id: string;
+    type: DiscountType;
+    value: number;
+    category: { id: string; name: string; slug: string } | null;
+    products: { product: { id: number; name: string; price: number } }[];
+  }[];
+  coupons: {
+    id: string;
+    code: string;
+    maxUses: number | null;
+    usedCount: number;
+    perUserLimit: number;
+    startDate: string | null;
+    endDate: string | null;
+    isActive: boolean;
+  }[];
+}
+
+export interface CategoryProductsResponse {
+  category: CategoryRef;
+  items: Product[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface SignupFormInput {
+  username: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string;
+  phone?: string;
+}
+
+export interface CartLocalItem {
+  productId: number;
+  variantId: string | null;
+  quantity: number;
+  name: string;
+  price: number;
+  pricing?: ProductPricing;
+  image: string | null;
+  sku: string;
+  slug?: string;
+  maxQuantity?: number;
+}
+
+export interface CartContextValue {
+  items: CartLocalItem[];
+  totalItems: number;
+  totalAmount: number;
+  addItem: (item: CartLocalItem) => void;
+  removeItem: (productId: number, variantId: string | null) => void;
+  updateQuantity: (
+    productId: number,
+    variantId: string | null,
+    quantity: number,
+  ) => void;
+  clearCart: () => void;
+  isLoaded: boolean;
+}
+
+export interface CartContextValue {
+  items: CartLocalItem[];
+  totalItems: number;
+  totalAmount: number;
+  addItem: (item: CartLocalItem) => void;
+  removeItem: (productId: number, variantId: string | null) => void;
+  updateQuantity: (
+    productId: number,
+    variantId: string | null,
+    quantity: number,
+  ) => void;
+  clearCart: () => void;
+  isLoaded: boolean;
+}

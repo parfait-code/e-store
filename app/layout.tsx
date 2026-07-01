@@ -2,6 +2,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { AuthProvider } from "@/lib/auth/auth-context";
+import { CartProvider } from "@/lib/cart/cart-context";
 
 export const metadata: Metadata = {
   title: "E-Commerce",
@@ -16,7 +17,9 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className="bg-gray-50 text-gray-900 antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <CartProvider>{children}</CartProvider>
+        </AuthProvider>
       </body>
     </html>
   );
