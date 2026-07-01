@@ -14,6 +14,7 @@ import {
   LogOut,
   FolderTree,
   Tag as TagIcon2,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 
@@ -24,11 +25,11 @@ const NAV_ITEMS = [
   { href: "/admin/tags", label: "Tags", icon: TagIcon2 },
   { href: "/admin/orders", label: "Commandes", icon: ShoppingCart },
   { href: "/admin/users", label: "Utilisateurs", icon: Users },
-  { href: "/admin/inventory", label: "Inventaire", icon: Warehouse },
+  { href: "/admin/inventory", label: "Inventaire", icon: Building2 },
+  { href: "/admin/warehouses", label: "Entrepôts", icon: Warehouse },
   { href: "/admin/promotions", label: "Promotions", icon: Tag },
   { href: "/admin/shipments", label: "Expéditions", icon: Truck },
 ];
-
 export default function AdminLayout({
   children,
 }: {
