@@ -135,6 +135,16 @@ export interface Category extends CategoryRef {
   _count: { products: number };
 }
 
+export interface ProductPricing {
+  originalPrice: number;
+  finalPrice: number;
+  discountAmount: number;
+  discountPercentage: number;
+  hasDiscount: boolean;
+  promotionId: string | null;
+  discountId: string | null;
+}
+
 export interface Product {
   id: number;
   sku: string;
@@ -149,8 +159,25 @@ export interface Product {
   images: ProductImage[];
   variants: Variant[];
   attributeValues: ProductAttributeValue[];
+  pricing?: ProductPricing;
   createdAt: string;
   updatedAt: string;
+}
+
+export type PickupRequestStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
+
+export interface PickupRequest {
+  id: string;
+  userId: number;
+  pickupDate: string;
+  pickupAddress: string;
+  status: PickupRequestStatus;
+}
+
+export interface AttributeOptionUpdateInput {
+  value?: string;
+  colorHex?: string;
+  position?: number;
 }
 
 export interface ProductFormInput {

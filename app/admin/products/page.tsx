@@ -42,16 +42,27 @@ export default function ProductsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [categoryId, setCategoryId] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  // Debounce : évite un appel API à chaque frappe
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
 
   const fetchProducts = useCallback(() => {
     setIsLoading(true);
     setError(null);
     const params = new URLSearchParams({ page: String(page), limit: "20" });
     if (categoryId) params.set("categoryId", categoryId);
+    if (search) params.set("search", search);
 
     apiClient
       .get<Paginated<Product>>(`/product?${params.toString()}`)
@@ -66,7 +77,7 @@ export default function ProductsPage() {
         ),
       )
       .finally(() => setIsLoading(false));
-  }, [page, categoryId]);
+  }, [page, categoryId, search]);
 
   useEffect(() => {
     fetchProducts();
@@ -96,14 +107,6 @@ export default function ProductsPage() {
     }
   }
 
-  const filteredProducts = search
-    ? products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(search.toLowerCase()) ||
-          p.sku.toLowerCase().includes(search.toLowerCase()),
-      )
-    : products;
-
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -129,8 +132,8 @@ export default function ProductsPage() {
           <input
             type="text"
             placeholder="Rechercher (nom, SKU)..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="w-64 rounded-md border border-gray-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
           />
         </div>
@@ -180,7 +183,7 @@ export default function ProductsPage() {
                   <Loader2 size={20} className="mx-auto animate-spin" />
                 </td>
               </tr>
-            ) : filteredProducts.length === 0 ? (
+            ) : products.length === 0 ? (
               <tr>
                 <td
                   colSpan={7}
@@ -190,7 +193,7 @@ export default function ProductsPage() {
                 </td>
               </tr>
             ) : (
-              filteredProducts.map((product) => {
+              products.map((product) => {
                 const primaryImage =
                   product.images.find((img) => img.isPrimary) ??
                   product.images[0];
@@ -221,7 +224,23 @@ export default function ProductsPage() {
                     <td className="px-4 py-3 text-gray-500">
                       {product.category?.name ?? "—"}
                     </td>
-                    <td className="px-4 py-3">{formatXAF(product.price)}</td>
+                    <td className="px-4 py-3">
+                      {product.pricing?.hasDiscount ? (
+                        <div>
+                          <span className="font-medium text-green-600">
+                            {formatXAF(product.pricing.finalPrice)}
+                          </span>
+                          <span className="ml-1 text-xs text-gray-400 line-through">
+                            {formatXAF(product.pricing.originalPrice)}
+                          </span>
+                          <span className="ml-1 text-xs text-green-600">
+                            -{product.pricing.discountPercentage}%
+                          </span>
+                        </div>
+                      ) : (
+                        formatXAF(product.price)
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[product.status]}`}

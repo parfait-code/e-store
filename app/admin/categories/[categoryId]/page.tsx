@@ -4,12 +4,22 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Plus, Trash2, Tag } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  Plus,
+  Trash2,
+  Tag,
+  Check,
+  Pencil,
+  X,
+} from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type {
   Category,
   AttributeDefinition,
   AttributeDefinitionFormInput,
+  AttributeOption,
 } from "@/lib/types";
 import { CategoryForm } from "../_components/CategoryForm";
 
@@ -20,6 +30,121 @@ const TYPE_LABELS: Record<AttributeDefinition["type"], string> = {
   BOOLEAN: "Oui/Non",
   SELECT: "Liste (options)",
 };
+
+function AttributeOptionRow({
+  option,
+  definitionType,
+  onUpdated,
+  onDeleted,
+}: {
+  option: AttributeOption;
+  definitionType: AttributeDefinition["type"];
+  onUpdated: (option: AttributeOption) => void;
+  onDeleted: () => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [value, setValue] = useState(option.value);
+  const [colorHex, setColorHex] = useState(option.colorHex ?? "#000000");
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function handleSave() {
+    setIsSaving(true);
+    try {
+      const updated = await apiClient.patch<AttributeOption>(
+        `/attributes/options/${option.id}`,
+        {
+          value: value.trim(),
+          colorHex: definitionType === "COLOR" ? colorHex : undefined,
+        },
+      );
+      onUpdated(updated);
+      setIsEditing(false);
+    } catch (err) {
+      alert(
+        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Supprimer l'option « ${option.value} » ?`)) return;
+    try {
+      await apiClient.delete(`/attributes/options/${option.id}`);
+      onDeleted();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Suppression impossible");
+    }
+  }
+
+  if (isEditing) {
+    return (
+      <span className="flex items-center gap-1.5 rounded-full bg-gray-100 py-1 pl-2 pr-1 text-xs">
+        {definitionType === "COLOR" && (
+          <input
+            type="color"
+            value={colorHex}
+            onChange={(e) => setColorHex(e.target.value)}
+            className="h-4 w-4 rounded border-0"
+          />
+        )}
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="w-20 rounded border border-gray-300 px-1 py-0.5 text-xs outline-none focus:border-gray-900"
+          autoFocus
+        />
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="rounded-full p-0.5 text-green-600 hover:bg-green-50"
+        >
+          {isSaving ? (
+            <Loader2 size={11} className="animate-spin" />
+          ) : (
+            <Check size={11} />
+          )}
+        </button>
+        <button
+          onClick={() => {
+            setIsEditing(false);
+            setValue(option.value);
+            setColorHex(option.colorHex ?? "#000000");
+          }}
+          className="rounded-full p-0.5 hover:bg-gray-200"
+        >
+          <X size={11} />
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1.5 rounded-full bg-gray-100 py-1 pl-2 pr-1 text-xs">
+      {option.colorHex && (
+        <span
+          className="h-3 w-3 rounded-full border border-gray-300"
+          style={{ backgroundColor: option.colorHex }}
+        />
+      )}
+      {option.value}
+      <button
+        onClick={() => setIsEditing(true)}
+        className="rounded-full p-0.5 hover:bg-gray-200"
+      >
+        <Pencil size={11} />
+      </button>
+      <button
+        onClick={handleDelete}
+        className="rounded-full p-0.5 hover:bg-gray-200"
+      >
+        <Trash2 size={11} />
+      </button>
+    </span>
+  );
+}
 
 function AttributeOptionsEditor({
   definition,
@@ -36,40 +161,19 @@ function AttributeOptionsEditor({
     if (!value.trim()) return;
     setIsAdding(true);
     try {
-      await apiClient.post(`/attributes/${definition.id}/options`, {
-        value: value.trim(),
-        colorHex: definition.type === "COLOR" ? colorHex : undefined,
-      });
-      // recharge la définition depuis la liste parente (voir CategoryAttributes)
-      onChange({
-        ...definition,
-        options: [
-          ...definition.options,
-          {
-            id: crypto.randomUUID(),
-            value: value.trim(),
-            colorHex: definition.type === "COLOR" ? colorHex : null,
-            position: definition.options.length,
-          },
-        ],
-      });
+      const created = await apiClient.post<AttributeOption>(
+        `/attributes/${definition.id}/options`,
+        {
+          value: value.trim(),
+          colorHex: definition.type === "COLOR" ? colorHex : undefined,
+        },
+      );
+      onChange({ ...definition, options: [...definition.options, created] });
       setValue("");
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Erreur lors de l'ajout");
     } finally {
       setIsAdding(false);
-    }
-  }
-
-  async function removeOption(optionId: string) {
-    try {
-      await apiClient.delete(`/attributes/options/${optionId}`);
-      onChange({
-        ...definition,
-        options: definition.options.filter((o) => o.id !== optionId),
-      });
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
     }
   }
 
@@ -79,24 +183,25 @@ function AttributeOptionsEditor({
     <div className="mt-3 border-t border-gray-100 pt-3">
       <div className="mb-2 flex flex-wrap gap-2">
         {definition.options.map((opt) => (
-          <span
+          <AttributeOptionRow
             key={opt.id}
-            className="flex items-center gap-1.5 rounded-full bg-gray-100 py-1 pl-2 pr-1 text-xs"
-          >
-            {opt.colorHex && (
-              <span
-                className="h-3 w-3 rounded-full border border-gray-300"
-                style={{ backgroundColor: opt.colorHex }}
-              />
-            )}
-            {opt.value}
-            <button
-              onClick={() => removeOption(opt.id)}
-              className="rounded-full p-0.5 hover:bg-gray-200"
-            >
-              <Trash2 size={11} />
-            </button>
-          </span>
+            option={opt}
+            definitionType={definition.type}
+            onUpdated={(updated) =>
+              onChange({
+                ...definition,
+                options: definition.options.map((o) =>
+                  o.id === updated.id ? updated : o,
+                ),
+              })
+            }
+            onDeleted={() =>
+              onChange({
+                ...definition,
+                options: definition.options.filter((o) => o.id !== opt.id),
+              })
+            }
+          />
         ))}
       </div>
       <div className="flex items-center gap-2">
