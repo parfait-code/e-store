@@ -291,3 +291,64 @@ export interface TagFormInput {
   name: string;
   slug: string;
 }
+
+export type PromotionStatus = "SCHEDULED" | "ACTIVE" | "EXPIRED" | "CANCELLED";
+export type DiscountType = "PERCENTAGE" | "FIXED_AMOUNT";
+
+export interface Discount {
+  id: string;
+  type: DiscountType;
+  value: number;
+  category: { id: string; name: string; slug: string } | null;
+  products: { product: { id: number; name: string; price: number } }[];
+}
+
+export interface CouponCode {
+  id: string;
+  code: string;
+  maxUses: number | null;
+  usedCount: number;
+  perUserLimit: number;
+  startDate: string | null;
+  endDate: string | null;
+  isActive: boolean;
+}
+
+export interface Promotion {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  images: string[];
+  status: PromotionStatus;
+  isActive: boolean;
+  startDate: string;
+  endDate: string;
+  discounts: Discount[];
+  coupons: CouponCode[];
+}
+
+export interface PromotionFormInput {
+  name: string;
+  slug: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  isActive?: boolean;
+}
+
+export interface DiscountFormInput {
+  type: DiscountType;
+  value: number;
+  categoryId?: string;
+  productIds?: number[];
+}
+
+export interface CouponFormInput {
+  code: string;
+  maxUses?: number;
+  perUserLimit?: number;
+  startDate?: string;
+  endDate?: string;
+  isActive?: boolean;
+}
