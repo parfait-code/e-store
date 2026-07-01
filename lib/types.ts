@@ -401,3 +401,100 @@ export interface InventoryTransferInput {
   to_warehouse: string;
   quantity: number;
 }
+
+export type ShipmentStatus =
+  | "PENDING"
+  | "IN_TRANSIT"
+  | "DELIVERED"
+  | "CANCELLED";
+
+export interface TrackingEvent {
+  id: string;
+  status: string;
+  location: string | null;
+  createdAt: string;
+}
+
+export interface Shipment {
+  id: string;
+  orderId: string | null;
+  senderName: string;
+  senderAddress: string;
+  recipientName: string;
+  recipientAddress: string;
+  weight: number;
+  dimensions: { length: number; width: number; height: number } | null;
+  status: ShipmentStatus;
+  trackingNumber: string | null;
+  estimatedDeliveryDate: string | null;
+  trackingEvents: TrackingEvent[];
+  label: { id: string; labelUrl: string } | null;
+}
+
+export interface ShipmentTrackingInput {
+  status: string;
+  location?: string;
+}
+
+export type ReturnStatus = "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED";
+
+export interface ReturnRequest {
+  id: string;
+  orderId: string;
+  userId: number;
+  status: ReturnStatus;
+  reason: string;
+  notes: string | null;
+  items: {
+    id: string;
+    orderItemId: string;
+    quantity: number;
+    condition: string | null;
+    orderItem: {
+      id: string;
+      productId: number;
+      quantity: number;
+      price: number;
+    };
+  }[];
+  order: { id: string; userId: number; status: OrderStatus };
+}
+
+export interface ReturnStatusUpdateInput {
+  status: ReturnStatus;
+  notes?: string;
+}
+
+export type LoyaltyTransactionType =
+  | "EARNED"
+  | "REDEEMED"
+  | "EXPIRED"
+  | "ADJUSTED";
+
+export interface LoyaltyTransaction {
+  id: string;
+  points: number;
+  type: LoyaltyTransactionType;
+  orderId: string | null;
+  createdAt: string;
+}
+
+export interface LoyaltyAdjustInput {
+  userId: number;
+  points: number;
+  type: LoyaltyTransactionType;
+  orderId?: string;
+}
+
+export interface SalesChartPoint {
+  label: string;
+  amount: number;
+  orderCount: number;
+}
+
+export interface SalesChartResponse {
+  period: string;
+  year: number;
+  currency: "XAF";
+  points: SalesChartPoint[];
+}
