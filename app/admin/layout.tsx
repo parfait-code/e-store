@@ -9,12 +9,13 @@ import {
   ShoppingCart,
   Users,
   Warehouse,
+  Building2,
   Tag,
   Truck,
-  LogOut,
+  RotateCcw,
+  Coins,
   FolderTree,
-  Tag as TagIcon2,
-  Building2,
+  LogOut,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 
@@ -22,14 +23,17 @@ const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/admin/products", label: "Produits", icon: Package },
   { href: "/admin/categories", label: "Catégories", icon: FolderTree },
-  { href: "/admin/tags", label: "Tags", icon: TagIcon2 },
+  { href: "/admin/tags", label: "Tags", icon: Tag },
   { href: "/admin/orders", label: "Commandes", icon: ShoppingCart },
   { href: "/admin/users", label: "Utilisateurs", icon: Users },
-  { href: "/admin/inventory", label: "Inventaire", icon: Building2 },
-  { href: "/admin/warehouses", label: "Entrepôts", icon: Warehouse },
+  { href: "/admin/inventory", label: "Inventaire", icon: Warehouse },
+  { href: "/admin/warehouses", label: "Entrepôts", icon: Building2 },
   { href: "/admin/promotions", label: "Promotions", icon: Tag },
   { href: "/admin/shipments", label: "Expéditions", icon: Truck },
+  { href: "/admin/returns", label: "Retours", icon: RotateCcw },
+  { href: "/admin/loyalty", label: "Fidélité", icon: Coins },
 ];
+
 export default function AdminLayout({
   children,
 }: {
