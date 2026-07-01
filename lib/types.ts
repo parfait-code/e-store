@@ -352,3 +352,52 @@ export interface CouponFormInput {
   endDate?: string;
   isActive?: boolean;
 }
+
+export interface UserFormInput {
+  username: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string;
+  phone?: string;
+  role?: Role;
+}
+
+export interface Warehouse {
+  id: string;
+  name: string;
+  location: string;
+  capacity: number | null;
+}
+
+export interface WarehouseFormInput {
+  name: string;
+  location: string;
+  capacity?: number;
+}
+
+export interface InventoryItem {
+  id: string;
+  productId: number;
+  variantId: string | null;
+  warehouseId: string;
+  quantity: number;
+  product: { id: number; name: string; sku: string; images: ProductImage[] };
+  warehouse: Warehouse;
+  variant: { id: string; sku: string } | null;
+}
+
+export interface InventoryFormInput {
+  product_id: number;
+  warehouse_id: string;
+  variant_id?: string;
+  quantity?: number;
+}
+
+export interface InventoryTransferInput {
+  item_id: string;
+  from_warehouse: string;
+  to_warehouse: string;
+  quantity: number;
+}
