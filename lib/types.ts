@@ -62,8 +62,6 @@ export interface DashboardStats {
   };
 }
 
-// lib/types.ts (ajouts)
-
 export type ProductStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 
 export interface ProductImage {
@@ -164,4 +162,34 @@ export interface ProductFormInput {
   status?: ProductStatus;
   weight?: number;
   brand?: string;
+}
+
+export interface CategoryFormInput {
+  name: string;
+  slug: string;
+  description?: string;
+  imageUrl?: string;
+  iconUrl?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  isActive?: boolean;
+  parentId?: string;
+}
+
+export interface AttributeDefinitionFormInput {
+  name: string;
+  slug: string;
+  type: "TEXT" | "NUMBER" | "COLOR" | "BOOLEAN" | "SELECT";
+  unit?: string;
+  isVariant?: boolean;
+  isFilterable?: boolean;
+  isRequired?: boolean;
+  position?: number;
+}
+
+export interface VariantFormInput {
+  sku: string;
+  price?: number;
+  isActive?: boolean;
+  attributes: { attributeDefinitionId: string; value: string }[];
 }

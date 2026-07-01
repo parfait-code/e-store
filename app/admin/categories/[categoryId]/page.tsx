@@ -1,0 +1,394 @@
+// app/admin/categories/[categoryId]/page.tsx
+"use client";
+
+import { useEffect, useState, FormEvent } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Loader2, Plus, Trash2, Tag } from "lucide-react";
+import { apiClient, ApiError } from "@/lib/api-client";
+import type {
+  Category,
+  AttributeDefinition,
+  AttributeDefinitionFormInput,
+} from "@/lib/types";
+import { CategoryForm } from "../_components/CategoryForm";
+
+const TYPE_LABELS: Record<AttributeDefinition["type"], string> = {
+  TEXT: "Texte",
+  NUMBER: "Nombre",
+  COLOR: "Couleur",
+  BOOLEAN: "Oui/Non",
+  SELECT: "Liste (options)",
+};
+
+function AttributeOptionsEditor({
+  definition,
+  onChange,
+}: {
+  definition: AttributeDefinition;
+  onChange: (updated: AttributeDefinition) => void;
+}) {
+  const [value, setValue] = useState("");
+  const [colorHex, setColorHex] = useState("#000000");
+  const [isAdding, setIsAdding] = useState(false);
+
+  async function addOption() {
+    if (!value.trim()) return;
+    setIsAdding(true);
+    try {
+      await apiClient.post(`/attributes/${definition.id}/options`, {
+        value: value.trim(),
+        colorHex: definition.type === "COLOR" ? colorHex : undefined,
+      });
+      // recharge la définition depuis la liste parente (voir CategoryAttributes)
+      onChange({
+        ...definition,
+        options: [
+          ...definition.options,
+          {
+            id: crypto.randomUUID(),
+            value: value.trim(),
+            colorHex: definition.type === "COLOR" ? colorHex : null,
+            position: definition.options.length,
+          },
+        ],
+      });
+      setValue("");
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Erreur lors de l'ajout");
+    } finally {
+      setIsAdding(false);
+    }
+  }
+
+  async function removeOption(optionId: string) {
+    try {
+      await apiClient.delete(`/attributes/options/${optionId}`);
+      onChange({
+        ...definition,
+        options: definition.options.filter((o) => o.id !== optionId),
+      });
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Suppression impossible");
+    }
+  }
+
+  if (definition.type !== "SELECT" && definition.type !== "COLOR") return null;
+
+  return (
+    <div className="mt-3 border-t border-gray-100 pt-3">
+      <div className="mb-2 flex flex-wrap gap-2">
+        {definition.options.map((opt) => (
+          <span
+            key={opt.id}
+            className="flex items-center gap-1.5 rounded-full bg-gray-100 py-1 pl-2 pr-1 text-xs"
+          >
+            {opt.colorHex && (
+              <span
+                className="h-3 w-3 rounded-full border border-gray-300"
+                style={{ backgroundColor: opt.colorHex }}
+              />
+            )}
+            {opt.value}
+            <button
+              onClick={() => removeOption(opt.id)}
+              className="rounded-full p-0.5 hover:bg-gray-200"
+            >
+              <Trash2 size={11} />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          placeholder="Nouvelle option"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="rounded-md border border-gray-300 px-2 py-1 text-xs outline-none focus:border-gray-900"
+        />
+        {definition.type === "COLOR" && (
+          <input
+            type="color"
+            value={colorHex}
+            onChange={(e) => setColorHex(e.target.value)}
+            className="h-7 w-7 rounded border border-gray-300"
+          />
+        )}
+        <button
+          onClick={addOption}
+          disabled={isAdding}
+          className="rounded-md bg-gray-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+        >
+          {isAdding ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            "Ajouter"
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CategoryAttributes({ categoryId }: { categoryId: string }) {
+  const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<AttributeDefinitionFormInput>({
+    name: "",
+    slug: "",
+    type: "TEXT",
+    isVariant: false,
+    isFilterable: false,
+    isRequired: false,
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiClient
+      .get<AttributeDefinition[]>(`/categories/${categoryId}/attributes`)
+      .then(setAttributes)
+      .finally(() => setIsLoading(false));
+  }, [categoryId]);
+
+  async function handleCreate(e: FormEvent) {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const created = await apiClient.post<AttributeDefinition>(
+        `/categories/${categoryId}/attributes`,
+        form,
+      );
+      setAttributes((prev) => [...prev, created]);
+      setForm({
+        name: "",
+        slug: "",
+        type: "TEXT",
+        isVariant: false,
+        isFilterable: false,
+        isRequired: false,
+      });
+      setShowForm(false);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Erreur lors de la création",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDelete(definitionId: string) {
+    if (!confirm("Supprimer cet attribut ?")) return;
+    try {
+      await apiClient.delete(`/attributes/${definitionId}`);
+      setAttributes((prev) => prev.filter((a) => a.id !== definitionId));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Suppression impossible");
+    }
+  }
+
+  const inputClass =
+    "rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-gray-900";
+
+  return (
+    <div className="max-w-2xl">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-medium">Attributs de la catégorie</h2>
+        <button
+          onClick={() => setShowForm((s) => !s)}
+          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
+        >
+          <Plus size={14} /> Nouvel attribut
+        </button>
+      </div>
+
+      {showForm && (
+        <form
+          onSubmit={handleCreate}
+          className="mb-4 space-y-3 rounded-md border border-gray-200 bg-gray-50 p-4"
+        >
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              type="text"
+              required
+              placeholder="Nom (ex: Couleur)"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className={inputClass}
+            />
+            <input
+              type="text"
+              required
+              placeholder="Slug (ex: couleur)"
+              value={form.slug}
+              onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+              className={inputClass}
+            />
+          </div>
+          <select
+            value={form.type}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                type: e.target.value as AttributeDefinitionFormInput["type"],
+              }))
+            }
+            className={inputClass}
+          >
+            {Object.entries(TYPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <div className="flex flex-wrap gap-4 text-xs">
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={form.isVariant}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, isVariant: e.target.checked }))
+                }
+              />
+              Utilisé pour les variantes
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={form.isFilterable}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, isFilterable: e.target.checked }))
+                }
+              />
+              Filtrable
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={form.isRequired}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, isRequired: e.target.checked }))
+                }
+              />
+              Obligatoire
+            </label>
+          </div>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+          >
+            {isSubmitting ? "Création..." : "Créer l'attribut"}
+          </button>
+        </form>
+      )}
+
+      {isLoading ? (
+        <Loader2 size={16} className="animate-spin text-gray-400" />
+      ) : attributes.length === 0 ? (
+        <p className="text-sm text-gray-400">
+          Aucun attribut défini pour cette catégorie.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {attributes.map((attr) => (
+            <div
+              key={attr.id}
+              className="rounded-md border border-gray-200 bg-white p-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Tag size={14} className="text-gray-400" />
+                  <span className="text-sm font-medium">{attr.name}</span>
+                  <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
+                    {TYPE_LABELS[attr.type]}
+                  </span>
+                  {attr.isVariant && (
+                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">
+                      Variante
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDelete(attr.id)}
+                  className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              <AttributeOptionsEditor
+                definition={attr}
+                onChange={(updated) =>
+                  setAttributes((prev) =>
+                    prev.map((a) => (a.id === updated.id ? updated : a)),
+                  )
+                }
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function EditCategoryPage() {
+  const { categoryId } = useParams<{ categoryId: string }>();
+  const router = useRouter();
+  const [category, setCategory] = useState<Category | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiClient
+      .get<Category>(`/categories/${categoryId}`)
+      .then(setCategory)
+      .catch((err) =>
+        setError(
+          err instanceof ApiError ? err.message : "Erreur de chargement",
+        ),
+      )
+      .finally(() => setIsLoading(false));
+  }, [categoryId]);
+
+  if (isLoading)
+    return <Loader2 size={20} className="animate-spin text-gray-400" />;
+  if (error || !category) {
+    return (
+      <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+        {error ?? "Catégorie introuvable."}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Link
+        href="/admin/categories"
+        className="mb-4 flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
+      >
+        <ArrowLeft size={14} /> Retour aux catégories
+      </Link>
+      <h1 className="mb-6 text-xl font-semibold">
+        Modifier « {category.name} »
+      </h1>
+
+      <CategoryForm
+        initialCategory={category}
+        onSuccess={(updated) => {
+          setCategory(updated);
+          router.refresh();
+        }}
+      />
+
+      <div className="mt-10">
+        <CategoryAttributes categoryId={category.id} />
+      </div>
+    </div>
+  );
+}

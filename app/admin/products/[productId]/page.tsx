@@ -176,37 +176,20 @@ export default function EditProductPage() {
       />
 
       {/* Variantes (aperçu, gestion détaillée à venir) */}
-      {product.variants.length > 0 && (
-        <div className="mt-10 max-w-2xl">
-          <h2 className="mb-3 text-sm font-medium">
+      {/* Variantes — remplace le bloc "aperçu" précédent */}
+      <div className="mt-10 max-w-2xl">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium">
             Variantes ({product.variants.length})
           </h2>
-          <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
-            {product.variants.map((v) => (
-              <div
-                key={v.id}
-                className="flex items-center justify-between px-4 py-3 text-sm"
-              >
-                <div>
-                  <span className="font-medium">{v.sku}</span>
-                  <span className="ml-2 text-gray-500">
-                    {v.attributeValues.map((av) => av.value).join(" / ")}
-                  </span>
-                </div>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${
-                    v.isActive
-                      ? "bg-green-100 text-green-700"
-                      : "bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  {v.isActive ? "Actif" : "Inactif"}
-                </span>
-              </div>
-            ))}
-          </div>
+          <Link
+            href={`/admin/products/${product.id}/variants`}
+            className="text-sm font-medium text-gray-900 hover:underline"
+          >
+            Gérer les variantes →
+          </Link>
         </div>
-      )}
+      </div>
     </div>
   );
 }
