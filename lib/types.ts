@@ -61,3 +61,107 @@ export interface DashboardStats {
     currency: "XAF";
   };
 }
+
+// lib/types.ts (ajouts)
+
+export type ProductStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
+
+export interface ProductImage {
+  id: string;
+  url: string;
+  altText: string | null;
+  position: number;
+  isPrimary: boolean;
+}
+
+export interface AttributeOption {
+  id: string;
+  value: string;
+  colorHex: string | null;
+  position: number;
+}
+
+export interface AttributeDefinition {
+  id: string;
+  categoryId: string;
+  name: string;
+  slug: string;
+  type: "TEXT" | "NUMBER" | "COLOR" | "BOOLEAN" | "SELECT";
+  unit: string | null;
+  isVariant: boolean;
+  isFilterable: boolean;
+  isRequired: boolean;
+  position: number;
+  options: AttributeOption[];
+}
+
+export interface ProductAttributeValue {
+  id: string;
+  value: string;
+  attributeDefinition: AttributeDefinition;
+}
+
+export interface Variant {
+  id: string;
+  productId: number;
+  sku: string;
+  price: number | null;
+  isActive: boolean;
+  attributeValues: {
+    id: string;
+    value: string;
+    attributeDefinition: AttributeDefinition;
+  }[];
+  inventory: { id: string; quantity: number; warehouseId: string }[];
+  images: ProductImage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoryRef {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface Category extends CategoryRef {
+  description: string | null;
+  imageUrl: string | null;
+  iconUrl: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  isActive: boolean;
+  parentId: string | null;
+  parent: CategoryRef | null;
+  children: CategoryRef[];
+  _count: { products: number };
+}
+
+export interface Product {
+  id: number;
+  sku: string;
+  name: string;
+  description: string | null;
+  price: number;
+  status: ProductStatus;
+  weight: number | null;
+  brand: string | null;
+  categoryId: string;
+  category: CategoryRef;
+  images: ProductImage[];
+  variants: Variant[];
+  attributeValues: ProductAttributeValue[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductFormInput {
+  sku: string;
+  name: string;
+  description?: string;
+  price: number;
+  categoryId: string;
+  status?: ProductStatus;
+  weight?: number;
+  brand?: string;
+}
