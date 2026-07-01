@@ -12,9 +12,21 @@ import {
   Tag,
   TrendingUp,
   TrendingDown,
+  Loader2,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { DashboardStats } from "@/lib/types";
+import type { SalesChartResponse } from "@/lib/types";
+
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 function formatXAF(amount: number) {
   return (
@@ -62,6 +74,69 @@ function StatCard({
     </div>
   );
 }
+
+function SalesChart() {
+  const [data, setData] = useState<SalesChartResponse | null>(null);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsLoading(true);
+    apiClient
+      .get<SalesChartResponse>(`/dashboard/sales-chart?year=${year}&period=monthly`)
+      .then(setData)
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Erreur de chargement"))
+      .finally(() => setIsLoading(false));
+  }, [year]);
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-sm font-medium">Ventes mensuelles</h2>
+        <select
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+          className="rounded-md border border-gray-300 px-2 py-1 text-sm outline-none focus:border-gray-900"
+        >
+          {[year, year - 1, year - 2].map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {isLoading ? (
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 size={20} className="animate-spin text-gray-400" />
+        </div>
+      ) : error || !data ? (
+        <p className="text-sm text-red-600">{error ?? "Erreur de chargement"}</p>
+      ) : (
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={data.points}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#9ca3af" />
+            <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" />
+            <Tooltip
+              formatter={(value) => {
+                const formattedValue =
+                  typeof value === "number"
+                    ? `${new Intl.NumberFormat("fr-FR").format(value)} XAF`
+                    : value ?? "";
+                return [formattedValue, "Revenu"];
+              }}
+              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            />
+            <Line type="monotone" dataKey="amount" stroke="#111827" strokeWidth={2} dot={{ r: 3 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -142,6 +217,10 @@ export default function DashboardPage() {
           label="Revenu via coupons ce mois"
           value={formatXAF(stats.promotions.revenueFromCouponsThisMonth)}
         />
+      </div>
+
+      <div className="mt-6">
+        <SalesChart />
       </div>
     </div>
   );
