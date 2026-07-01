@@ -16,6 +16,7 @@ import {
   Coins,
   FolderTree,
   LogOut,
+  Route,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 
@@ -30,6 +31,11 @@ const NAV_ITEMS = [
   { href: "/admin/warehouses", label: "Entrepôts", icon: Building2 },
   { href: "/admin/promotions", label: "Promotions", icon: Tag },
   { href: "/admin/shipments", label: "Expéditions", icon: Truck },
+  {
+    href: "/admin/shipping-methods",
+    label: "Méthodes de livraison",
+    icon: Route,
+  },
   { href: "/admin/returns", label: "Retours", icon: RotateCcw },
   { href: "/admin/loyalty", label: "Fidélité", icon: Coins },
 ];

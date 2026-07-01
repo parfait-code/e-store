@@ -498,3 +498,36 @@ export interface SalesChartResponse {
   currency: "XAF";
   points: SalesChartPoint[];
 }
+// lib/types.ts (ajouts)
+
+export interface ShippingMethod {
+  id: string;
+  name: string;
+  description: string | null;
+  estimatedDays: number;
+  basePrice: number;
+  pricePerKg: number;
+  isActive: boolean;
+  zones: string[];
+}
+
+export interface ShippingMethodFormInput {
+  name: string;
+  description?: string;
+  estimatedDays: number;
+  basePrice: number;
+  pricePerKg?: number;
+  isActive?: boolean;
+  zones: string[];
+}
+
+export interface ShipmentFormInput {
+  sender_name: string;
+  sender_address: string;
+  recipient_name: string;
+  recipient_address: string;
+  weight: number;
+  dimensions?: { length: number; width: number; height: number };
+  order_id?: string;
+  estimated_delivery_at?: string;
+}

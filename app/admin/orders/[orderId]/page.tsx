@@ -377,6 +377,12 @@ export default function OrderDetailPage() {
                 {order.shippingMethod.estimatedDays} jours
               </p>
             )}
+            <Link
+              href={`/admin/shipments/new?orderId=${order.id}`}
+              className="mt-3 inline-block text-xs font-medium text-gray-900 hover:underline"
+            >
+              Créer une expédition pour cette commande →
+            </Link>
           </div>
 
           <StatusUpdateForm order={order} onSuccess={setOrder} />
