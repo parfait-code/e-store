@@ -13,13 +13,15 @@ import {
   Truck,
   LogOut,
   FolderTree,
+  Tag as TagIcon2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/admin/products", label: "Produits", icon: Package },
-  { href: "/admin/categories", label: "Catégories", icon: FolderTree }, // ← nouveau
+  { href: "/admin/categories", label: "Catégories", icon: FolderTree },
+  { href: "/admin/tags", label: "Tags", icon: TagIcon2 },
   { href: "/admin/orders", label: "Commandes", icon: ShoppingCart },
   { href: "/admin/users", label: "Utilisateurs", icon: Users },
   { href: "/admin/inventory", label: "Inventaire", icon: Warehouse },

@@ -193,3 +193,101 @@ export interface VariantFormInput {
   isActive?: boolean;
   attributes: { attributeDefinitionId: string; value: string }[];
 }
+
+export type OrderStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "PROCESSING"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "CANCELLED"
+  | "REFUNDED";
+
+export interface Address {
+  id: string;
+  userId: number;
+  street: string;
+  city: string;
+  state: string | null;
+  country: string;
+  postalCode: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderItem {
+  id: string;
+  productId: number;
+  quantity: number;
+  price: number;
+  originalPrice: number;
+  discountAmount: number;
+  product: { id: number; name: string; sku: string; images: ProductImage[] };
+}
+
+export interface Payment {
+  id: string;
+  orderId: string;
+  userId: number;
+  method: string;
+  status: string;
+  amount: number;
+  currency: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderStatusHistoryEntry {
+  id: string;
+  fromStatus: OrderStatus | null;
+  toStatus: OrderStatus;
+  changedBy: number | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface Order {
+  id: string;
+  userId: number;
+  status: OrderStatus;
+  totalAmount: number;
+  discountedAmount: number | null;
+  shippingAddressSnapshot: Record<string, unknown>;
+  billingAddressSnapshot: Record<string, unknown> | null;
+  items: OrderItem[];
+  payments: Payment[];
+  appliedCoupon: {
+    id: string;
+    code: string;
+    promotion: { id: string; name: string; slug: string };
+  } | null;
+  shippingMethod: { id: string; name: string; estimatedDays: number } | null;
+  statusHistory: OrderStatusHistoryEntry[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderStatusUpdateInput {
+  status: OrderStatus;
+  reason?: string;
+  shippingCarrier?: string;
+  trackingNumber?: string;
+  estimatedDeliveryDate?: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface TagWithProducts extends Tag {
+  products: { id: number; name: string; sku: string }[];
+}
+
+export interface TagFormInput {
+  name: string;
+  slug: string;
+}

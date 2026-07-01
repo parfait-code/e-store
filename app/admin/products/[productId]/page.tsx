@@ -5,10 +5,107 @@ import { useEffect, useState, useRef, ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Loader2, Upload, Star, X } from "lucide-react";
+import { ArrowLeft, Loader2, Upload, Star, X, TagIcon } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { Product } from "@/lib/types";
 import { ProductForm } from "../_components/ProductForm";
+import type { Tag } from "@/lib/types";
+
+function ProductTagsEditor({ productId }: { productId: number }) {
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [tags, productTags] = await Promise.all([
+          apiClient.get<Tag[]>("/tags"),
+          apiClient.get<{ tag: Tag }[]>(`/product/${productId}/tags`),
+        ]);
+        setAllTags(tags);
+        setSelectedIds(productTags.map((pt) => pt.tag.id));
+      } catch (err) {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Erreur de chargement des tags",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    load();
+  }, [productId]);
+
+  function toggle(tagId: string) {
+    setSelectedIds((prev) =>
+      prev.includes(tagId)
+        ? prev.filter((id) => id !== tagId)
+        : [...prev, tagId],
+    );
+  }
+
+  async function handleSave() {
+    if (selectedIds.length === 0) {
+      setError("Sélectionnez au moins un tag.");
+      return;
+    }
+    setIsSaving(true);
+    setError(null);
+    try {
+      await apiClient.put(`/product/${productId}/tags`, {
+        tagIds: selectedIds,
+      });
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Erreur lors de l'enregistrement",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (isLoading)
+    return <Loader2 size={16} className="animate-spin text-gray-400" />;
+
+  return (
+    <div className="max-w-2xl">
+      <h2 className="mb-3 text-sm font-medium">Tags</h2>
+      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+      <div className="mb-3 flex flex-wrap gap-2">
+        {allTags.map((tag) => {
+          const active = selectedIds.includes(tag.id);
+          return (
+            <button
+              key={tag.id}
+              type="button"
+              onClick={() => toggle(tag.id)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                active
+                  ? "bg-gray-900 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {tag.name}
+            </button>
+          );
+        })}
+      </div>
+      <button
+        onClick={handleSave}
+        disabled={isSaving}
+        className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+      >
+        {isSaving ? "Enregistrement..." : "Enregistrer les tags"}
+      </button>
+    </div>
+  );
+}
 
 export default function EditProductPage() {
   const { productId } = useParams<{ productId: string }>();
@@ -164,6 +261,10 @@ export default function EditProductPage() {
         <p className="mt-2 text-xs text-gray-400">
           JPEG, PNG, WEBP ou GIF · 5 Mo max · 5 fichiers max
         </p>
+      </div>
+
+      <div className="mb-8">
+        <ProductTagsEditor productId={product.id} />
       </div>
 
       {/* Formulaire infos produit */}
