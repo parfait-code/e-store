@@ -1,4 +1,4 @@
-// app/layout.tsx
+// app/layout.tsx — ordre des providers inversé
 import "./globals.css";
 import type { Metadata } from "next";
 import { AuthProvider } from "@/lib/auth/auth-context";
@@ -17,9 +17,9 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className="bg-gray-50 text-gray-900 antialiased">
-        <AuthProvider>
-          <CartProvider>{children}</CartProvider>
-        </AuthProvider>
+        <CartProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </CartProvider>
       </body>
     </html>
   );

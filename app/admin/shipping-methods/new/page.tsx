@@ -1,14 +1,14 @@
-// app/admin/shipments/new/page.tsx
+// app/admin/shipping-methods/new/page.tsx
 "use client";
 
-import { useState, FormEvent } from "react";
+import { Suspense, useState, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { Shipment, ShipmentFormInput } from "@/lib/types";
 
-export default function NewShipmentPage() {
+function NewShipmentForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderIdFromQuery = searchParams.get("orderId") ?? "";
@@ -168,5 +168,15 @@ export default function NewShipmentPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function NewShipmentPage() {
+  return (
+    <Suspense
+      fallback={<Loader2 size={20} className="animate-spin text-gray-400" />}
+    >
+      <NewShipmentForm />
+    </Suspense>
   );
 }

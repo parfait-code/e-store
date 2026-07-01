@@ -1,4 +1,4 @@
-// lib/cart/cart-context.tsx
+// lib/cart/cart-context.tsx — version complète avec sync
 "use client";
 
 import {
@@ -9,9 +9,16 @@ import {
   ReactNode,
   useCallback,
 } from "react";
-import type { CartLocalItem, CartContextValue } from "@/lib/types";
+import { apiClient } from "@/lib/api-client";
+import type { CartLocalItem, CartContextValue, Basket } from "@/lib/types";
 
-const CartContext = createContext<CartContextValue | undefined>(undefined);
+interface CartContextValueWithSync extends CartContextValue {
+  syncToServer: () => Promise<void>;
+}
+
+const CartContext = createContext<CartContextValueWithSync | undefined>(
+  undefined,
+);
 
 const STORAGE_KEY = "cart_items";
 
@@ -20,16 +27,13 @@ function sameLine(
   productId: number,
   variantId: string | null,
 ) {
-  return (
-    a.productId === productId && (a.variantId ?? null) === (variantId ?? null)
-  );
+  return a.productId === productId && a.variantId === variantId;
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartLocalItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Chargement initial depuis localStorage
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -41,7 +45,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Persistance à chaque changement (une fois le chargement initial fait)
   useEffect(() => {
     if (!isLoaded) return;
     try {
@@ -104,6 +107,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => setItems([]), []);
 
+  // Pousse le panier local vers l'API (basket serveur), puis vide le panier local.
+  // À appeler juste après un login/signup réussi.
+  const syncToServer = useCallback(async () => {
+    if (items.length === 0) return;
+    try {
+      const basket = await apiClient.post<Basket>("/basket");
+      for (const item of items) {
+        await apiClient.post(`/basket/${basket.id}/product`, {
+          product_id: item.productId,
+          variant_id: item.variantId ?? undefined,
+          quantity: item.quantity,
+        });
+      }
+      clearCart();
+    } catch {
+      // En cas d'échec de sync, on garde le panier local intact plutôt que de perdre les articles.
+      // L'utilisateur pourra réessayer (ex: en revisitant /cart) ou le panier restera visible localement.
+    }
+  }, [items, clearCart]);
+
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const totalAmount = items.reduce((sum, i) => {
     const unitPrice = i.pricing?.hasDiscount ? i.pricing.finalPrice : i.price;
@@ -121,6 +144,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         updateQuantity,
         clearCart,
         isLoaded,
+        syncToServer,
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-// lib/auth/auth-context.tsx
+// lib/auth/auth-context.tsx — version avec sync panier au login
 "use client";
 
 import {
@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { apiClient, ApiError } from "@/lib/api-client";
+import { useCart } from "@/lib/cart/cart-context";
 import type { AuthResponse, User } from "@/lib/types";
 
 interface AuthContextValue {
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { syncToServer } = useCart();
 
   useEffect(() => {
     const rawUser = Cookies.get(USER_COOKIE);
@@ -56,6 +58,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sameSite: "lax",
     });
     setUser(data.user);
+
+    // Synchronise le panier invité vers le panier serveur maintenant que le token est disponible
+    await syncToServer();
 
     if (data.user.role === "ADMIN") {
       router.push("/admin/dashboard");
