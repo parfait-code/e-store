@@ -8,6 +8,7 @@ import { apiClient, ApiError } from "@/lib/api-client";
 import { ProductGallery } from "@/components/ProductGallery";
 import { VariantSelector } from "@/components/VariantSelector";
 import { AddToCartButton } from "@/components/AddToCartButton";
+import { WishlistButton } from "@/components/WishlistButton";
 import { PriceDisplay } from "@/components/PriceDisplay";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -111,11 +112,17 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          <div className="mt-6">
-            <AddToCartButton
-              product={product}
-              selectedVariant={selectedVariant}
-              requiresVariant={requiresVariant}
+          <div className="mt-6 flex items-center gap-3">
+            <div className="flex-1">
+              <AddToCartButton
+                product={product}
+                selectedVariant={selectedVariant}
+                requiresVariant={requiresVariant}
+              />
+            </div>
+            <WishlistButton
+              productId={product.id}
+              variantId={selectedVariant?.id ?? null}
             />
           </div>
 

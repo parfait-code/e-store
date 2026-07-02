@@ -661,21 +661,7 @@ export interface CartContextValue {
     quantity: number,
   ) => void;
   clearCart: () => void;
-  isLoaded: boolean;
-}
-
-export interface CartContextValue {
-  items: CartLocalItem[];
-  totalItems: number;
-  totalAmount: number;
-  addItem: (item: CartLocalItem) => void;
-  removeItem: (productId: number, variantId: string | null) => void;
-  updateQuantity: (
-    productId: number,
-    variantId: string | null,
-    quantity: number,
-  ) => void;
-  clearCart: () => void;
+  syncToServer: () => Promise<void>;
   isLoaded: boolean;
 }
 

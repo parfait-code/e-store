@@ -12,6 +12,7 @@ import {
   RotateCcw,
   X,
   Send,
+  XCircle,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
@@ -229,6 +230,7 @@ export default function OrderDetailPage() {
   const [reviewingItemId, setReviewingItemId] = useState<string | null>(null);
   const [reviewedItemIds, setReviewedItemIds] = useState<string[]>([]);
   const [showReturnForm, setShowReturnForm] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     apiClient
@@ -254,6 +256,20 @@ export default function OrderDetailPage() {
 
   const canReturn = order.status === "DELIVERED";
 
+  async function handleCancelOrder() {
+    if (!confirm("Annuler cette commande ? Cette action est irréversible."))
+      return;
+    setIsCancelling(true);
+    try {
+      await apiClient.delete(`/orders/${order!.id}`);
+      setOrder((prev) => (prev ? { ...prev, status: "CANCELLED" } : prev));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Annulation impossible");
+    } finally {
+      setIsCancelling(false);
+    }
+  }
+
   return (
     <div>
       <Link
@@ -272,10 +288,25 @@ export default function OrderDetailPage() {
             Passée le {formatDate(order.createdAt)}
           </p>
         </div>
+
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
             {STATUS_LABELS[order.status]}
           </span>
+          {["PENDING", "CONFIRMED"].includes(order.status) && (
+            <button
+              onClick={handleCancelOrder}
+              disabled={isCancelling}
+              className="flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              {isCancelling ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <XCircle size={14} />
+              )}
+              Annuler la commande
+            </button>
+          )}
           {canReturn && (
             <button
               onClick={() => setShowReturnForm(true)}

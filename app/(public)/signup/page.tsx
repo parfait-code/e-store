@@ -8,6 +8,7 @@ import { Loader2, UserPlus } from "lucide-react";
 import Cookies from "js-cookie";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { AuthResponse, SignupFormInput } from "@/lib/types";
+import { useCart } from "@/lib/cart/cart-context";
 
 function SignupForm() {
   const searchParams = useSearchParams();
@@ -23,6 +24,7 @@ function SignupForm() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { syncToServer } = useCart();
 
   function update<K extends keyof SignupFormInput>(
     key: K,
@@ -45,6 +47,7 @@ function SignupForm() {
         expires: 7,
         sameSite: "lax",
       });
+      await syncToServer();
       window.location.href = redirect;
     } catch (err) {
       if (err instanceof ApiError) {

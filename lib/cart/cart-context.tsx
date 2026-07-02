@@ -9,7 +9,8 @@ import {
   ReactNode,
   useCallback,
 } from "react";
-import type { CartLocalItem, CartContextValue } from "@/lib/types";
+import { apiClient } from "@/lib/api-client";
+import type { Basket, CartLocalItem, CartContextValue } from "@/lib/types";
 
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
@@ -100,6 +101,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => setItems([]), []);
 
+  // Pousse le panier local vers le serveur — appelé juste après login/signup.
+  // Ne vide PAS le panier local : localStorage reste la source de vérité pour
+  // l'invité ; le serveur ne sert qu'à refléter l'état côté API pour les
+  // fonctionnalités qui en dépendent (multi-device, etc). Échec silencieux :
+  // on ne bloque jamais un login pour un souci de sync panier.
+  const syncToServer = useCallback(async () => {
+    if (items.length === 0) return;
+    try {
+      const basket = await apiClient.post<Basket>("/basket");
+      for (const item of items) {
+        await apiClient.post(`/basket/${basket.id}/product`, {
+          product_id: item.productId,
+          variant_id: item.variantId ?? undefined,
+          quantity: item.quantity,
+        });
+      }
+    } catch {
+      // On retentera à la prochaine connexion.
+    }
+  }, [items]);
+
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const totalAmount = items.reduce((sum, i) => {
     const unitPrice = i.pricing?.hasDiscount ? i.pricing.finalPrice : i.price;
@@ -116,6 +138,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         removeItem,
         updateQuantity,
         clearCart,
+        syncToServer,
         isLoaded,
       }}
     >

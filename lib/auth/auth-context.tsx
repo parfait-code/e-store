@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { AuthResponse, User } from "@/lib/types";
+import { useCart } from "@/lib/cart/cart-context";
 
 interface AuthContextValue {
   user: User | null;
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { syncToServer } = useCart();
 
   useEffect(() => {
     const rawUser = Cookies.get(USER_COOKIE);
@@ -64,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sameSite: "lax",
     });
     setUser(data.user);
+    await syncToServer();
 
     if (redirectTo) router.push(redirectTo);
     else if (data.user.role === "ADMIN") router.push("/admin/dashboard");
