@@ -43,10 +43,11 @@ export function AddToCartButton({
       quantity,
       name: product.name,
       price: selectedVariant?.price ?? product.price,
-      pricing: selectedVariant ? undefined : product.pricing, // remise connue seulement au niveau produit pour l'instant
+      pricing: selectedVariant ? undefined : product.pricing,
       image: primaryImage?.url ?? null,
       sku: selectedVariant?.sku ?? product.sku,
       maxQuantity: stock,
+      weight: product.weight ?? undefined,
     });
 
     setJustAdded(true);

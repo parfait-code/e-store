@@ -4,7 +4,15 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { Loader2, User, MapPin, Package, Heart, Coins } from "lucide-react";
+import {
+  Loader2,
+  User,
+  MapPin,
+  Package,
+  Heart,
+  Coins,
+  Truck,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { PublicHeader } from "@/components/PublicHeader";
 import { PublicFooter } from "@/components/PublicFooter";
@@ -13,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/account", label: "Profil", icon: User },
   { href: "/account/addresses", label: "Adresses", icon: MapPin },
   { href: "/account/orders", label: "Mes commandes", icon: Package },
+  { href: "/account/pickup-requests", label: "Enlèvements", icon: Truck },
   { href: "/account/wishlist", label: "Liste de souhaits", icon: Heart },
   { href: "/account/loyalty", label: "Fidélité", icon: Coins },
 ];

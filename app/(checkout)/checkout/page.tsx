@@ -10,6 +10,7 @@ import { formatXAF } from "@/lib/format";
 import type {
   Address,
   ShippingMethod,
+  ShippingCostResponse,
   PaymentMethodOption,
   PaymentMethodType,
   Order,
@@ -44,6 +45,48 @@ export default function CheckoutPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [shippingCosts, setShippingCosts] = useState<
+    Record<string, number | null>
+  >({});
+
+  const [isLoadingCosts, setIsLoadingCosts] = useState(false);
+
+  const totalWeight = items.reduce(
+    (sum, i) => sum + (i.weight ?? 0) * i.quantity,
+    0,
+  );
+
+  useEffect(() => {
+    if (shippingMethods.length === 0) return;
+    setIsLoadingCosts(true);
+    Promise.allSettled(
+      shippingMethods.map((m) =>
+        apiClient.post<ShippingCostResponse>("/shipping-methods/calculate", {
+          shippingMethodId: m.id,
+          weight: totalWeight,
+        }),
+      ),
+    )
+      .then((results) => {
+        const costs: Record<string, number | null> = {};
+        results.forEach((result, i) => {
+          const method = shippingMethods[i];
+          costs[method.id] =
+            result.status === "fulfilled" &&
+            typeof result.value?.cost === "number"
+              ? result.value.cost
+              : null; // échec ou coût absent → on affichera "Livraison gratuite"
+        });
+        setShippingCosts(costs);
+      })
+      .finally(() => setIsLoadingCosts(false));
+  }, [shippingMethods, totalWeight]);
+
+  const selectedShippingCost = shippingMethodId
+    ? (shippingCosts[shippingMethodId] ?? 0)
+    : 0;
+  const grandTotal = totalAmount + selectedShippingCost;
 
   useEffect(() => {
     Promise.all([
@@ -253,24 +296,36 @@ export default function CheckoutPage() {
               <Truck size={16} /> Méthode de livraison
             </h2>
             <div className="space-y-2">
-              {shippingMethods.map((m) => (
-                <label
-                  key={m.id}
-                  className="flex items-center justify-between rounded-md border border-gray-200 p-3 text-sm"
-                >
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      checked={shippingMethodId === m.id}
-                      onChange={() => setShippingMethodId(m.id)}
-                    />
-                    {m.name} — {m.estimatedDays} jour(s)
-                  </span>
-                  <span className="text-gray-500">
-                    {formatXAF(m.basePrice)}+
-                  </span>
-                </label>
-              ))}
+              {shippingMethods.map((m) => {
+                const cost = shippingCosts[m.id];
+                return (
+                  <label
+                    key={m.id}
+                    className="flex items-center justify-between rounded-md border border-gray-200 p-3 text-sm"
+                  >
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        checked={shippingMethodId === m.id}
+                        onChange={() => setShippingMethodId(m.id)}
+                      />
+                      {m.name} — {m.estimatedDays} jour(s)
+                    </span>
+                    {isLoadingCosts ? (
+                      <Loader2
+                        size={14}
+                        className="animate-spin text-gray-400"
+                      />
+                    ) : cost != null ? (
+                      <span className="text-gray-500">{formatXAF(cost)}</span>
+                    ) : (
+                      <span className="text-xs font-medium text-green-600">
+                        Livraison gratuite
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
             </div>
           </section>
 
@@ -341,12 +396,28 @@ export default function CheckoutPage() {
             />
           </div>
 
-          <div className="mt-4 flex justify-between border-t border-gray-100 pt-4 text-base font-semibold">
+          <div className="mt-4 space-y-1 border-t border-gray-100 pt-4 text-sm">
+            <div className="flex justify-between text-gray-600">
+              <span>Sous-total</span>
+              <span>{formatXAF(totalAmount)}</span>
+            </div>
+            <div className="flex justify-between text-gray-600">
+              <span>Livraison</span>
+              <span>
+                {shippingMethodId
+                  ? selectedShippingCost > 0
+                    ? formatXAF(selectedShippingCost)
+                    : "Gratuite"
+                  : "—"}
+              </span>
+            </div>
+          </div>
+          <div className="mt-2 flex justify-between border-t border-gray-100 pt-4 text-base font-semibold">
             <span>Total</span>
-            <span>{formatXAF(totalAmount)}</span>
+            <span>{formatXAF(grandTotal)}</span>
           </div>
           <p className="mt-1 text-xs text-gray-400">
-            Frais de livraison et remise coupon appliqués à la confirmation.
+            Remise coupon appliquée à la confirmation.
           </p>
 
           <button

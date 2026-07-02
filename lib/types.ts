@@ -647,6 +647,7 @@ export interface CartLocalItem {
   sku: string;
   slug?: string;
   maxQuantity?: number;
+  weight?: number;
 }
 
 export interface CartContextValue {
@@ -736,4 +737,18 @@ export interface OrderCreateInput {
   paymentMethodId?: string;
   notes?: string;
   couponCode?: string;
+}
+
+export interface PickupRequestFormInput {
+  pickup_date: string; // ISO
+  pickup_address: string;
+}
+
+export interface ShippingCalculateInput {
+  shippingMethodId: string;
+  weight: number;
+}
+
+export interface ShippingCostResponse {
+  cost: number;
 }
