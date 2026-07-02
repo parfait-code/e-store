@@ -678,3 +678,76 @@ export interface CartContextValue {
   clearCart: () => void;
   isLoaded: boolean;
 }
+
+export interface AddressFormInput {
+  street: string;
+  city: string;
+  state?: string;
+  country: string;
+  postalCode: string;
+  isDefault?: boolean;
+}
+
+export interface WishlistItem {
+  id: string;
+  productId: number;
+  variantId: string | null;
+  product: {
+    id: number;
+    name: string;
+    price: number;
+    images: { url: string }[];
+  };
+  variant: { id: string; sku: string; price: number } | null;
+  addedAt: string;
+}
+
+export interface Wishlist {
+  id: string;
+  userId: number;
+  items: WishlistItem[];
+}
+
+export interface ReviewCreateInput {
+  order_item_id: string;
+  product_id: number;
+  rating: number;
+  comment?: string;
+}
+
+export interface ReturnCreateInput {
+  order_id: string;
+  reason: string;
+  notes?: string;
+  items: { order_item_id: string; quantity: number; condition?: string }[];
+}
+
+export interface PaymentMethodOption {
+  id: string;
+  name: string;
+  description: string;
+  available: boolean;
+  message?: string;
+}
+
+export type PaymentMethodType =
+  | "CASH_ON_DELIVERY"
+  | "PAYPAL"
+  | "STRIPE"
+  | "CINETPAY";
+
+export interface OrderCreateInput {
+  items: { id: string; quantity: number }[];
+  shippingAddressId?: string;
+  shippingAddress: {
+    street: string;
+    city: string;
+    state?: string;
+    country: string;
+    postalCode: string;
+  };
+  shippingMethodId?: string;
+  paymentMethodId?: string;
+  notes?: string;
+  couponCode?: string;
+}

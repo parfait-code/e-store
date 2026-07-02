@@ -1,4 +1,4 @@
-// lib/cart/cart-context.tsx — version complète avec sync
+// lib/cart/cart-context.tsx
 "use client";
 
 import {
@@ -9,16 +9,9 @@ import {
   ReactNode,
   useCallback,
 } from "react";
-import { apiClient } from "@/lib/api-client";
-import type { CartLocalItem, CartContextValue, Basket } from "@/lib/types";
+import type { CartLocalItem, CartContextValue } from "@/lib/types";
 
-interface CartContextValueWithSync extends CartContextValue {
-  syncToServer: () => Promise<void>;
-}
-
-const CartContext = createContext<CartContextValueWithSync | undefined>(
-  undefined,
-);
+const CartContext = createContext<CartContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "cart_items";
 
@@ -50,7 +43,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     } catch {
-      // quota localStorage dépassé ou navigateur en mode privé strict : on ignore silencieusement
+      // quota localStorage dépassé ou navigateur en mode privé strict
     }
   }, [items, isLoaded]);
 
@@ -107,26 +100,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => setItems([]), []);
 
-  // Pousse le panier local vers l'API (basket serveur), puis vide le panier local.
-  // À appeler juste après un login/signup réussi.
-  const syncToServer = useCallback(async () => {
-    if (items.length === 0) return;
-    try {
-      const basket = await apiClient.post<Basket>("/basket");
-      for (const item of items) {
-        await apiClient.post(`/basket/${basket.id}/product`, {
-          product_id: item.productId,
-          variant_id: item.variantId ?? undefined,
-          quantity: item.quantity,
-        });
-      }
-      clearCart();
-    } catch {
-      // En cas d'échec de sync, on garde le panier local intact plutôt que de perdre les articles.
-      // L'utilisateur pourra réessayer (ex: en revisitant /cart) ou le panier restera visible localement.
-    }
-  }, [items, clearCart]);
-
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const totalAmount = items.reduce((sum, i) => {
     const unitPrice = i.pricing?.hasDiscount ? i.pricing.finalPrice : i.price;
@@ -144,7 +117,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         updateQuantity,
         clearCart,
         isLoaded,
-        syncToServer,
       }}
     >
       {children}

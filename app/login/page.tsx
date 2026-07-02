@@ -1,13 +1,16 @@
 // app/login/page.tsx
 "use client";
 
-import { useState, FormEvent } from "react";
+import { Suspense, useState, FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Loader2, LogIn, Eye, EyeOff } from "lucide-react";
 import { useAuth, ApiError } from "@/lib/auth/auth-context";
 
-export default function LoginPage() {
+function LoginForm() {
   const { login } = useAuth();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") ?? undefined;
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -19,13 +22,13 @@ export default function LoginPage() {
     setError(null);
     setIsSubmitting(true);
     try {
-      await login(username, password);
+      await login(username, password, redirect);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError("Une erreur est survenue. Réessayez.");
-      }
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Une erreur est survenue. Réessayez.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -118,5 +121,13 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

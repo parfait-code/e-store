@@ -1,4 +1,4 @@
-// lib/auth/auth-context.tsx — version avec sync panier au login
+// lib/auth/auth-context.tsx
 "use client";
 
 import {
@@ -11,14 +11,18 @@ import {
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { apiClient, ApiError } from "@/lib/api-client";
-import { useCart } from "@/lib/cart/cart-context";
 import type { AuthResponse, User } from "@/lib/types";
 
 interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (
+    username: string,
+    password: string,
+    redirectTo?: string,
+  ) => Promise<void>;
   logout: () => void;
+  updateUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -30,7 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const { syncToServer } = useCart();
 
   useEffect(() => {
     const rawUser = Cookies.get(USER_COOKIE);
@@ -45,13 +48,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  async function login(username: string, password: string) {
+  async function login(
+    username: string,
+    password: string,
+    redirectTo?: string,
+  ) {
     const data = await apiClient.post<AuthResponse>(
       "/login",
       { username, password },
       { auth: false },
     );
-
     Cookies.set(TOKEN_COOKIE, data.token, { expires: 7, sameSite: "lax" });
     Cookies.set(USER_COOKIE, JSON.stringify(data.user), {
       expires: 7,
@@ -59,14 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     setUser(data.user);
 
-    // Synchronise le panier invité vers le panier serveur maintenant que le token est disponible
-    await syncToServer();
-
-    if (data.user.role === "ADMIN") {
-      router.push("/admin/dashboard");
-    } else {
-      router.push("/");
-    }
+    if (redirectTo) router.push(redirectTo);
+    else if (data.user.role === "ADMIN") router.push("/admin/dashboard");
+    else router.push("/");
   }
 
   function logout() {
@@ -76,8 +77,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   }
 
+  function updateUser(updated: User) {
+    Cookies.set(USER_COOKIE, JSON.stringify(updated), {
+      expires: 7,
+      sameSite: "lax",
+    });
+    setUser(updated);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, login, logout, updateUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

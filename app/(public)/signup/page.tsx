@@ -1,17 +1,17 @@
 // app/(public)/signup/page.tsx
 "use client";
 
-import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, UserPlus } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import { useCart } from "@/lib/cart/cart-context";
-import type { AuthResponse, SignupFormInput } from "@/lib/types";
 import Cookies from "js-cookie";
+import { apiClient, ApiError } from "@/lib/api-client";
+import type { AuthResponse, SignupFormInput } from "@/lib/types";
 
-export default function SignupPage() {
-  const router = useRouter();
+function SignupForm() {
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") ?? "/";
   const [form, setForm] = useState<SignupFormInput>({
     username: "",
     email: "",
@@ -23,7 +23,6 @@ export default function SignupPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { syncToServer } = useCart();
 
   function update<K extends keyof SignupFormInput>(
     key: K,
@@ -46,8 +45,7 @@ export default function SignupPage() {
         expires: 7,
         sameSite: "lax",
       });
-      await syncToServer(); // ← nouveau
-      window.location.href = "/";
+      window.location.href = redirect;
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -65,7 +63,6 @@ export default function SignupPage() {
 
   const inputClass =
     "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
-
   function fieldError(name: string) {
     return fieldErrors[name]?.[0];
   }
@@ -208,5 +205,13 @@ export default function SignupPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
   );
 }

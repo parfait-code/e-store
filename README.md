@@ -1,8 +1,6 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Demarrer le serveur
 
-## Getting Started
-
-First, run the development server:
+demarrer le serveur de development:
 
 ```bash
 npm run dev
@@ -14,23 +12,54 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+# 1. Vérification sur dev
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+C:\Users\PARFAIT\Desktop\PROJET\e-store> git status
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# On branch dev
 
-## Learn More
+# nothing to commit, working tree clean
 
-To learn more about Next.js, take a look at the following resources:
+# 2. Récupération des mises à jour
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+C:\Users\PARFAIT\Desktop\PROJET\e-store> git fetch origin
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# 3. Bascule sur main
 
-## Deploy on Vercel
+C:\Users\PARFAIT\Desktop\PROJET\e-store> git checkout main
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Switched to branch 'main'
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# 4. Mise à jour de main
+
+C:\Users\PARFAIT\Desktop\PROJET\e-store> git pull origin main
+
+# Already up to date.
+
+# 5. Fusion de dev dans main
+
+C:\Users\PARFAIT\Desktop\PROJET\e-store> git merge dev
+
+# Updating abc123..def456
+
+# Fast-forward
+
+# file1.tsx | 10 ++++++++++
+
+# file2.tsx | 5 +++++
+
+# 2 files changed, 15 insertions(+)
+
+# 6. Push vers GitHub
+
+C:\Users\PARFAIT\Desktop\PROJET\e-store> git push origin main
+
+# Enumerating objects: 5, done.
+
+# To https://github.com/votre-compte/e-store.git
+
+# abc123..def456 main -> main
+
+# 7. Retour sur dev
+
+C:\Users\PARFAIT\Desktop\PROJET\e-store> git checkout dev
