@@ -12,7 +12,11 @@ import {
   Star,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
-import type { Address, AddressFormInput } from "@/lib/types";
+import type {
+  Address,
+  AddressFormInput,
+  AddressValidateResponse,
+} from "@/lib/types";
 
 function AddressForm({
   initial,
@@ -33,10 +37,44 @@ function AddressForm({
   });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validation, setValidation] = useState<{
+    valid: boolean;
+    message: string;
+  } | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setIsValidating(true);
+    try {
+      const res = await apiClient.post<AddressValidateResponse>(
+        "/address/validate",
+        {
+          street: form.street,
+          city: form.city,
+          state: form.state || undefined,
+          country: form.country,
+          postal_code: form.postalCode,
+        },
+      );
+      if (!res.valid) {
+        setValidation({
+          valid: false,
+          message: "Adresse non reconnue — vérifiez le pays et le code postal.",
+        });
+        setIsValidating(false);
+        return;
+      }
+      setValidation({ valid: true, message: "Adresse valide." });
+    } catch {
+      // Le back peut être temporairement indisponible sur cette route — on
+      // n'empêche pas la sauvegarde pour autant, juste pas de confirmation visuelle.
+      setValidation(null);
+    } finally {
+      setIsValidating(false);
+    }
+
     setIsSubmitting(true);
     try {
       await onSubmit(form);
@@ -62,6 +100,17 @@ function AddressForm({
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
           {error}
+        </p>
+      )}
+      {validation && (
+        <p
+          className={`rounded-md px-3 py-2 text-xs ${
+            validation.valid
+              ? "bg-green-50 text-green-700"
+              : "bg-amber-50 text-amber-700"
+          }`}
+        >
+          {validation.message}
         </p>
       )}
       <div>
@@ -144,10 +193,10 @@ function AddressForm({
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isValidating}
           className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
         >
-          {isSubmitting ? (
+          {isSubmitting || isValidating ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (
             <Check size={16} />

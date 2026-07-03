@@ -13,6 +13,8 @@ import {
   X,
   Send,
   XCircle,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
@@ -21,6 +23,7 @@ import type {
   OrderStatus,
   ReviewCreateInput,
   ReturnCreateInput,
+  ProductReview,
 } from "@/lib/types";
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -36,14 +39,19 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
 function ReviewForm({
   orderItemId,
   productId,
+  existingReview,
   onDone,
+  onCancel,
 }: {
   orderItemId: string;
   productId: number;
-  onDone: () => void;
+  existingReview?: ProductReview;
+  onDone: (review: ProductReview) => void;
+  onCancel: () => void;
 }) {
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState("");
+  const isEditing = Boolean(existingReview);
+  const [rating, setRating] = useState(existingReview?.rating ?? 5);
+  const [comment, setComment] = useState(existingReview?.comment ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -52,14 +60,22 @@ function ReviewForm({
     setError(null);
     setIsSubmitting(true);
     try {
-      const payload: ReviewCreateInput = {
-        order_item_id: orderItemId,
-        product_id: productId,
-        rating,
-        comment: comment || undefined,
-      };
-      await apiClient.post("/reviews", payload);
-      onDone();
+      let review: ProductReview;
+      if (isEditing) {
+        review = await apiClient.put<ProductReview>(
+          `/reviews/${existingReview!.id}`,
+          { rating, comment: comment || undefined },
+        );
+      } else {
+        const payload: ReviewCreateInput = {
+          order_item_id: orderItemId,
+          product_id: productId,
+          rating,
+          comment: comment || undefined,
+        };
+        review = await apiClient.post<ProductReview>("/reviews", payload);
+      }
+      onDone(review);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -96,18 +112,29 @@ function ReviewForm({
         onChange={(e) => setComment(e.target.value)}
         className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs outline-none focus:border-gray-900"
       />
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-      >
-        {isSubmitting ? (
-          <Loader2 size={12} className="animate-spin" />
-        ) : (
-          <Send size={12} />
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+        >
+          {isSubmitting ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Send size={12} />
+          )}
+          {isEditing ? "Mettre à jour" : "Envoyer l'avis"}
+        </button>
+        {isEditing && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600"
+          >
+            Annuler
+          </button>
         )}
-        Envoyer l'avis
-      </button>
+      </div>
     </form>
   );
 }
@@ -227,11 +254,33 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reviewingItemId, setReviewingItemId] = useState<string | null>(null);
-  const [reviewedItemIds, setReviewedItemIds] = useState<string[]>([]);
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [reviewingItemId, setReviewingItemId] = useState<string | null>(null);
+  const [editingReviewItemId, setEditingReviewItemId] = useState<string | null>(
+    null,
+  );
+  const [reviewsByItem, setReviewsByItem] = useState<
+    Record<string, ProductReview>
+  >({});
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
 
+  async function handleDeleteReview(itemId: string, reviewId: string) {
+    if (!confirm("Supprimer cet avis ?")) return;
+    setDeletingReviewId(reviewId);
+    try {
+      await apiClient.delete(`/reviews/${reviewId}`);
+      setReviewsByItem((prev) => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Suppression impossible");
+    } finally {
+      setDeletingReviewId(null);
+    }
+  }
   useEffect(() => {
     apiClient
       .get<Order>(`/orders/${orderId}`)
@@ -336,16 +385,43 @@ export default function OrderDetailPage() {
               </div>
 
               {order.status === "DELIVERED" &&
-                !reviewedItemIds.includes(item.id) &&
-                (reviewingItemId === item.id ? (
+                (reviewingItemId === item.id ||
+                editingReviewItemId === item.id ? (
                   <ReviewForm
                     orderItemId={item.id}
                     productId={item.productId}
-                    onDone={() => {
-                      setReviewedItemIds((prev) => [...prev, item.id]);
+                    existingReview={reviewsByItem[item.id]}
+                    onDone={(review) => {
+                      setReviewsByItem((prev) => ({
+                        ...prev,
+                        [item.id]: review,
+                      }));
                       setReviewingItemId(null);
+                      setEditingReviewItemId(null);
                     }}
+                    onCancel={() => setEditingReviewItemId(null)}
                   />
+                ) : reviewsByItem[item.id] ? (
+                  <div className="mt-1 flex items-center gap-3 text-xs">
+                    <span className="text-green-600">
+                      Avis envoyé ({reviewsByItem[item.id].rating}★)
+                    </span>
+                    <button
+                      onClick={() => setEditingReviewItemId(item.id)}
+                      className="flex items-center gap-1 text-gray-500 hover:text-gray-900"
+                    >
+                      <Pencil size={12} /> Modifier
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleDeleteReview(item.id, reviewsByItem[item.id].id)
+                      }
+                      disabled={deletingReviewId === reviewsByItem[item.id].id}
+                      className="flex items-center gap-1 text-gray-500 hover:text-red-600 disabled:opacity-50"
+                    >
+                      <Trash2 size={12} /> Supprimer
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={() => setReviewingItemId(item.id)}
@@ -354,11 +430,6 @@ export default function OrderDetailPage() {
                     <Star size={12} /> Laisser un avis
                   </button>
                 ))}
-              {reviewedItemIds.includes(item.id) && (
-                <p className="mt-1 text-xs text-green-600">
-                  Merci pour votre avis !
-                </p>
-              )}
             </div>
           ))}
         </div>

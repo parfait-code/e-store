@@ -12,6 +12,7 @@ import {
   FileText,
   Plus,
   Save,
+  X,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
@@ -126,6 +127,7 @@ export default function ShipmentDetailPage() {
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     apiClient
@@ -138,6 +140,19 @@ export default function ShipmentDetailPage() {
       )
       .finally(() => setIsLoading(false));
   }, [shipmentId]);
+
+  async function handleCancelShipment() {
+    if (!confirm("Annuler cette expédition ?")) return;
+    setIsCancelling(true);
+    try {
+      await apiClient.post(`/shipments/${shipment!.id}/cancel`);
+      setShipment((prev) => (prev ? { ...prev, status: "CANCELLED" } : prev));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Annulation impossible");
+    } finally {
+      setIsCancelling(false);
+    }
+  }
 
   if (isLoading)
     return <Loader2 size={20} className="animate-spin text-gray-400" />;
@@ -170,11 +185,28 @@ export default function ShipmentDetailPage() {
             </p>
           )}
         </div>
-        <span
-          className={`rounded-full px-3 py-1 text-sm font-medium ${STATUS_STYLES[shipment.status]}`}
-        >
-          {shipment.status}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-full px-3 py-1 text-sm font-medium ${STATUS_STYLES[shipment.status]}`}
+          >
+            {shipment.status}
+          </span>
+          {shipment.status !== "CANCELLED" &&
+            shipment.status !== "DELIVERED" && (
+              <button
+                onClick={handleCancelShipment}
+                disabled={isCancelling}
+                className="flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                {isCancelling ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <X size={14} />
+                )}
+                Annuler l'expédition
+              </button>
+            )}
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-6">

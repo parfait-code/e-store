@@ -15,6 +15,8 @@ import type {
   PaymentMethodType,
   Order,
   OrderCreateInput,
+  Basket,
+  CouponValidateResponse,
 } from "@/lib/types";
 
 export default function CheckoutPage() {
@@ -49,6 +51,12 @@ export default function CheckoutPage() {
   const [shippingCosts, setShippingCosts] = useState<
     Record<string, number | null>
   >({});
+  const [couponBasketId, setCouponBasketId] = useState<string | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  const [couponResult, setCouponResult] = useState<{
+    valid: boolean;
+    message: string;
+  } | null>(null);
 
   const [isLoadingCosts, setIsLoadingCosts] = useState(false);
 
@@ -181,6 +189,40 @@ export default function CheckoutPage() {
     }
   }
 
+  // La validation nécessite un basketId côté API — on en crée un vide à la
+  // volée juste pour cette vérification (le panier réel de la commande reste
+  // géré localement, cf. cart-context).
+  async function handleValidateCoupon() {
+    if (!couponCode.trim()) return;
+    setIsValidatingCoupon(true);
+    setCouponResult(null);
+    try {
+      let basketId = couponBasketId;
+      if (!basketId) {
+        const basket = await apiClient.post<Basket>("/basket");
+        basketId = basket.id;
+        setCouponBasketId(basketId);
+      }
+      const res = await apiClient.post<CouponValidateResponse>(
+        "/coupons/validate",
+        { code: couponCode.trim(), basketId },
+      );
+      setCouponResult({
+        valid: res.valid,
+        message: res.valid
+          ? "Code valide — il sera appliqué à la confirmation."
+          : (res.message ?? "Code invalide."),
+      });
+    } catch (err) {
+      setCouponResult({
+        valid: false,
+        message:
+          err instanceof ApiError ? err.message : "Code invalide ou expiré.",
+      });
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  }
   if (isLoading)
     return <Loader2 size={24} className="animate-spin text-gray-400" />;
 
@@ -387,13 +429,37 @@ export default function CheckoutPage() {
             <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-gray-600">
               <Tag size={12} /> Code promo
             </label>
-            <input
-              type="text"
-              value={couponCode}
-              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-              placeholder="CODE"
-              className={inputClass}
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={couponCode}
+                onChange={(e) => {
+                  setCouponCode(e.target.value.toUpperCase());
+                  setCouponResult(null);
+                }}
+                placeholder="CODE"
+                className={inputClass}
+              />
+              <button
+                type="button"
+                onClick={handleValidateCoupon}
+                disabled={isValidatingCoupon || !couponCode.trim()}
+                className="shrink-0 rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {isValidatingCoupon ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  "Vérifier"
+                )}
+              </button>
+            </div>
+            {couponResult && (
+              <p
+                className={`mt-1 text-xs ${couponResult.valid ? "text-green-600" : "text-red-600"}`}
+              >
+                {couponResult.message}
+              </p>
+            )}
           </div>
 
           <div className="mt-4 space-y-1 border-t border-gray-100 pt-4 text-sm">
