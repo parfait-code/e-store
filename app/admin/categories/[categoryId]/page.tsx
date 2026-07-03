@@ -240,6 +240,7 @@ function CategoryAttributes({ categoryId }: { categoryId: string }) {
   const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AttributeDefinitionFormInput>({
     name: "",
     slug: "",
@@ -401,43 +402,197 @@ function CategoryAttributes({ categoryId }: { categoryId: string }) {
         </p>
       ) : (
         <div className="space-y-2">
-          {attributes.map((attr) => (
-            <div
-              key={attr.id}
-              className="rounded-md border border-gray-200 bg-white p-3"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Tag size={14} className="text-gray-400" />
-                  <span className="text-sm font-medium">{attr.name}</span>
-                  <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
-                    {TYPE_LABELS[attr.type]}
-                  </span>
-                  {attr.isVariant && (
-                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">
-                      Variante
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={() => handleDelete(attr.id)}
-                  className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-              <AttributeOptionsEditor
+          {attributes.map((attr) =>
+            editingId === attr.id ? (
+              <AttributeDefinitionEditor
+                key={attr.id}
                 definition={attr}
-                onChange={(updated) =>
+                onUpdated={(updated) => {
                   setAttributes((prev) =>
                     prev.map((a) => (a.id === updated.id ? updated : a)),
-                  )
-                }
+                  );
+                  setEditingId(null);
+                }}
+                onCancel={() => setEditingId(null)}
               />
-            </div>
-          ))}
+            ) : (
+              <div
+                key={attr.id}
+                className="rounded-md border border-gray-200 bg-white p-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Tag size={14} className="text-gray-400" />
+                    <span className="text-sm font-medium">{attr.name}</span>
+                    <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
+                      {TYPE_LABELS[attr.type]}
+                    </span>
+                    {attr.isVariant && (
+                      <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">
+                        Variante
+                      </span>
+                    )}
+                    {attr.isRequired && (
+                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-600">
+                        Requis
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setEditingId(attr.id)}
+                      className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-900"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(attr.id)}
+                      className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                <AttributeOptionsEditor
+                  definition={attr}
+                  onChange={(updated) =>
+                    setAttributes((prev) =>
+                      prev.map((a) => (a.id === updated.id ? updated : a)),
+                    )
+                  }
+                />
+              </div>
+            ),
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function AttributeDefinitionEditor({
+  definition,
+  onUpdated,
+  onCancel,
+}: {
+  definition: AttributeDefinition;
+  onUpdated: (updated: AttributeDefinition) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: definition.name,
+    slug: definition.slug,
+    unit: definition.unit ?? "",
+    isVariant: definition.isVariant,
+    isFilterable: definition.isFilterable,
+    isRequired: definition.isRequired,
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function handleSave() {
+    setIsSaving(true);
+    setError(null);
+    try {
+      const updated = await apiClient.patch<AttributeDefinition>(
+        `/attributes/${definition.id}`,
+        {
+          name: form.name,
+          slug: form.slug,
+          unit: form.unit || undefined,
+          isVariant: form.isVariant,
+          isFilterable: form.isFilterable,
+          isRequired: form.isRequired,
+        },
+      );
+      // La route PATCH ne renvoie pas forcément `options` à jour, on les
+      // préserve depuis la définition connue côté client.
+      onUpdated({ ...updated, options: definition.options });
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  const inputClass =
+    "rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-gray-900";
+
+  return (
+    <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        <input
+          type="text"
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          className={inputClass}
+          placeholder="Nom"
+        />
+        <input
+          type="text"
+          value={form.slug}
+          onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+          className={inputClass}
+          placeholder="Slug"
+        />
+      </div>
+      <input
+        type="text"
+        value={form.unit}
+        onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+        className={`${inputClass} w-full`}
+        placeholder="Unité (optionnel, ex: cm, kg)"
+      />
+      <div className="flex flex-wrap gap-4 text-xs">
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isVariant}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isVariant: e.target.checked }))
+            }
+          />
+          Utilisé pour les variantes
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isFilterable}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isFilterable: e.target.checked }))
+            }
+          />
+          Filtrable
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isRequired}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isRequired: e.target.checked }))
+            }
+          />
+          Obligatoire
+        </label>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+        >
+          {isSaving ? "Enregistrement..." : "Enregistrer"}
+        </button>
+        <button
+          onClick={onCancel}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600"
+        >
+          Annuler
+        </button>
+      </div>
     </div>
   );
 }

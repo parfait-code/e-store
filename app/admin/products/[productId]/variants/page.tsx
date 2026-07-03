@@ -1,9 +1,10 @@
 // app/admin/products/[productId]/variants/page.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, useRef, FormEvent, ChangeEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowLeft,
   Loader2,
@@ -12,6 +13,7 @@ import {
   Trash2,
   X,
   Save,
+  Upload,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF } from "@/lib/format";
@@ -251,6 +253,90 @@ function VariantForm({
   );
 }
 
+function VariantImageUploader({
+  productId,
+  variant,
+  onUpdated,
+}: {
+  productId: string;
+  variant: Variant;
+  onUpdated: (variant: Variant) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  async function handleUpload(e: ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append("images", file));
+    formData.append("variantId", variant.id);
+
+    setIsUploading(true);
+    try {
+      // La route renvoie le Product complet — on en extrait la variante à jour
+      const updatedProduct = await apiClient.post<Product>(
+        `/product/${productId}/images`,
+        formData,
+        { isFormData: true },
+      );
+      const updatedVariant = updatedProduct.variants.find(
+        (v) => v.id === variant.id,
+      );
+      if (updatedVariant) onUpdated(updatedVariant);
+    } catch (err) {
+      alert(
+        err instanceof ApiError ? err.message : "Échec de l'envoi des images",
+      );
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <div className="flex gap-1">
+        {variant.images.slice(0, 3).map((img) => (
+          <div
+            key={img.id}
+            className="h-8 w-8 overflow-hidden rounded border border-gray-200"
+          >
+            <Image
+              src={img.url}
+              alt=""
+              width={32}
+              height={32}
+              className="h-full w-full object-cover"
+            />
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={isUploading}
+        className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900 disabled:opacity-50"
+      >
+        {isUploading ? (
+          <Loader2 size={12} className="animate-spin" />
+        ) : (
+          <Upload size={12} />
+        )}
+        Images de la variante
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        multiple
+        hidden
+        onChange={handleUpload}
+      />
+    </div>
+  );
+}
+
 export default function ProductVariantsPage() {
   const { productId } = useParams<{ productId: string }>();
   const [product, setProduct] = useState<Product | null>(null);
@@ -376,7 +462,7 @@ export default function ProductVariantsPage() {
               key={variant.id}
               className="flex items-center justify-between px-4 py-3"
             >
-              <div>
+              <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium">{variant.sku}</span>
                   <span
@@ -395,6 +481,15 @@ export default function ProductVariantsPage() {
                     .join(" · ")}
                   {variant.price !== null && ` · ${formatXAF(variant.price)}`}
                 </p>
+                <VariantImageUploader
+                  productId={productId}
+                  variant={variant}
+                  onUpdated={(updated) =>
+                    setVariants((prev) =>
+                      prev.map((v) => (v.id === updated.id ? updated : v)),
+                    )
+                  }
+                />
               </div>
               <div className="flex items-center gap-2">
                 <button

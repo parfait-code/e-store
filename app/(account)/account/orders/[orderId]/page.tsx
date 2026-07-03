@@ -24,6 +24,7 @@ import type {
   ReviewCreateInput,
   ReturnCreateInput,
   ProductReview,
+  ReturnRequest,
 } from "@/lib/types";
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -257,6 +258,7 @@ export default function OrderDetailPage() {
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [reviewingItemId, setReviewingItemId] = useState<string | null>(null);
+  const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [editingReviewItemId, setEditingReviewItemId] = useState<string | null>(
     null,
   );
@@ -291,6 +293,11 @@ export default function OrderDetailPage() {
         ),
       )
       .finally(() => setIsLoading(false));
+
+    apiClient
+      .get<ReturnRequest[]>(`/orders/${orderId}/returns`)
+      .then(setReturns)
+      .catch(() => {}); // non bloquant — historique vide si échec
   }, [orderId]);
 
   if (isLoading)
@@ -447,12 +454,50 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
+      {returns.length > 0 && (
+        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
+            <RotateCcw size={16} /> Mes demandes de retour
+          </h2>
+          <div className="space-y-2">
+            {returns.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2 text-sm"
+              >
+                <div>
+                  <p className="font-medium">Retour #{r.id.slice(0, 8)}</p>
+                  <p className="text-xs text-gray-500">{r.reason}</p>
+                </div>
+                <span
+                  className={`rounded-full px-2 py-1 text-xs font-medium ${
+                    r.status === "APPROVED"
+                      ? "bg-green-100 text-green-700"
+                      : r.status === "REJECTED"
+                        ? "bg-red-100 text-red-700"
+                        : r.status === "COMPLETED"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {r.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {showReturnForm && (
         <ReturnRequestForm
           order={order}
           onClose={() => setShowReturnForm(false)}
           onCreated={() => {
             setShowReturnForm(false);
+            apiClient
+              .get<ReturnRequest[]>(`/orders/${order.id}/returns`)
+              .then(setReturns)
+              .catch(() => {});
             alert("Votre demande de retour a été envoyée.");
           }}
         />

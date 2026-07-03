@@ -173,11 +173,14 @@ export default function CategoriesPage() {
                       </Link>
                       <button
                         onClick={() => handleDelete(category.id)}
-                        disabled={deletingId === category.id}
-                        className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                        disabled={
+                          deletingId === category.id ||
+                          category._count.products > 0
+                        }
+                        className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                         title={
                           category._count.products > 0
-                            ? "Contient des produits"
+                            ? `Impossible de supprimer : ${category._count.products} produit(s) rattaché(s)`
                             : undefined
                         }
                       >
