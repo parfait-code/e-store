@@ -1,12 +1,12 @@
 // app/admin/shipments/new/page.tsx
 "use client";
 
-import { Suspense, useState, FormEvent } from "react";
+import { Suspense, useEffect, useState, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
-import type { Shipment, ShipmentFormInput } from "@/lib/types";
+import type { Shipment, ShipmentFormInput, Order, User, Product } from "@/lib/types";
 
 function NewShipmentForm() {
   const router = useRouter();
@@ -23,6 +23,65 @@ function NewShipmentForm() {
   });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPrefilling, setIsPrefilling] = useState(Boolean(orderIdFromQuery));
+
+  // Préremplit destinataire + poids à partir de la commande liée.
+  // - Nom : la commande n'a pas de champ nom direct, on le récupère via l'utilisateur.
+  // - Adresse : shippingAddressSnapshot de la commande.
+  // - Poids : somme (poids produit × quantité) — nécessite un fetch par produit
+  //   car OrderItem.product n'inclut pas le poids.
+  useEffect(() => {
+    if (!orderIdFromQuery) return;
+    setIsPrefilling(true);
+
+    apiClient
+      .get<Order>(`/orders/${orderIdFromQuery}`)
+      .then(async (order) => {
+        const snapshot = order.shippingAddressSnapshot as {
+          street?: string;
+          city?: string;
+          state?: string;
+          country?: string;
+          postalCode?: string;
+        };
+        const addressParts = [
+          snapshot.street,
+          [snapshot.postalCode, snapshot.city].filter(Boolean).join(" "),
+          snapshot.state,
+          snapshot.country,
+        ].filter(Boolean);
+
+        const [user, products] = await Promise.all([
+          apiClient
+            .get<User>(`/user/${order.userId}`)
+            .catch(() => null),
+          Promise.all(
+            order.items.map((item) =>
+              apiClient
+                .get<Product>(`/product/${item.productId}`)
+                .then((p) => ({ weight: p.weight ?? 0, quantity: item.quantity }))
+                .catch(() => ({ weight: 0, quantity: item.quantity })),
+            ),
+          ),
+        ]);
+
+        const totalWeight = products.reduce(
+          (sum, p) => sum + p.weight * p.quantity,
+          0,
+        );
+
+        setForm((prev) => ({
+          ...prev,
+          recipient_name: user ? `${user.firstName} ${user.lastName}` : prev.recipient_name,
+          recipient_address: addressParts.length > 0 ? addressParts.join(", ") : prev.recipient_address,
+          weight: totalWeight > 0 ? Number(totalWeight.toFixed(2)) : prev.weight,
+        }));
+      })
+      .catch(() => {
+        // Non bloquant — l'admin remplit manuellement si la commande est introuvable
+      })
+      .finally(() => setIsPrefilling(false));
+  }, [orderIdFromQuery]);
 
   function update<K extends keyof ShipmentFormInput>(
     key: K,
@@ -36,7 +95,15 @@ function NewShipmentForm() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const created = await apiClient.post<Shipment>("/shipments", form);
+      const payload = {
+        ...form,
+        // <input type="date"> renvoie "YYYY-MM-DD" — le backend attend un ISO
+        // datetime complet, sinon 400 "Invalid ISO datetime".
+        estimated_delivery_at: form.estimated_delivery_at
+          ? new Date(form.estimated_delivery_at).toISOString()
+          : undefined,
+      };
+      const created = await apiClient.post<Shipment>("/shipments", payload);
       router.push(`/admin/shipments/${created.id}`);
     } catch (err) {
       setError(
@@ -68,9 +135,14 @@ function NewShipmentForm() {
         )}
 
         {form.order_id && (
-          <p className="text-sm text-gray-500">
+          <p className="flex items-center gap-2 text-sm text-gray-500">
             Rattachée à la commande{" "}
             <span className="font-medium">#{form.order_id.slice(0, 8)}</span>
+            {isPrefilling && (
+              <span className="flex items-center gap-1 text-xs text-gray-400">
+                <Loader2 size={12} className="animate-spin" /> Préremplissage...
+              </span>
+            )}
           </p>
         )}
 
@@ -130,7 +202,9 @@ function NewShipmentForm() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium">Poids (kg)</label>
+            <label className="mb-1 block text-sm font-medium">
+              Poids (kg)
+            </label>
             <input
               type="number"
               required
@@ -140,6 +214,12 @@ function NewShipmentForm() {
               onChange={(e) => update("weight", Number(e.target.value))}
               className={inputClass}
             />
+            {form.order_id && (
+              <p className="mt-1 text-xs text-gray-400">
+                Calculé automatiquement à partir des produits de la commande —
+                modifiable si besoin.
+              </p>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">
@@ -148,7 +228,9 @@ function NewShipmentForm() {
             <input
               type="date"
               value={form.estimated_delivery_at ?? ""}
-              onChange={(e) => update("estimated_delivery_at", e.target.value)}
+              onChange={(e) =>
+                update("estimated_delivery_at", e.target.value)
+              }
               className={inputClass}
             />
           </div>

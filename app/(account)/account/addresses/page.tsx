@@ -46,7 +46,14 @@ function AddressForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    // La validation reste informative uniquement — elle ne doit jamais
+    // empêcher l'enregistrement. Avant, un retour `valid: false` du service
+    // (fréquent selon les pays/codes postaux supportés côté back) stoppait
+    // toute la soumission avec un `return` prématuré, rendant la sauvegarde
+    // impossible même avec une adresse parfaitement correcte.
     setIsValidating(true);
+    setValidation(null);
     try {
       const res = await apiClient.post<AddressValidateResponse>(
         "/address/validate",
@@ -58,18 +65,14 @@ function AddressForm({
           postal_code: form.postalCode,
         },
       );
-      if (!res.valid) {
-        setValidation({
-          valid: false,
-          message: "Adresse non reconnue — vérifiez le pays et le code postal.",
-        });
-        setIsValidating(false);
-        return;
-      }
-      setValidation({ valid: true, message: "Adresse valide." });
+      setValidation({
+        valid: res.valid,
+        message: res.valid
+          ? "Adresse valide."
+          : "Adresse non reconnue par le service de validation — vous pouvez tout de même l'enregistrer.",
+      });
     } catch {
-      // Le back peut être temporairement indisponible sur cette route — on
-      // n'empêche pas la sauvegarde pour autant, juste pas de confirmation visuelle.
+      // Route indisponible : pas de confirmation visuelle, on ne bloque pas.
       setValidation(null);
     } finally {
       setIsValidating(false);
