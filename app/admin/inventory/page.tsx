@@ -1,6 +1,5 @@
 // app/admin/inventory/page.tsx
 "use client";
-
 import { useEffect, useState, useCallback, FormEvent } from "react";
 import Link from "next/link";
 import {
@@ -23,6 +22,8 @@ import type {
   Warehouse,
   Paginated,
   InventoryTransferInput,
+  Product,
+  ProductCombination,
 } from "@/lib/types";
 
 type Tab = "all" | "low-stock" | "out-of-stock";
@@ -205,6 +206,205 @@ function TransferModal({
   );
 }
 
+// Recherche live d'un produit par nom/SKU — remplace le champ "ID produit"
+// qu'aucun admin n'a réellement sous la main.
+function ProductSearchPicker({
+  selected,
+  onSelect,
+}: {
+  selected: { id: number; name: string; sku: string } | null;
+  onSelect: (product: { id: number; name: string; sku: string } | null) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<Product[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      setIsSearching(true);
+      apiClient
+        .get<Paginated<Product>>(
+          `/product?search=${encodeURIComponent(query.trim())}&limit=8`,
+        )
+        .then((res) => setResults(res.items))
+        .catch(() => setResults([]))
+        .finally(() => setIsSearching(false));
+    }, 350);
+    return () => clearTimeout(timeout);
+  }, [query]);
+
+  if (selected) {
+    return (
+      <div className="flex items-center justify-between rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm">
+        <div>
+          <span className="font-medium">{selected.name}</span>
+          <span className="ml-2 text-xs text-gray-400">SKU {selected.sku}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => onSelect(null)}
+          className="text-gray-400 hover:text-gray-600"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Search
+          size={14}
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+        />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => setTimeout(() => setIsOpen(false), 150)}
+          placeholder="Rechercher un produit (nom, SKU)..."
+          className="w-full rounded-md border border-gray-300 py-2 pl-8 pr-3 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+        />
+      </div>
+      {isOpen && query.trim() && (
+        <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+          {isSearching ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 size={14} className="animate-spin text-gray-400" />
+            </div>
+          ) : results.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-gray-400">
+              Aucun produit trouvé.
+            </p>
+          ) : (
+            results.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onMouseDown={() => {
+                  onSelect({ id: p.id, name: p.name, sku: p.sku });
+                  setQuery("");
+                  setIsOpen(false);
+                }}
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
+              >
+                <span>{p.name}</span>
+                <span className="text-xs text-gray-400">{p.sku}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Liste les combinaisons réelles du produit sélectionné — remplace le champ
+// "ID variante" en texte libre. Se recharge à chaque changement de produit.
+function CombinationSearchPicker({
+  productId,
+  selected,
+  onSelect,
+}: {
+  productId: number | null;
+  selected: { id: string; sku: string } | null;
+  onSelect: (combination: { id: string; sku: string } | null) => void;
+}) {
+  const [combinations, setCombinations] = useState<ProductCombination[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onSelect(null);
+    setCombinations([]);
+    if (!productId) return;
+    setIsLoading(true);
+    setError(null);
+    apiClient
+      .get<ProductCombination[]>(`/product/${productId}/combinations`)
+      .then(setCombinations)
+      .catch(() =>
+        setError("Impossible de charger les combinaisons pour ce produit."),
+      )
+      .finally(() => setIsLoading(false));
+    // onSelect volontairement exclu des deps : ne doit se relancer que sur
+    // changement de produit, pas à chaque re-render du parent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
+
+  if (!productId) {
+    return (
+      <p className="rounded-md border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-400">
+        Sélectionnez d'abord un produit.
+      </p>
+    );
+  }
+
+  if (isLoading) {
+    return <Loader2 size={14} className="animate-spin text-gray-400" />;
+  }
+
+  if (error) {
+    return <p className="text-xs text-red-600">{error}</p>;
+  }
+
+  if (combinations.length === 0) {
+    return (
+      <p className="rounded-md border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-400">
+        Ce produit n'a pas de combinaisons — l'article sera rattaché au produit
+        seul.
+      </p>
+    );
+  }
+
+  return (
+    <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-gray-200 p-2">
+      <button
+        type="button"
+        onClick={() => onSelect(null)}
+        className={`flex w-full items-center rounded px-2 py-1.5 text-left text-xs ${
+          !selected
+            ? "bg-gray-900 text-white"
+            : "text-gray-600 hover:bg-gray-50"
+        }`}
+      >
+        Aucune (produit simple)
+      </button>
+      {combinations.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => onSelect({ id: c.id, sku: c.sku })}
+          className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs ${
+            selected?.id === c.id
+              ? "bg-gray-900 text-white"
+              : "text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          <span>
+            {c.values.map((v) => v.attributeOption.value).join(" / ")} — {c.sku}
+          </span>
+          {!c.isActive && (
+            <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
+              inactive
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function NewInventoryItemForm({
   warehouses,
   onCreated,
@@ -214,9 +414,16 @@ function NewInventoryItemForm({
   onCreated: (item: InventoryItem) => void;
   onCancel: () => void;
 }) {
-  const [productId, setProductId] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<{
+    id: number;
+    name: string;
+    sku: string;
+  } | null>(null);
+  const [selectedCombination, setSelectedCombination] = useState<{
+    id: string;
+    sku: string;
+  } | null>(null);
   const [warehouseId, setWarehouseId] = useState("");
-  const [combinationId, setCombinationId] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -224,16 +431,16 @@ function NewInventoryItemForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!productId || !warehouseId) {
-      setError("Renseignez le produit et l'entrepôt.");
+    if (!selectedProduct || !warehouseId) {
+      setError("Sélectionnez un produit et un entrepôt.");
       return;
     }
     setIsSubmitting(true);
     try {
       const created = await apiClient.post<InventoryItem>("/inventory", {
-        product_id: Number(productId),
+        product_id: selectedProduct.id,
         warehouse_id: warehouseId,
-        combination_id: combinationId || undefined,
+        combination_id: selectedCombination?.id,
         quantity,
       });
       onCreated(created);
@@ -241,7 +448,7 @@ function NewInventoryItemForm({
       setError(
         err instanceof ApiError
           ? err.message
-          : "Erreur lors de la création (doublon produit/entrepôt/combination ?)",
+          : "Erreur lors de la création (doublon produit/entrepôt/combinaison ?)",
       );
     } finally {
       setIsSubmitting(false);
@@ -264,14 +471,14 @@ function NewInventoryItemForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">
-            ID produit
+            Produit
           </label>
-          <input
-            type="number"
-            required
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            className={inputClass}
+          <ProductSearchPicker
+            selected={selectedProduct}
+            onSelect={(p) => {
+              setSelectedProduct(p);
+              setSelectedCombination(null);
+            }}
           />
         </div>
         <div>
@@ -296,13 +503,12 @@ function NewInventoryItemForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">
-            ID combinaison (optionnel)
+            Combinaison (optionnel)
           </label>
-          <input
-            type="text"
-            value={combinationId}
-            onChange={(e) => setCombinationId(e.target.value)}
-            className={inputClass}
+          <CombinationSearchPicker
+            productId={selectedProduct?.id ?? null}
+            selected={selectedCombination}
+            onSelect={setSelectedCombination}
           />
         </div>
         <div>
