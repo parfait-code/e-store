@@ -253,10 +253,10 @@ export default function OrderDetailPage() {
           {/* Articles */}
           <div className="rounded-lg border border-gray-200 bg-white p-4">
             <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
-              <Package size={16} /> Articles ({order.items.length})
+              <Package size={16} /> Articles ({order?.items?.length})
             </h2>
             <div className="divide-y divide-gray-100">
-              {order.items.map((item) => (
+              {order?.items?.map((item) => (
                 <div
                   key={item.id}
                   className="flex items-center justify-between py-3"
@@ -289,7 +289,7 @@ export default function OrderDetailPage() {
             <div className="mt-3 flex justify-end border-t border-gray-100 pt-3 text-sm">
               <div className="text-right">
                 <p className="text-gray-500">
-                  Sous-total : {formatXAF(order.totalAmount)}
+                  Sous-total : {formatXAF(order?.totalAmount)}
                 </p>
                 {order.discountedAmount !== null && (
                   <p className="font-semibold">
@@ -312,13 +312,13 @@ export default function OrderDetailPage() {
             <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
               <CreditCard size={16} /> Paiements
             </h2>
-            {order.payments.length === 0 ? (
+            {order?.payments?.length === 0 ? (
               <p className="text-sm text-gray-400">
                 Aucun paiement enregistré.
               </p>
             ) : (
               <div className="space-y-2">
-                {order.payments.map((p) => (
+                {order?.payments?.map((p) => (
                   <div
                     key={p.id}
                     className="flex items-center justify-between text-sm"
@@ -341,8 +341,8 @@ export default function OrderDetailPage() {
               <History size={16} /> Historique
             </h2>
             <div className="space-y-2">
-              {order.statusHistory
-                .slice()
+              {order?.statusHistory
+                ?.slice()
                 .reverse()
                 .map((h) => (
                   <div
@@ -372,12 +372,12 @@ export default function OrderDetailPage() {
               <Truck size={16} /> Livraison
             </h2>
             <p className="text-sm text-gray-600">
-              {shipping.street}
+              {shipping?.street}
               <br />
-              {shipping.postalCode} {shipping.city}
-              {shipping.state ? `, ${shipping.state}` : ""}
+              {shipping?.postalCode} {shipping?.city}
+              {shipping?.state ? `, ${shipping?.state}` : ""}
               <br />
-              {shipping.country}
+              {shipping?.country}
             </p>
             {order.shippingMethod && (
               <p className="mt-2 text-xs text-gray-500">
