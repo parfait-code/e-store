@@ -433,17 +433,15 @@ export default function EditProductPage() {
         }}
       />
 
-      {/* Variantes */}
+      {/* Combinaisons */}
       <div className="mt-10 max-w-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium">
-            Variantes ({product.variants.length})
-          </h2>
+          <h2 className="text-sm font-medium">Combinaisons</h2>
           <Link
             href={`/admin/products/${product.id}/variants`}
             className="text-sm font-medium text-gray-900 hover:underline"
           >
-            Gérer les variantes →
+            Gérer les combinaisons →
           </Link>
         </div>
       </div>

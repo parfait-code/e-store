@@ -216,7 +216,7 @@ function NewInventoryItemForm({
 }) {
   const [productId, setProductId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
-  const [variantId, setVariantId] = useState("");
+  const [combinationId, setCombinationId] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -233,7 +233,7 @@ function NewInventoryItemForm({
       const created = await apiClient.post<InventoryItem>("/inventory", {
         product_id: Number(productId),
         warehouse_id: warehouseId,
-        variant_id: variantId || undefined,
+        combination_id: combinationId || undefined,
         quantity,
       });
       onCreated(created);
@@ -241,7 +241,7 @@ function NewInventoryItemForm({
       setError(
         err instanceof ApiError
           ? err.message
-          : "Erreur lors de la création (doublon produit/entrepôt/variante ?)",
+          : "Erreur lors de la création (doublon produit/entrepôt/combination ?)",
       );
     } finally {
       setIsSubmitting(false);
@@ -296,12 +296,12 @@ function NewInventoryItemForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">
-            ID variante (optionnel)
+            ID combinaison (optionnel)
           </label>
           <input
             type="text"
-            value={variantId}
-            onChange={(e) => setVariantId(e.target.value)}
+            value={combinationId}
+            onChange={(e) => setCombinationId(e.target.value)}
             className={inputClass}
           />
         </div>

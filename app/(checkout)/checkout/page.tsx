@@ -158,6 +158,7 @@ export default function CheckoutPage() {
       const payload: OrderCreateInput = {
         items: items.map((i) => ({
           id: String(i.productId),
+          combinationId: i.combinationId ?? undefined,
           quantity: i.quantity,
         })),
         shippingAddressId: useNewAddress ? undefined : selectedAddressId,
@@ -408,7 +409,7 @@ export default function CheckoutPage() {
           <div className="max-h-64 space-y-2 overflow-y-auto text-sm">
             {items.map((item) => (
               <div
-                key={`${item.productId}-${item.variantId ?? "base"}`}
+                key={`${item.productId}-${item.combinationId ?? "base"}`}
                 className="flex justify-between text-gray-600"
               >
                 <span className="line-clamp-1">

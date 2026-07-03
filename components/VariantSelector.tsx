@@ -1,30 +1,34 @@
 // components/VariantSelector.tsx
 "use client";
 
-import type { Variant, AttributeDefinition } from "@/lib/types";
+import type { ProductCombination, CombinationAttributeRef } from "@/lib/types";
 
-interface VariantSelectorProps {
-  variants: Variant[];
-  selectedVariant: Variant | null;
-  onSelect: (variant: Variant | null) => void;
+interface CombinationSelectorProps {
+  combinations: ProductCombination[];
+  selectedCombination: ProductCombination | null;
+  onSelect: (combination: ProductCombination | null) => void;
 }
 
 interface AttributeGroup {
-  definition: AttributeDefinition;
-  values: string[];
+  definition: CombinationAttributeRef;
+  values: { id: string; value: string; colorHex: string | null }[];
 }
 
-function buildAttributeGroups(variants: Variant[]): AttributeGroup[] {
+function buildAttributeGroups(
+  combinations: ProductCombination[],
+): AttributeGroup[] {
   const groups = new Map<string, AttributeGroup>();
 
-  variants.forEach((variant) => {
-    variant.attributeValues.forEach((av) => {
-      const defId = av.attributeDefinition.id;
+  combinations.forEach((combo) => {
+    combo.values.forEach((v) => {
+      const defId = v.attributeDefinition.id;
       if (!groups.has(defId)) {
-        groups.set(defId, { definition: av.attributeDefinition, values: [] });
+        groups.set(defId, { definition: v.attributeDefinition, values: [] });
       }
       const group = groups.get(defId)!;
-      if (!group.values.includes(av.value)) group.values.push(av.value);
+      if (!group.values.some((o) => o.id === v.attributeOption.id)) {
+        group.values.push(v.attributeOption);
+      }
     });
   });
 
@@ -32,38 +36,41 @@ function buildAttributeGroups(variants: Variant[]): AttributeGroup[] {
 }
 
 export function VariantSelector({
-  variants,
-  selectedVariant,
+  combinations,
+  selectedCombination,
   onSelect,
-}: VariantSelectorProps) {
-  const activeVariants = variants.filter((v) => v.isActive);
-  const groups = buildAttributeGroups(activeVariants);
+}: CombinationSelectorProps) {
+  const activeCombinations = combinations.filter((c) => c.isActive);
+  const groups = buildAttributeGroups(activeCombinations);
 
   if (groups.length === 0) return null;
 
-  function getValueForAttribute(
-    variant: Variant | null,
+  function getOptionIdForAttribute(
+    combo: ProductCombination | null,
     attributeDefinitionId: string,
   ): string | undefined {
-    return variant?.attributeValues.find(
-      (av) => av.attributeDefinition.id === attributeDefinitionId,
-    )?.value;
+    return combo?.values.find(
+      (v) => v.attributeDefinition.id === attributeDefinitionId,
+    )?.attributeOption.id;
   }
 
-  function handlePick(attributeDefinitionId: string, value: string) {
+  function handlePick(attributeDefinitionId: string, optionId: string) {
     // Construit la combinaison de valeurs souhaitée (celle déjà sélectionnée + ce nouveau choix)
     const desired: Record<string, string> = {};
     groups.forEach((g) => {
-      const current = getValueForAttribute(selectedVariant, g.definition.id);
+      const current = getOptionIdForAttribute(
+        selectedCombination,
+        g.definition.id,
+      );
       if (current) desired[g.definition.id] = current;
     });
-    desired[attributeDefinitionId] = value;
+    desired[attributeDefinitionId] = optionId;
 
-    const match = activeVariants.find((v) =>
+    const match = activeCombinations.find((c) =>
       Object.entries(desired).every(
-        ([defId, val]) =>
-          v.attributeValues.find((av) => av.attributeDefinition.id === defId)
-            ?.value === val,
+        ([defId, optId]) =>
+          c.values.find((v) => v.attributeDefinition.id === defId)
+            ?.attributeOption.id === optId,
       ),
     );
 
@@ -73,11 +80,11 @@ export function VariantSelector({
   return (
     <div className="space-y-4">
       {groups.map((group) => {
-        const currentValue = getValueForAttribute(
-          selectedVariant,
+        const currentOptionId = getOptionIdForAttribute(
+          selectedCombination,
           group.definition.id,
         );
-        const isColor = group.definition.type === "COLOR";
+        const isColor = group.values.some((v) => v.colorHex !== null);
 
         return (
           <div key={group.definition.id}>
@@ -85,19 +92,16 @@ export function VariantSelector({
               {group.definition.name}
             </p>
             <div className="flex flex-wrap gap-2">
-              {group.values.map((value) => {
-                const isSelected = currentValue === value;
-                const option = group.definition.options.find(
-                  (o) => o.value === value,
-                );
+              {group.values.map((option) => {
+                const isSelected = currentOptionId === option.id;
 
-                if (isColor && option?.colorHex) {
+                if (isColor && option.colorHex) {
                   return (
                     <button
-                      key={value}
+                      key={option.id}
                       type="button"
-                      onClick={() => handlePick(group.definition.id, value)}
-                      title={value}
+                      onClick={() => handlePick(group.definition.id, option.id)}
+                      title={option.value}
                       className={`h-8 w-8 rounded-full border-2 ${
                         isSelected ? "border-gray-900" : "border-gray-200"
                       }`}
@@ -108,16 +112,16 @@ export function VariantSelector({
 
                 return (
                   <button
-                    key={value}
+                    key={option.id}
                     type="button"
-                    onClick={() => handlePick(group.definition.id, value)}
+                    onClick={() => handlePick(group.definition.id, option.id)}
                     className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
                       isSelected
                         ? "border-gray-900 bg-gray-900 text-white"
                         : "border-gray-300 text-gray-700 hover:border-gray-400"
                     }`}
                   >
-                    {value}
+                    {option.value}
                   </button>
                 );
               })}

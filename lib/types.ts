@@ -99,23 +99,6 @@ export interface ProductAttributeValue {
   attributeDefinition: AttributeDefinition;
 }
 
-export interface Variant {
-  id: string;
-  productId: number;
-  sku: string;
-  price: number | null;
-  isActive: boolean;
-  attributeValues: {
-    id: string;
-    value: string;
-    attributeDefinition: AttributeDefinition;
-  }[];
-  inventory: { id: string; quantity: number; warehouseId: string }[];
-  images: ProductImage[];
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface CategoryRef {
   id: string;
   name: string;
@@ -145,6 +128,56 @@ export interface ProductPricing {
   discountId: string | null;
 }
 
+// --- ProductCombination (chargé via endpoint séparé) ---
+
+export interface CombinationOptionRef {
+  id: string;
+  value: string;
+  colorHex: string | null;
+}
+
+export interface CombinationAttributeRef {
+  id: string;
+  name: string;
+}
+
+export interface CombinationValue {
+  attributeDefinition: CombinationAttributeRef;
+  attributeOption: CombinationOptionRef;
+}
+
+export interface CombinationInventoryLine {
+  quantity: number;
+  warehouseId: string;
+}
+
+export interface ProductCombination {
+  id: string;
+  productId: number;
+  optionsKey: string;
+  sku: string;
+  price: number | null;
+  isActive: boolean;
+  values: CombinationValue[];
+  inventory: CombinationInventoryLine[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AttributeSelection {
+  attributeDefinitionId: string;
+  attributeDefinition: AttributeDefinition;
+  optionIds: string[];
+}
+
+export interface CombinationFormInput {
+  sku?: string;
+  price?: number;
+  isActive?: boolean;
+}
+
+// --- Product sans combinaisons (chargées séparément) ---
+
 export interface Product {
   id: number;
   sku: string;
@@ -157,11 +190,21 @@ export interface Product {
   categoryId: string;
   category: CategoryRef;
   images: ProductImage[];
-  variants: Variant[];
   attributeValues: ProductAttributeValue[];
   pricing?: ProductPricing;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductWithCombinations extends Product {
+  combinations: ProductCombination[];
+}
+
+// --- Endpoint séparé pour les combinaisons ---
+
+export interface ProductCombinationsResponse {
+  productId: number;
+  combinations: ProductCombination[];
 }
 
 export type PickupRequestStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
@@ -214,13 +257,6 @@ export interface AttributeDefinitionFormInput {
   position?: number;
 }
 
-export interface VariantFormInput {
-  sku: string;
-  price?: number;
-  isActive?: boolean;
-  attributes: { attributeDefinitionId: string; value: string }[];
-}
-
 export type OrderStatus =
   | "PENDING"
   | "CONFIRMED"
@@ -243,13 +279,25 @@ export interface Address {
   updatedAt: string;
 }
 
+// --- OrderItem avec support des combinaisons ---
+
+export interface OrderItemCombinationRef {
+  id: string;
+  sku: string;
+  price: number | null;
+  values: CombinationValue[];
+}
+
 export interface OrderItem {
   id: string;
   productId: number;
+  combinationId: string | null;
+  combinationSnapshot: Record<string, string> | null;
   quantity: number;
   price: number;
   originalPrice: number;
   discountAmount: number;
+  combination: OrderItemCombinationRef | null;
   product: { id: number; name: string; sku: string; images: ProductImage[] };
 }
 
@@ -404,21 +452,23 @@ export interface WarehouseFormInput {
   capacity?: number;
 }
 
+// --- Inventaire keyé par (productId, combinationId) ---
+
 export interface InventoryItem {
   id: string;
   productId: number;
-  variantId: string | null;
+  combinationId: string | null;
   warehouseId: string;
   quantity: number;
   product: { id: number; name: string; sku: string; images: ProductImage[] };
   warehouse: Warehouse;
-  variant: { id: string; sku: string } | null;
+  combination: { id: string; sku: string } | null;
 }
 
 export interface InventoryFormInput {
   product_id: number;
   warehouse_id: string;
-  variant_id?: string;
+  combination_id?: string;
   quantity?: number;
 }
 
@@ -525,7 +575,6 @@ export interface SalesChartResponse {
   currency: "XAF";
   points: SalesChartPoint[];
 }
-// lib/types.ts (ajouts)
 
 export interface ShippingMethod {
   id: string;
@@ -559,16 +608,18 @@ export interface ShipmentFormInput {
   estimated_delivery_at?: string;
 }
 
+// --- Basket avec support des combinaisons ---
+
 export interface Basket {
   id: string;
   userId: number;
   items: {
     id: string;
     productId: number;
-    variantId: string | null;
+    combinationId: string | null;
     quantity: number;
     product: Product;
-    variant: Variant | null;
+    combination: ProductCombination | null;
   }[];
 }
 
@@ -636,9 +687,11 @@ export interface SignupFormInput {
   phone?: string;
 }
 
+// --- Cart local avec combinationId ---
+
 export interface CartLocalItem {
   productId: number;
-  variantId: string | null;
+  combinationId: string | null;
   quantity: number;
   name: string;
   price: number;
@@ -655,10 +708,10 @@ export interface CartContextValue {
   totalItems: number;
   totalAmount: number;
   addItem: (item: CartLocalItem) => void;
-  removeItem: (productId: number, variantId: string | null) => void;
+  removeItem: (productId: number, combinationId: string | null) => void;
   updateQuantity: (
     productId: number,
-    variantId: string | null,
+    combinationId: string | null,
     quantity: number,
   ) => void;
   clearCart: () => void;
@@ -675,17 +728,19 @@ export interface AddressFormInput {
   isDefault?: boolean;
 }
 
+// --- Wishlist avec combinationId ---
+
 export interface WishlistItem {
   id: string;
   productId: number;
-  variantId: string | null;
+  combinationId: string | null;
   product: {
     id: number;
     name: string;
     price: number;
     images: { url: string }[];
   };
-  variant: { id: string; sku: string; price: number } | null;
+  combination: { id: string; sku: string; price: number | null } | null;
   addedAt: string;
 }
 
@@ -723,8 +778,10 @@ export type PaymentMethodType =
   | "STRIPE"
   | "CINETPAY";
 
+// --- OrderCreateInput avec combinationId ---
+
 export interface OrderCreateInput {
-  items: { id: string; quantity: number }[];
+  items: { id: string; combinationId?: string; quantity: number }[];
   shippingAddressId?: string;
   shippingAddress: {
     street: string;
@@ -740,7 +797,7 @@ export interface OrderCreateInput {
 }
 
 export interface PickupRequestFormInput {
-  pickup_date: string; // ISO
+  pickup_date: string;
   pickup_address: string;
 }
 
@@ -752,6 +809,7 @@ export interface ShippingCalculateInput {
 export interface ShippingCostResponse {
   cost: number;
 }
+
 export interface PaymentsAdminQuery {
   page?: number;
   limit?: number;

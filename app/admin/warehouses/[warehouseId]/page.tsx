@@ -65,7 +65,7 @@ export default function WarehouseDetailPage() {
             <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
               <th className="px-4 py-3">Produit</th>
               <th className="px-4 py-3">SKU</th>
-              <th className="px-4 py-3">Variante</th>
+              <th className="px-4 py-3">Combination</th>
               <th className="px-4 py-3">Quantité</th>
             </tr>
           </thead>
@@ -95,7 +95,7 @@ export default function WarehouseDetailPage() {
                     {item.product.sku}
                   </td>
                   <td className="px-4 py-3 text-gray-500">
-                    {item.variant?.sku ?? "—"}
+                    {item.combination?.sku ?? "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span

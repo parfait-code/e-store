@@ -14,7 +14,7 @@ export default function CartPage() {
     useCart();
   const { user } = useAuth();
 
-  if (!isLoaded) return null; // évite un flash de "panier vide" avant lecture du localStorage
+  if (!isLoaded) return null;
 
   if (items.length === 0) {
     return (
@@ -49,7 +49,7 @@ export default function CartPage() {
                 : item.price;
               return (
                 <div
-                  key={`${item.productId}-${item.variantId ?? "base"}`}
+                  key={`${item.productId}-${item.combinationId ?? "base"}`}
                   className="flex gap-4 p-4"
                 >
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-gray-100">
@@ -83,7 +83,7 @@ export default function CartPage() {
                         quantity={item.quantity}
                         max={item.maxQuantity}
                         onChange={(q) =>
-                          updateQuantity(item.productId, item.variantId, q)
+                          updateQuantity(item.productId, item.combinationId, q)
                         }
                       />
                       <span className="text-sm font-semibold">
@@ -93,7 +93,9 @@ export default function CartPage() {
                   </div>
 
                   <button
-                    onClick={() => removeItem(item.productId, item.variantId)}
+                    onClick={() =>
+                      removeItem(item.productId, item.combinationId)
+                    }
                     className="self-start rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
                   >
                     <Trash2 size={16} />

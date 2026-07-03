@@ -169,7 +169,6 @@ export default function ProductsPage() {
               <th className="px-4 py-3">Catégorie</th>
               <th className="px-4 py-3">Prix</th>
               <th className="px-4 py-3">Statut</th>
-              <th className="px-4 py-3">Variantes</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -177,7 +176,7 @@ export default function ProductsPage() {
             {isLoading ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={6}
                   className="px-4 py-10 text-center text-gray-500"
                 >
                   <Loader2 size={20} className="mx-auto animate-spin" />
@@ -186,7 +185,7 @@ export default function ProductsPage() {
             ) : products.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={6}
                   className="px-4 py-10 text-center text-gray-500"
                 >
                   Aucun produit trouvé.
@@ -248,9 +247,7 @@ export default function ProductsPage() {
                         {STATUS_LABELS[product.status]}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {product.variants.length}
-                    </td>
+
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
                         <Link

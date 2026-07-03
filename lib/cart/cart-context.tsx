@@ -19,9 +19,9 @@ const STORAGE_KEY = "cart_items";
 function sameLine(
   a: CartLocalItem,
   productId: number,
-  variantId: string | null,
+  combinationId: string | null,
 ) {
-  return a.productId === productId && a.variantId === variantId;
+  return a.productId === productId && a.combinationId === combinationId;
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -51,7 +51,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addItem = useCallback((item: CartLocalItem) => {
     setItems((prev) => {
       const existing = prev.find((i) =>
-        sameLine(i, item.productId, item.variantId),
+        sameLine(i, item.productId, item.combinationId),
       );
       if (existing) {
         const nextQuantity = existing.quantity + item.quantity;
@@ -59,7 +59,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           ? Math.min(nextQuantity, item.maxQuantity)
           : nextQuantity;
         return prev.map((i) =>
-          sameLine(i, item.productId, item.variantId)
+          sameLine(i, item.productId, item.combinationId)
             ? { ...i, quantity: capped }
             : i,
         );
@@ -72,23 +72,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeItem = useCallback(
-    (productId: number, variantId: string | null) => {
+    (productId: number, combinationId: string | null) => {
       setItems((prev) =>
-        prev.filter((i) => !sameLine(i, productId, variantId)),
+        prev.filter((i) => !sameLine(i, productId, combinationId)),
       );
     },
     [],
   );
 
   const updateQuantity = useCallback(
-    (productId: number, variantId: string | null, quantity: number) => {
+    (productId: number, combinationId: string | null, quantity: number) => {
       if (quantity <= 0) {
-        removeItem(productId, variantId);
+        removeItem(productId, combinationId);
         return;
       }
       setItems((prev) =>
         prev.map((i) => {
-          if (!sameLine(i, productId, variantId)) return i;
+          if (!sameLine(i, productId, combinationId)) return i;
           const capped = i.maxQuantity
             ? Math.min(quantity, i.maxQuantity)
             : quantity;
@@ -102,10 +102,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const clearCart = useCallback(() => setItems([]), []);
 
   // Pousse le panier local vers le serveur — appelé juste après login/signup.
-  // Ne vide PAS le panier local : localStorage reste la source de vérité pour
-  // l'invité ; le serveur ne sert qu'à refléter l'état côté API pour les
-  // fonctionnalités qui en dépendent (multi-device, etc). Échec silencieux :
-  // on ne bloque jamais un login pour un souci de sync panier.
   const syncToServer = useCallback(async () => {
     if (items.length === 0) return;
     try {
@@ -113,7 +109,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       for (const item of items) {
         await apiClient.post(`/basket/${basket.id}/product`, {
           product_id: item.productId,
-          variant_id: item.variantId ?? undefined,
+          combination_id: item.combinationId ?? undefined,
           quantity: item.quantity,
         });
       }

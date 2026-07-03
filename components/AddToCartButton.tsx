@@ -5,47 +5,47 @@ import { useState } from "react";
 import { ShoppingCart, Check } from "lucide-react";
 import { useCart } from "@/lib/cart/cart-context";
 import { QuantitySelector } from "./QuantitySelector";
-import type { Product, Variant } from "@/lib/types";
+import type { Product, ProductCombination } from "@/lib/types";
 
 interface AddToCartButtonProps {
   product: Product;
-  selectedVariant: Variant | null;
-  requiresVariant: boolean;
+  selectedCombination: ProductCombination | null;
+  requiresCombination: boolean;
 }
 
 export function AddToCartButton({
   product,
-  selectedVariant,
-  requiresVariant,
+  selectedCombination,
+  requiresCombination,
 }: AddToCartButtonProps) {
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
 
-  const stock = selectedVariant
-    ? selectedVariant.inventory.reduce((sum, inv) => sum + inv.quantity, 0)
-    : undefined; // stock du produit "simple" (sans variantes) non exposé publiquement, voir warning
+  // Stock total = somme sur tous les entrepôts pour cette combinaison
+  // (nouvelle logique multi-entrepôt : plus de blocage par entrepôt isolé).
+  const stock = selectedCombination
+    ? selectedCombination.inventory.reduce((sum, inv) => sum + inv.quantity, 0)
+    : undefined;
 
-  const isOutOfStock = selectedVariant !== null && stock === 0;
-  const missingSelection = requiresVariant && !selectedVariant;
+  const isOutOfStock = selectedCombination !== null && stock === 0;
+  const missingSelection = requiresCombination && !selectedCombination;
 
   function handleAdd() {
     if (missingSelection || isOutOfStock) return;
 
     const primaryImage =
-      selectedVariant?.images[0] ??
-      product.images.find((i) => i.isPrimary) ??
-      product.images[0];
+      product.images.find((i) => i.isPrimary) ?? product.images[0];
 
     addItem({
       productId: product.id,
-      variantId: selectedVariant?.id ?? null,
+      combinationId: selectedCombination?.id ?? null,
       quantity,
       name: product.name,
-      price: selectedVariant?.price ?? product.price,
-      pricing: selectedVariant ? undefined : product.pricing,
+      price: selectedCombination?.price ?? product.price,
+      pricing: selectedCombination ? undefined : product.pricing,
       image: primaryImage?.url ?? null,
-      sku: selectedVariant?.sku ?? product.sku,
+      sku: selectedCombination?.sku ?? product.sku,
       maxQuantity: stock,
       weight: product.weight ?? undefined,
     });
@@ -74,7 +74,7 @@ export function AddToCartButton({
           <>
             <ShoppingCart size={16} />
             {missingSelection
-              ? "Choisissez une variante"
+              ? "Choisissez une option"
               : isOutOfStock
                 ? "Rupture de stock"
                 : "Ajouter au panier"}

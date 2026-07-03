@@ -1,403 +1,360 @@
 // app/admin/products/[productId]/variants/page.tsx
 "use client";
 
-import { useEffect, useState, useRef, FormEvent, ChangeEvent } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ArrowLeft,
   Loader2,
-  Plus,
+  RefreshCw,
   Pencil,
   Trash2,
   X,
   Save,
-  Upload,
+  Check,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF } from "@/lib/format";
 import type {
   Product,
-  Variant,
   AttributeDefinition,
-  VariantFormInput,
+  ProductCombination,
+  CombinationFormInput,
 } from "@/lib/types";
 
-function AttributeValueInput({
+// Sélecteur des options disponibles pour UN attribut de variante donné.
+// PUT /product/:productId/combinations/selections/:attributeDefinitionId
+function AttributeSelectionEditor({
+  productId,
   definition,
-  value,
-  onChange,
+  selectedOptionIds,
+  onSaved,
 }: {
+  productId: string;
   definition: AttributeDefinition;
-  value: string;
-  onChange: (value: string) => void;
+  selectedOptionIds: string[];
+  onSaved: (optionIds: string[]) => void;
 }) {
-  const inputClass =
-    "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
+  const [selected, setSelected] = useState<string[]>(selectedOptionIds);
+  const [isSaving, setIsSaving] = useState(false);
 
-  if (definition.type === "SELECT" || definition.type === "COLOR") {
-    return (
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={inputClass}
-      >
-        <option value="">Sélectionner...</option>
-        {definition.options.map((opt) => (
-          <option key={opt.id} value={opt.value}>
-            {opt.value}
-          </option>
-        ))}
-      </select>
+  function toggle(optionId: string) {
+    setSelected((prev) =>
+      prev.includes(optionId)
+        ? prev.filter((id) => id !== optionId)
+        : [...prev, optionId],
     );
   }
 
-  if (definition.type === "BOOLEAN") {
-    return (
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={inputClass}
-      >
-        <option value="">Sélectionner...</option>
-        <option value="true">Oui</option>
-        <option value="false">Non</option>
-      </select>
-    );
-  }
-
-  return (
-    <input
-      type={definition.type === "NUMBER" ? "number" : "text"}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={inputClass}
-      placeholder={definition.unit ?? undefined}
-    />
-  );
-}
-
-function VariantForm({
-  productId,
-  attributeDefinitions,
-  editingVariant,
-  onSuccess,
-  onCancel,
-}: {
-  productId: string;
-  attributeDefinitions: AttributeDefinition[];
-  editingVariant?: Variant;
-  onSuccess: (variant: Variant) => void;
-  onCancel: () => void;
-}) {
-  const isEditing = Boolean(editingVariant);
-  const [sku, setSku] = useState(editingVariant?.sku ?? "");
-  const [price, setPrice] = useState<string>(
-    editingVariant?.price?.toString() ?? "",
-  );
-  const [isActive, setIsActive] = useState(editingVariant?.isActive ?? true);
-  const [values, setValues] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {};
-    editingVariant?.attributeValues.forEach((av) => {
-      initial[av.attributeDefinition.id] = av.value;
-    });
-    return initial;
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    const attributes = attributeDefinitions
-      .filter((def) => values[def.id]?.trim())
-      .map((def) => ({ attributeDefinitionId: def.id, value: values[def.id] }));
-
-    if (attributes.length === 0) {
-      setError("Renseignez au moins un attribut.");
-      return;
-    }
-
-    const payload: VariantFormInput = {
-      sku,
-      price: price ? Number(price) : undefined,
-      isActive,
-      attributes,
-    };
-
-    setIsSubmitting(true);
+  async function handleSave() {
+    setIsSaving(true);
     try {
-      const result = isEditing
-        ? await apiClient.patch<Variant>(
-            `/product/${productId}/variants/${editingVariant!.id}`,
-            payload,
-          )
-        : await apiClient.post<Variant>(
-            `/product/${productId}/variants`,
-            payload,
-          );
-      onSuccess(result);
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Une erreur est survenue.",
+      await apiClient.put(
+        `/product/${productId}/combinations/selections/${definition.id}`,
+        { optionIds: selected },
       );
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  const inputClass =
-    "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="mb-4 space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
-    >
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium">
-          {isEditing ? "Modifier la variante" : "Nouvelle variante"}
-        </h3>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-gray-400 hover:text-gray-600"
-        >
-          <X size={16} />
-        </button>
-      </div>
-
-      {error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
-          {error}
-        </p>
-      )}
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">
-            SKU
-          </label>
-          <input
-            type="text"
-            required
-            value={sku}
-            onChange={(e) => setSku(e.target.value)}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">
-            Prix (XAF, optionnel — hérite du produit sinon)
-          </label>
-          <input
-            type="number"
-            min={0}
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className={inputClass}
-          />
-        </div>
-      </div>
-
-      {attributeDefinitions.length === 0 ? (
-        <p className="text-xs text-amber-600">
-          Aucun attribut « variante » défini pour la catégorie de ce produit.
-          Ajoutez-en dans la fiche catégorie avant de créer des variantes.
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {attributeDefinitions.map((def) => (
-            <div key={def.id}>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
-                {def.name}{" "}
-                {def.isRequired && <span className="text-red-500">*</span>}
-              </label>
-              <AttributeValueInput
-                definition={def}
-                value={values[def.id] ?? ""}
-                onChange={(v) =>
-                  setValues((prev) => ({ ...prev, [def.id]: v }))
-                }
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
-        <input
-          type="checkbox"
-          checked={isActive}
-          onChange={(e) => setIsActive(e.target.checked)}
-          className="h-4 w-4 rounded border-gray-300"
-        />
-        Variante active
-      </label>
-
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
-      >
-        {isSubmitting ? (
-          <Loader2 size={16} className="animate-spin" />
-        ) : (
-          <Save size={16} />
-        )}
-        {isEditing ? "Enregistrer" : "Créer la variante"}
-      </button>
-    </form>
-  );
-}
-
-function VariantImageUploader({
-  productId,
-  variant,
-  onUpdated,
-}: {
-  productId: string;
-  variant: Variant;
-  onUpdated: (variant: Variant) => void;
-}) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
-
-  async function handleUpload(e: ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const formData = new FormData();
-    Array.from(files).forEach((file) => formData.append("images", file));
-    formData.append("variantId", variant.id);
-
-    setIsUploading(true);
-    try {
-      // La route renvoie le Product complet — on en extrait la variante à jour
-      const updatedProduct = await apiClient.post<Product>(
-        `/product/${productId}/images`,
-        formData,
-        { isFormData: true },
-      );
-      const updatedVariant = updatedProduct.variants.find(
-        (v) => v.id === variant.id,
-      );
-      if (updatedVariant) onUpdated(updatedVariant);
+      onSaved(selected);
     } catch (err) {
       alert(
-        err instanceof ApiError ? err.message : "Échec de l'envoi des images",
+        err instanceof ApiError
+          ? err.message
+          : "Erreur lors de l'enregistrement des options",
       );
     } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setIsSaving(false);
     }
   }
 
   return (
-    <div className="mt-2 flex items-center gap-2">
-      <div className="flex gap-1">
-        {variant.images.slice(0, 3).map((img) => (
-          <div
-            key={img.id}
-            className="h-8 w-8 overflow-hidden rounded border border-gray-200"
-          >
-            <Image
-              src={img.url}
-              alt=""
-              width={32}
-              height={32}
-              className="h-full w-full object-cover"
-            />
-          </div>
-        ))}
+    <div className="rounded-md border border-gray-200 bg-white p-3">
+      <p className="mb-2 text-sm font-medium">{definition.name}</p>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {definition.options.map((opt) => {
+          const isSelected = selected.includes(opt.id);
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => toggle(opt.id)}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition ${
+                isSelected
+                  ? "bg-gray-900 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {opt.colorHex && (
+                <span
+                  className="h-3 w-3 rounded-full border border-white/40"
+                  style={{ backgroundColor: opt.colorHex }}
+                />
+              )}
+              {opt.value}
+            </button>
+          );
+        })}
+        {definition.options.length === 0 && (
+          <p className="text-xs text-gray-400">
+            Aucune option définie pour cet attribut — ajoutez-en dans la fiche
+            catégorie.
+          </p>
+        )}
       </div>
       <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        disabled={isUploading}
-        className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900 disabled:opacity-50"
+        onClick={handleSave}
+        disabled={isSaving}
+        className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
       >
-        {isUploading ? (
-          <Loader2 size={12} className="animate-spin" />
-        ) : (
-          <Upload size={12} />
-        )}
-        Images de la variante
+        {isSaving ? "Enregistrement..." : "Enregistrer la sélection"}
       </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
-        multiple
-        hidden
-        onChange={handleUpload}
-      />
     </div>
   );
 }
 
-export default function ProductVariantsPage() {
-  const { productId } = useParams<{ productId: string }>();
-  const [product, setProduct] = useState<Product | null>(null);
-  const [variants, setVariants] = useState<Variant[]>([]);
-  const [attributeDefinitions, setAttributeDefinitions] = useState<
-    AttributeDefinition[]
-  >([]);
-  const [isLoading, setIsLoading] = useState(true);
+function CombinationEditRow({
+  productId,
+  combination,
+  onUpdated,
+  onDeleted,
+}: {
+  productId: string;
+  combination: ProductCombination;
+  onUpdated: (updated: ProductCombination) => void;
+  onDeleted: () => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [form, setForm] = useState<CombinationFormInput>({
+    sku: combination.sku,
+    price: combination.price ?? undefined,
+    isActive: combination.isActive,
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [editingVariant, setEditingVariant] = useState<Variant | undefined>();
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function load() {
-      setIsLoading(true);
-      try {
-        const [productRes, variantsRes] = await Promise.all([
-          apiClient.get<Product>(`/product/${productId}`),
-          apiClient.get<Variant[]>(`/product/${productId}/variants`),
-        ]);
-        setProduct(productRes);
-        setVariants(variantsRes);
-
-        const attrsRes = await apiClient.get<AttributeDefinition[]>(
-          `/categories/${productRes.categoryId}/attributes`,
-        );
-        setAttributeDefinitions(attrsRes.filter((a) => a.isVariant));
-      } catch (err) {
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    load();
-  }, [productId]);
-
-  async function handleDelete(variantId: string) {
-    if (!confirm("Supprimer cette variante ?")) return;
-    setDeletingId(variantId);
+  async function handleSave() {
+    setIsSaving(true);
+    setError(null);
     try {
-      await apiClient.delete(`/product/${productId}/variants/${variantId}`);
-      setVariants((prev) => prev.filter((v) => v.id !== variantId));
+      const updated = await apiClient.patch<ProductCombination>(
+        `/product/${productId}/combinations/${combination.id}`,
+        form,
+      );
+      onUpdated(updated);
+      setIsEditing(false);
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
+      setError(
+        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
+      );
     } finally {
-      setDeletingId(null);
+      setIsSaving(false);
     }
   }
 
-  function handleFormSuccess(variant: Variant) {
-    setVariants((prev) => {
-      const exists = prev.some((v) => v.id === variant.id);
-      return exists
-        ? prev.map((v) => (v.id === variant.id ? variant : v))
-        : [...prev, variant];
-    });
-    setShowForm(false);
-    setEditingVariant(undefined);
+  async function handleDelete() {
+    if (
+      !confirm(
+        "Supprimer cette combinaison ? Impossible si du stock existe encore dessus.",
+      )
+    )
+      return;
+    setIsDeleting(true);
+    try {
+      await apiClient.delete(
+        `/product/${productId}/combinations/${combination.id}`,
+      );
+      onDeleted();
+    } catch (err) {
+      alert(
+        err instanceof ApiError
+          ? err.message
+          : "Suppression impossible (stock encore présent ?)",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  const inputClass =
+    "rounded-md border border-gray-300 px-2 py-1 text-sm outline-none focus:border-gray-900";
+
+  const totalStock = combination.inventory.reduce(
+    (sum, inv) => sum + inv.quantity,
+    0,
+  );
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+        {error && <p className="text-xs text-red-600">{error}</p>}
+        <input
+          value={form.sku ?? ""}
+          onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
+          className={inputClass}
+          placeholder="SKU"
+        />
+        <input
+          type="number"
+          value={form.price ?? ""}
+          onChange={(e) =>
+            setForm((f) => ({
+              ...f,
+              price: e.target.value ? Number(e.target.value) : undefined,
+            }))
+          }
+          className={`${inputClass} w-28`}
+          placeholder="Prix (hérite sinon)"
+        />
+        <label className="flex items-center gap-1.5 text-xs">
+          <input
+            type="checkbox"
+            checked={form.isActive}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isActive: e.target.checked }))
+            }
+          />
+          Active
+        </label>
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="rounded-md p-1.5 text-green-600 hover:bg-green-50"
+        >
+          {isSaving ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Check size={14} />
+          )}
+        </button>
+        <button
+          onClick={() => setIsEditing(false)}
+          className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between rounded-md border border-gray-200 bg-white p-3">
+      <div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">{combination.sku}</span>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs ${
+              combination.isActive
+                ? "bg-green-100 text-green-700"
+                : "bg-gray-100 text-gray-500"
+            }`}
+          >
+            {combination.isActive ? "Active" : "Inactive"}
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs text-gray-500">
+          {combination.values
+            .map(
+              (v) =>
+                `${v.attributeDefinition.name}: ${v.attributeOption.value}`,
+            )
+            .join(" · ")}
+          {combination.price !== null && ` · ${formatXAF(combination.price)}`}
+        </p>
+        <p className="mt-0.5 text-xs text-gray-400">
+          Stock total : {totalStock} unité(s) sur {combination.inventory.length}{" "}
+          entrepôt(s)
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setIsEditing(true)}
+          className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+        >
+          <Pencil size={16} />
+        </button>
+        <button
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+        >
+          {isDeleting ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Trash2 size={16} />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function ProductCombinationsPage() {
+  const { productId } = useParams<{ productId: string }>();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [variantAttributes, setVariantAttributes] = useState<
+    AttributeDefinition[]
+  >([]);
+  const [selections, setSelections] = useState<Record<string, string[]>>({});
+  const [combinations, setCombinations] = useState<ProductCombination[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadAll() {
+    setIsLoading(true);
+    try {
+      const productRes = await apiClient.get<Product>(`/product/${productId}`);
+      setProduct(productRes);
+
+      const [attrsRes, selectionsRes, combosRes] = await Promise.all([
+        apiClient.get<AttributeDefinition[]>(
+          `/categories/${productRes.categoryId}/attributes`,
+        ),
+        apiClient
+          .get<
+            { attributeDefinitionId: string; optionIds: string[] }[]
+          >(`/product/${productId}/combinations/selections`)
+          .catch(() => []),
+        apiClient
+          .get<ProductCombination[]>(`/product/${productId}/combinations`)
+          .catch(() => []),
+      ]);
+
+      setVariantAttributes(attrsRes.filter((a) => a.isVariant));
+      const selMap: Record<string, string[]> = {};
+      selectionsRes.forEach((s) => {
+        selMap[s.attributeDefinitionId] = s.optionIds;
+      });
+      setSelections(selMap);
+      setCombinations(combosRes);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Erreur de chargement");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
+
+  async function handleGenerate() {
+    setIsGenerating(true);
+    try {
+      const generated = await apiClient.post<ProductCombination[]>(
+        `/product/${productId}/combinations/generate`,
+      );
+      setCombinations(generated);
+    } catch (err) {
+      alert(
+        err instanceof ApiError
+          ? err.message
+          : "Erreur lors de la génération des combinaisons",
+      );
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   if (isLoading)
@@ -419,101 +376,76 @@ export default function ProductVariantsPage() {
         <ArrowLeft size={14} /> Retour au produit
       </Link>
 
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Variantes — {product.name}</h1>
-          <p className="text-sm text-gray-500">{variants.length} variante(s)</p>
-        </div>
-        {!showForm && (
-          <button
-            onClick={() => {
-              setEditingVariant(undefined);
-              setShowForm(true);
-            }}
-            className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-          >
-            <Plus size={16} />
-            Nouvelle variante
-          </button>
-        )}
-      </div>
+      <h1 className="mb-1 text-xl font-semibold">
+        Combinaisons — {product.name}
+      </h1>
+      <p className="mb-6 text-sm text-gray-500">
+        Sélectionnez les valeurs disponibles pour chaque attribut de variante,
+        puis générez le produit cartésien.
+      </p>
 
-      {showForm && (
-        <VariantForm
-          productId={productId}
-          attributeDefinitions={attributeDefinitions}
-          editingVariant={editingVariant}
-          onSuccess={handleFormSuccess}
-          onCancel={() => {
-            setShowForm(false);
-            setEditingVariant(undefined);
-          }}
-        />
-      )}
-
-      {variants.length === 0 ? (
-        <p className="text-sm text-gray-400">
-          Aucune variante pour ce produit.
+      {variantAttributes.length === 0 ? (
+        <p className="mb-6 text-sm text-gray-400">
+          Aucun attribut « variante » (isVariant: true) défini pour la catégorie
+          de ce produit. Ajoutez-en dans la fiche catégorie.
         </p>
       ) : (
-        <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
-          {variants.map((variant) => (
-            <div
-              key={variant.id}
-              className="flex items-center justify-between px-4 py-3"
-            >
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{variant.sku}</span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${
-                      variant.isActive
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {variant.isActive ? "Active" : "Inactive"}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {variant.attributeValues
-                    .map((av) => `${av.attributeDefinition.name}: ${av.value}`)
-                    .join(" · ")}
-                  {variant.price !== null && ` · ${formatXAF(variant.price)}`}
-                </p>
-                <VariantImageUploader
-                  productId={productId}
-                  variant={variant}
-                  onUpdated={(updated) =>
-                    setVariants((prev) =>
-                      prev.map((v) => (v.id === updated.id ? updated : v)),
-                    )
-                  }
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setEditingVariant(variant);
-                    setShowForm(true);
-                  }}
-                  className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                >
-                  <Pencil size={16} />
-                </button>
-                <button
-                  onClick={() => handleDelete(variant.id)}
-                  disabled={deletingId === variant.id}
-                  className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                >
-                  {deletingId === variant.id ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={16} />
-                  )}
-                </button>
-              </div>
-            </div>
+        <div className="mb-6 space-y-3">
+          {variantAttributes.map((def) => (
+            <AttributeSelectionEditor
+              key={def.id}
+              productId={productId}
+              definition={def}
+              selectedOptionIds={selections[def.id] ?? []}
+              onSaved={(optionIds) =>
+                setSelections((prev) => ({ ...prev, [def.id]: optionIds }))
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={handleGenerate}
+        disabled={isGenerating || variantAttributes.length === 0}
+        className="mb-6 flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+      >
+        {isGenerating ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : (
+          <RefreshCw size={16} />
+        )}
+        Générer les combinaisons
+      </button>
+      <p className="-mt-4 mb-6 text-xs text-gray-400">
+        Crée les combinaisons manquantes, réactive celles qui correspondent
+        encore aux sélections, désactive les autres. Le stock n'est jamais
+        supprimé automatiquement.
+      </p>
+
+      <h2 className="mb-3 text-sm font-medium">
+        Combinaisons ({combinations.length})
+      </h2>
+      {combinations.length === 0 ? (
+        <p className="text-sm text-gray-400">
+          Aucune combinaison générée pour l'instant.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {combinations.map((combo) => (
+            <CombinationEditRow
+              key={combo.id}
+              productId={productId}
+              combination={combo}
+              onUpdated={(updated) =>
+                setCombinations((prev) =>
+                  prev.map((c) => (c.id === updated.id ? updated : c)),
+                )
+              }
+              onDeleted={() =>
+                setCombinations((prev) => prev.filter((c) => c.id !== combo.id))
+              }
+            />
           ))}
         </div>
       )}

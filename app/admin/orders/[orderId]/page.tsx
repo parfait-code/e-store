@@ -264,8 +264,16 @@ export default function OrderDetailPage() {
                   <div>
                     <p className="text-sm font-medium">{item.product.name}</p>
                     <p className="text-xs text-gray-500">
-                      SKU {item.product.sku} · Qté {item.quantity}
+                      SKU {item.combination?.sku ?? item.product.sku} · Qté{" "}
+                      {item.quantity}
                     </p>
+                    {item.combinationSnapshot && (
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        {Object.entries(item.combinationSnapshot)
+                          .map(([k, v]) => `${k}: ${v}`)
+                          .join(" · ")}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right text-sm">
                     <p>{formatXAF(item.price * item.quantity)}</p>

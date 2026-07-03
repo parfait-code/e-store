@@ -9,12 +9,12 @@ import { useAuth } from "@/lib/auth/auth-context";
 
 interface WishlistButtonProps {
   productId: number;
-  variantId?: string | null;
+  combinationId?: string | null;
 }
 
 export function WishlistButton({
   productId,
-  variantId = null,
+  combinationId = null,
 }: WishlistButtonProps) {
   const { user } = useAuth();
   const router = useRouter();
@@ -32,7 +32,7 @@ export function WishlistButton({
     try {
       await apiClient.post("/wishlist/items", {
         product_id: productId,
-        variant_id: variantId ?? undefined,
+        combination_id: combinationId ?? undefined,
       });
       setAdded(true);
     } catch (err) {

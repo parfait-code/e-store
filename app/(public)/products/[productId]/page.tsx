@@ -12,24 +12,30 @@ import { WishlistButton } from "@/components/WishlistButton";
 import { PriceDisplay } from "@/components/PriceDisplay";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { ReviewsSection } from "@/components/ReviewsSection";
-import type { Product, Variant } from "@/lib/types";
+import type { Product, ProductCombination } from "@/lib/types";
 
 export default function ProductDetailPage() {
   const { productId } = useParams<{ productId: string }>();
   const [product, setProduct] = useState<Product | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
+  const [combinations, setCombinations] = useState<ProductCombination[]>([]);
+  const [selectedCombination, setSelectedCombination] =
+    useState<ProductCombination | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setSelectedVariant(null);
-    apiClient
-      .get<Product>(`/product/${productId}`)
-      .then((p) => {
+    setSelectedCombination(null);
+    Promise.all([
+      apiClient.get<Product>(`/product/${productId}`),
+      apiClient
+        .get<ProductCombination[]>(`/product/${productId}/combinations`)
+        .catch(() => []), // pas grave si absent (produit sans variantes)
+    ])
+      .then(([p, combos]) => {
         setProduct(p);
-        // Si le produit n'a qu'une seule variante active, on la présélectionne
-        const active = p.variants.filter((v) => v.isActive);
-        if (active.length === 1) setSelectedVariant(active[0]);
+        const active = combos.filter((c) => c.isActive);
+        setCombinations(combos);
+        if (active.length === 1) setSelectedCombination(active[0]);
       })
       .catch((err) =>
         setError(
@@ -55,12 +61,9 @@ export default function ProductDetailPage() {
     );
   }
 
-  const activeVariants = product.variants.filter((v) => v.isActive);
-  const requiresVariant = activeVariants.length > 0;
-  const displayImages = selectedVariant?.images.length
-    ? selectedVariant.images
-    : product.images;
-  const displayPrice = selectedVariant?.price ?? product.price;
+  const activeCombinations = combinations.filter((c) => c.isActive);
+  const requiresCombination = activeCombinations.length > 0;
+  const displayPrice = selectedCombination?.price ?? product.price;
 
   return (
     <div>
@@ -75,7 +78,8 @@ export default function ProductDetailPage() {
       />
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
-        <ProductGallery images={displayImages} />
+        {/* Les combinaisons n'ont pas d'images propres — toujours celles du produit */}
+        <ProductGallery images={product.images} />
 
         <div>
           {product.brand && (
@@ -85,13 +89,13 @@ export default function ProductDetailPage() {
             {product.name}
           </h1>
           <p className="mt-1 text-xs text-gray-400">
-            SKU : {selectedVariant?.sku ?? product.sku}
+            SKU : {selectedCombination?.sku ?? product.sku}
           </p>
 
           <div className="mt-4">
             <PriceDisplay
               price={displayPrice}
-              pricing={selectedVariant ? undefined : product.pricing}
+              pricing={selectedCombination ? undefined : product.pricing}
               size="lg"
             />
           </div>
@@ -102,12 +106,12 @@ export default function ProductDetailPage() {
             </p>
           )}
 
-          {requiresVariant && (
+          {requiresCombination && (
             <div className="mt-6">
               <VariantSelector
-                variants={activeVariants}
-                selectedVariant={selectedVariant}
-                onSelect={setSelectedVariant}
+                combinations={activeCombinations}
+                selectedCombination={selectedCombination}
+                onSelect={setSelectedCombination}
               />
             </div>
           )}
@@ -116,13 +120,13 @@ export default function ProductDetailPage() {
             <div className="flex-1">
               <AddToCartButton
                 product={product}
-                selectedVariant={selectedVariant}
-                requiresVariant={requiresVariant}
+                selectedCombination={selectedCombination}
+                requiresCombination={requiresCombination}
               />
             </div>
             <WishlistButton
               productId={product.id}
-              variantId={selectedVariant?.id ?? null}
+              combinationId={selectedCombination?.id ?? null}
             />
           </div>
 
