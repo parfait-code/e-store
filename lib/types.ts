@@ -752,3 +752,43 @@ export interface ShippingCalculateInput {
 export interface ShippingCostResponse {
   cost: number;
 }
+export interface PaymentsAdminQuery {
+  page?: number;
+  limit?: number;
+  status?: string;
+  method?: string;
+  order_id?: string;
+}
+
+export interface CouponValidateInput {
+  code: string;
+  basketId: string;
+}
+
+export interface CouponValidateResponse {
+  valid: boolean;
+  message?: string;
+  discount?: {
+    type: DiscountType;
+    value: number;
+  };
+}
+
+export interface AddressValidateInput {
+  street: string;
+  city: string;
+  state?: string;
+  country: string;
+  postal_code: string;
+}
+
+export interface AddressValidateResponse {
+  valid: boolean;
+  normalized_address?: {
+    street: string;
+    city: string;
+    state?: string;
+    country: string;
+    postalCode: string;
+  };
+}

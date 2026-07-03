@@ -2,13 +2,14 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, AlertTriangle } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type {
   CategoryRef,
   ProductFormInput,
   ProductStatus,
   Product,
+  AttributeDefinition,
 } from "@/lib/types";
 
 interface ProductFormProps {
@@ -35,12 +36,46 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Règle backend #3 : le passage à ACTIVE est refusé (400) tant que les
+  // attributs produit (isVariant:false) marqués isRequired:true n'ont pas
+  // tous une valeur. On le vérifie ici pour ne pas laisser l'admin essuyer
+  // l'erreur serveur sans indication.
+  const [missingRequiredAttrs, setMissingRequiredAttrs] = useState<
+    AttributeDefinition[]
+  >([]);
+  const [isCheckingAttrs, setIsCheckingAttrs] = useState(isEditing);
+
+  // La catégorie n'est sélectionnable qu'à la création (règle backend #1 :
+  // categoryId est immuable ensuite, PATCH l'ignore silencieusement).
   useEffect(() => {
+    if (isEditing) return;
     apiClient
       .get<CategoryRef[]>("/categories")
       .then(setCategories)
       .catch(() => {});
-  }, []);
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (!initialProduct) return;
+    setIsCheckingAttrs(true);
+    apiClient
+      .get<AttributeDefinition[]>(
+        `/categories/${initialProduct.categoryId}/attributes`,
+      )
+      .then((defs) => {
+        const requiredProductAttrs = defs.filter(
+          (d) => !d.isVariant && d.isRequired,
+        );
+        const coveredIds = new Set(
+          initialProduct.attributeValues.map((av) => av.attributeDefinition.id),
+        );
+        setMissingRequiredAttrs(
+          requiredProductAttrs.filter((d) => !coveredIds.has(d.id)),
+        );
+      })
+      .catch(() => setMissingRequiredAttrs([]))
+      .finally(() => setIsCheckingAttrs(false));
+  }, [initialProduct]);
 
   function update<K extends keyof ProductFormInput>(
     key: K,
@@ -53,14 +88,42 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
     e.preventDefault();
     setError(null);
     setFieldErrors({});
-    setIsSubmitting(true);
 
+    if (
+      isEditing &&
+      form.status === "ACTIVE" &&
+      missingRequiredAttrs.length > 0
+    ) {
+      setError(
+        `Impossible d'activer : attributs requis manquants (${missingRequiredAttrs
+          .map((a) => a.name)
+          .join(
+            ", ",
+          )}). Renseignez-les dans "Caractéristiques produit" ci-dessous.`,
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      const payload = {
-        ...form,
+      const payload: Record<string, unknown> = {
+        sku: form.sku,
+        name: form.name,
+        description: form.description,
         price: Number(form.price),
         weight: form.weight ? Number(form.weight) : undefined,
+        brand: form.brand,
       };
+
+      if (isEditing) {
+        // categoryId n'est pas accepté par PATCH — on ne l'envoie pas
+        payload.status = form.status;
+      } else {
+        // status envoyé à la création est ignoré (toujours DRAFT) — inutile
+        // de l'envoyer, on envoie categoryId (requis uniquement ici)
+        payload.categoryId = form.categoryId;
+      }
+
       const result = isEditing
         ? await apiClient.patch<Product>(
             `/product/${initialProduct!.id}`,
@@ -153,7 +216,7 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
           <input
             type="number"
             required
-            min={0}
+            min={1}
             value={form.price}
             onChange={(e) => update("price", Number(e.target.value))}
             className={inputClass}
@@ -163,10 +226,13 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
           )}
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Poids (kg)</label>
+          <label className="mb-1 block text-sm font-medium">
+            Poids (kg) {!isEditing && <span className="text-red-500">*</span>}
+          </label>
           <input
             type="number"
-            min={0}
+            required={!isEditing}
+            min={0.01}
             step="0.01"
             value={form.weight ?? ""}
             onChange={(e) =>
@@ -177,44 +243,85 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
             }
             className={inputClass}
           />
+          {fieldError("weight") && (
+            <p className="mt-1 text-xs text-red-600">{fieldError("weight")}</p>
+          )}
         </div>
+
+        {isEditing ? (
+          <div>
+            <label className="mb-1 block text-sm font-medium">Statut</label>
+            <select
+              value={form.status}
+              onChange={(e) =>
+                update("status", e.target.value as ProductStatus)
+              }
+              className={inputClass}
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option
+                  key={s}
+                  value={s}
+                  disabled={s === "ACTIVE" && missingRequiredAttrs.length > 0}
+                >
+                  {s}
+                </option>
+              ))}
+            </select>
+            {isCheckingAttrs ? (
+              <p className="mt-1 text-xs text-gray-400">
+                Vérification des attributs requis...
+              </p>
+            ) : (
+              missingRequiredAttrs.length > 0 && (
+                <p className="mt-1 flex items-start gap-1 text-xs text-amber-600">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                  Manquant pour activer :{" "}
+                  {missingRequiredAttrs.map((a) => a.name).join(", ")}
+                </p>
+              )
+            )}
+          </div>
+        ) : (
+          <div className="flex items-end pb-2 text-xs text-gray-400">
+            Créé en brouillon — activable après complétion.
+          </div>
+        )}
+      </div>
+
+      {isEditing ? (
         <div>
-          <label className="mb-1 block text-sm font-medium">Statut</label>
+          <label className="mb-1 block text-sm font-medium">Catégorie</label>
+          <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+            {initialProduct!.category.name}
+          </p>
+          <p className="mt-1 text-xs text-gray-400">
+            La catégorie ne peut plus être modifiée après création.
+          </p>
+        </div>
+      ) : (
+        <div>
+          <label className="mb-1 block text-sm font-medium">Catégorie</label>
           <select
-            value={form.status}
-            onChange={(e) => update("status", e.target.value as ProductStatus)}
+            required
+            value={form.categoryId}
+            onChange={(e) => update("categoryId", e.target.value)}
             className={inputClass}
           >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
+            <option value="">Sélectionner...</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>
+          {fieldError("categoryId") && (
+            <p className="mt-1 text-xs text-red-600">
+              {fieldError("categoryId")}
+            </p>
+          )}
         </div>
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">Catégorie</label>
-        <select
-          required
-          value={form.categoryId}
-          onChange={(e) => update("categoryId", e.target.value)}
-          className={inputClass}
-        >
-          <option value="">Sélectionner...</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        {fieldError("categoryId") && (
-          <p className="mt-1 text-xs text-red-600">
-            {fieldError("categoryId")}
-          </p>
-        )}
-      </div>
+      )}
 
       <button
         type="submit"

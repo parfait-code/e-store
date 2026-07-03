@@ -7,9 +7,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, Loader2, Upload, Star, X, TagIcon } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
-import type { Product } from "@/lib/types";
+import type { Product, Tag, AttributeDefinition } from "@/lib/types";
 import { ProductForm } from "../_components/ProductForm";
-import type { Tag } from "@/lib/types";
 
 function ProductTagsEditor({ productId }: { productId: number }) {
   const [allTags, setAllTags] = useState<Tag[]>([]);
@@ -102,6 +101,158 @@ function ProductTagsEditor({ productId }: { productId: number }) {
         className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
         {isSaving ? "Enregistrement..." : "Enregistrer les tags"}
+      </button>
+    </div>
+  );
+}
+
+// Gère les attributs PRODUIT (isVariant:false) via PUT /product/:id/attributes.
+// Distinct des attributs de VARIANTE (gérés dans /admin/products/:id/variants).
+// Cette route remplace TOUTES les valeurs à chaque appel (pas de merge partiel),
+// donc on soumet systématiquement l'ensemble des champs renseignés.
+function ProductAttributesEditor({
+  product,
+  onUpdated,
+}: {
+  product: Product;
+  onUpdated: (product: Product) => void;
+}) {
+  const [definitions, setDefinitions] = useState<AttributeDefinition[]>([]);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiClient
+      .get<AttributeDefinition[]>(
+        `/categories/${product.categoryId}/attributes`,
+      )
+      .then((defs) => {
+        const productDefs = defs.filter((d) => !d.isVariant);
+        setDefinitions(productDefs);
+        const initial: Record<string, string> = {};
+        product.attributeValues.forEach((av) => {
+          initial[av.attributeDefinition.id] = av.value;
+        });
+        setValues(initial);
+      })
+      .catch(() =>
+        setError("Erreur lors du chargement des attributs de la catégorie"),
+      )
+      .finally(() => setIsLoading(false));
+    // On ne relance que si la catégorie ou les valeurs déjà en base changent
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.categoryId, product.attributeValues]);
+
+  async function handleSave() {
+    setIsSaving(true);
+    setError(null);
+    try {
+      const attributes = definitions
+        .filter((def) => values[def.id]?.trim())
+        .map((def) => ({
+          attributeDefinitionId: def.id,
+          value: values[def.id],
+        }));
+
+      const updated = await apiClient.put<Product>(
+        `/product/${product.id}/attributes`,
+        { attributes },
+      );
+      onUpdated(updated);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Erreur lors de l'enregistrement des attributs",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  const inputClass =
+    "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
+
+  if (isLoading)
+    return <Loader2 size={16} className="animate-spin text-gray-400" />;
+
+  if (definitions.length === 0) {
+    return (
+      <div className="max-w-2xl">
+        <h2 className="mb-2 text-sm font-medium">Caractéristiques produit</h2>
+        <p className="text-sm text-gray-400">
+          Aucun attribut produit (hors variante) défini pour cette catégorie.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl">
+      <h2 className="mb-1 text-sm font-medium">Caractéristiques produit</h2>
+      <p className="mb-3 text-xs text-gray-400">
+        Ces valeurs remplacent l'intégralité des caractéristiques du produit à
+        chaque enregistrement. Les attributs marqués{" "}
+        <span className="text-red-500">*</span> sont requis pour activer le
+        produit.
+      </p>
+      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        {definitions.map((def) => (
+          <div key={def.id}>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              {def.name}{" "}
+              {def.isRequired && <span className="text-red-500">*</span>}
+              {def.unit && <span className="text-gray-400"> ({def.unit})</span>}
+            </label>
+            {def.type === "SELECT" || def.type === "COLOR" ? (
+              <select
+                value={values[def.id] ?? ""}
+                onChange={(e) =>
+                  setValues((prev) => ({ ...prev, [def.id]: e.target.value }))
+                }
+                className={inputClass}
+              >
+                <option value="">Sélectionner...</option>
+                {def.options.map((opt) => (
+                  <option key={opt.id} value={opt.value}>
+                    {opt.value}
+                  </option>
+                ))}
+              </select>
+            ) : def.type === "BOOLEAN" ? (
+              <select
+                value={values[def.id] ?? ""}
+                onChange={(e) =>
+                  setValues((prev) => ({ ...prev, [def.id]: e.target.value }))
+                }
+                className={inputClass}
+              >
+                <option value="">Sélectionner...</option>
+                <option value="true">Oui</option>
+                <option value="false">Non</option>
+              </select>
+            ) : (
+              <input
+                type={def.type === "NUMBER" ? "number" : "text"}
+                value={values[def.id] ?? ""}
+                onChange={(e) =>
+                  setValues((prev) => ({ ...prev, [def.id]: e.target.value }))
+                }
+                className={inputClass}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={handleSave}
+        disabled={isSaving}
+        className="mt-3 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+      >
+        {isSaving ? "Enregistrement..." : "Enregistrer les caractéristiques"}
       </button>
     </div>
   );
@@ -267,6 +418,12 @@ export default function EditProductPage() {
         <ProductTagsEditor productId={product.id} />
       </div>
 
+      {/* Caractéristiques produit (attributs isVariant:false) — doit être
+          renseigné pour pouvoir activer le produit (voir ProductForm) */}
+      <div className="mb-8">
+        <ProductAttributesEditor product={product} onUpdated={setProduct} />
+      </div>
+
       {/* Formulaire infos produit */}
       <ProductForm
         initialProduct={product}
@@ -276,8 +433,7 @@ export default function EditProductPage() {
         }}
       />
 
-      {/* Variantes (aperçu, gestion détaillée à venir) */}
-      {/* Variantes — remplace le bloc "aperçu" précédent */}
+      {/* Variantes */}
       <div className="mt-10 max-w-2xl">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium">
