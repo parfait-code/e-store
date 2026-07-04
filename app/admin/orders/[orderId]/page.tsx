@@ -12,10 +12,16 @@ import {
   CreditCard,
   History,
   Save,
+  ExternalLink,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
-import type { Order, OrderStatus, OrderStatusUpdateInput } from "@/lib/types";
+import type {
+  Order,
+  OrderStatus,
+  OrderStatusUpdateInput,
+  Shipment,
+} from "@/lib/types";
 
 const STATUS_OPTIONS: OrderStatus[] = [
   "PENDING",
@@ -184,6 +190,74 @@ function StatusUpdateForm({
         Mettre à jour
       </button>
     </form>
+  );
+}
+
+function LinkedShipmentCard({ orderId }: { orderId: string }) {
+  const [shipment, setShipment] = useState<Shipment | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    apiClient
+      .get<Shipment | null>(`/orders/${orderId}/shipment`)
+      .then(setShipment)
+      .catch(() => setShipment(null)) // non bloquant — aucune expédition liée
+      .finally(() => setIsLoading(false));
+  }, [orderId]);
+
+  const STATUS_STYLES: Record<string, string> = {
+    PENDING: "bg-gray-100 text-gray-600",
+    IN_TRANSIT: "bg-blue-100 text-blue-700",
+    DELIVERED: "bg-green-100 text-green-700",
+    CANCELLED: "bg-red-100 text-red-700",
+  };
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
+        <Truck size={16} /> Expédition liée
+      </h2>
+
+      {isLoading ? (
+        <Loader2 size={16} className="animate-spin text-gray-400" />
+      ) : !shipment ? (
+        <>
+          <p className="mb-3 text-sm text-gray-400">
+            Aucune expédition créée pour cette commande.
+          </p>
+          <Link
+            href={`/admin/shipments/new?orderId=${orderId}`}
+            className="text-xs font-medium text-gray-900 hover:underline"
+          >
+            Créer une expédition →
+          </Link>
+        </>
+      ) : (
+        <div className="text-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-medium">
+              {shipment.trackingNumber ?? `#${shipment.id.slice(0, 8)}`}
+            </span>
+            <span
+              className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[shipment.status]}`}
+            >
+              {shipment.status}
+            </span>
+          </div>
+          <p className="mb-3 text-xs text-gray-400">
+            Rappel : le statut de l'expédition n'est pas synchronisé
+            automatiquement avec celui de la commande (sauf via l'endpoint de
+            statut officiel — voir SHIPPED/DELIVERED).
+          </p>
+          <Link
+            href={`/admin/shipments/${shipment.id}`}
+            className="flex items-center gap-1 text-xs font-medium text-gray-900 hover:underline"
+          >
+            Voir le détail <ExternalLink size={12} />
+          </Link>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -392,6 +466,8 @@ export default function OrderDetailPage() {
               Créer une expédition pour cette commande →
             </Link>
           </div>
+
+          <LinkedShipmentCard orderId={order.id} />
 
           <StatusUpdateForm order={order} onSuccess={setOrder} />
         </div>

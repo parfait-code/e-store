@@ -301,17 +301,35 @@ export interface OrderItem {
   product: { id: number; name: string; sku: string; images: ProductImage[] };
 }
 
+// Remplacer le champ `status: string` de l'interface Payment par :
+export type PaymentStatus =
+  | "PENDING"
+  | "COMPLETED"
+  | "FAILED"
+  | "REFUNDED"
+  | "CANCELLED";
+
 export interface Payment {
   id: string;
   orderId: string;
   userId: number;
   method: string;
-  status: string;
+  status: PaymentStatus; // était `string`
   amount: number;
   currency: string;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PaymentStatusUpdateInput {
+  status: PaymentStatus;
+  notes?: string;
+}
+
+export interface ShipmentStatusUpdateInput {
+  status: ShipmentStatus;
+  reason?: string;
 }
 
 export interface OrderStatusHistoryEntry {

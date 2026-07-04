@@ -3,10 +3,23 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Loader2, ChevronLeft, ChevronRight, CreditCard } from "lucide-react";
+import {
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  Pencil,
+  Check,
+  X,
+} from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
-import type { Payment, Paginated, PaymentMethodType } from "@/lib/types";
+import type {
+  Payment,
+  Paginated,
+  PaymentMethodType,
+  PaymentStatus,
+} from "@/lib/types";
 
 const METHOD_OPTIONS: PaymentMethodType[] = [
   "CASH_ON_DELIVERY",
@@ -15,12 +28,127 @@ const METHOD_OPTIONS: PaymentMethodType[] = [
   "CINETPAY",
 ];
 
-const STATUS_STYLES: Record<string, string> = {
+const STATUS_OPTIONS: PaymentStatus[] = [
+  "PENDING",
+  "COMPLETED",
+  "FAILED",
+  "REFUNDED",
+  "CANCELLED",
+];
+
+const STATUS_STYLES: Record<PaymentStatus, string> = {
   PENDING: "bg-gray-100 text-gray-600",
   COMPLETED: "bg-green-100 text-green-700",
   FAILED: "bg-red-100 text-red-700",
   REFUNDED: "bg-amber-100 text-amber-700",
+  CANCELLED: "bg-gray-200 text-gray-500",
 };
+
+// Transitions validées côté backend (payment.service) : COMPLETED → uniquement
+// REFUNDED ; FAILED / REFUNDED / CANCELLED sont terminaux.
+const ALLOWED_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
+  PENDING: ["COMPLETED", "FAILED", "CANCELLED"],
+  COMPLETED: ["REFUNDED"],
+  FAILED: [],
+  REFUNDED: [],
+  CANCELLED: [],
+};
+
+function PaymentStatusEditor({
+  payment,
+  onUpdated,
+}: {
+  payment: Payment;
+  onUpdated: (p: Payment) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [status, setStatus] = useState<PaymentStatus>(payment.status);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const options = ALLOWED_TRANSITIONS[payment.status];
+  const isTerminal = options.length === 0;
+
+  async function handleSave() {
+    setIsSaving(true);
+    setError(null);
+    try {
+      const updated = await apiClient.put<Payment>(
+        `/payments/${payment.id}/status`,
+        { status },
+      );
+      onUpdated(updated);
+      setIsEditing(false);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (!isEditing) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span
+          className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[payment.status]}`}
+        >
+          {payment.status}
+        </span>
+        {!isTerminal && (
+          <button
+            onClick={() => {
+              setStatus(options[0]);
+              setIsEditing(true);
+            }}
+            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-900"
+            title="Changer le statut"
+          >
+            <Pencil size={12} />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <select
+        value={status}
+        onChange={(e) => setStatus(e.target.value as PaymentStatus)}
+        className="rounded-md border border-gray-300 px-1.5 py-1 text-xs outline-none focus:border-gray-900"
+      >
+        {options.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+      <button
+        onClick={handleSave}
+        disabled={isSaving}
+        className="rounded-md p-1 text-green-600 hover:bg-green-50 disabled:opacity-50"
+      >
+        {isSaving ? (
+          <Loader2 size={12} className="animate-spin" />
+        ) : (
+          <Check size={12} />
+        )}
+      </button>
+      <button
+        onClick={() => {
+          setIsEditing(false);
+          setError(null);
+        }}
+        className="rounded-md p-1 text-gray-400 hover:bg-gray-100"
+      >
+        <X size={12} />
+      </button>
+      {error && <span className="text-xs text-red-600">{error}</span>}
+    </div>
+  );
+}
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -96,10 +224,11 @@ export default function PaymentsPage() {
           className={selectClass}
         >
           <option value="">Tous les statuts</option>
-          <option value="PENDING">En attente</option>
-          <option value="COMPLETED">Complété</option>
-          <option value="FAILED">Échoué</option>
-          <option value="REFUNDED">Remboursé</option>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
         </select>
         <select
           value={method}
@@ -182,13 +311,14 @@ export default function PaymentsPage() {
                     {formatXAF(p.amount)}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs font-medium ${
-                        STATUS_STYLES[p.status] ?? "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {p.status}
-                    </span>
+                    <PaymentStatusEditor
+                      payment={p}
+                      onUpdated={(updated) =>
+                        setPayments((prev) =>
+                          prev.map((x) => (x.id === updated.id ? updated : x)),
+                        )
+                      }
+                    />
                   </td>
                   <td className="px-4 py-3 text-gray-500">
                     {formatDate(p.createdAt)}

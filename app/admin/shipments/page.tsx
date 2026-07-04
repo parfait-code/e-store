@@ -34,6 +34,8 @@ export default function ShipmentsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState<ShipmentStatus | "">("");
+  const [orderIdInput, setOrderIdInput] = useState("");
+  const [orderId, setOrderId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +44,7 @@ export default function ShipmentsPage() {
     setError(null);
     const params = new URLSearchParams({ page: String(page), limit: "20" });
     if (status) params.set("status", status);
+    if (orderId) params.set("order_id", orderId);
 
     apiClient
       .get<Paginated<Shipment>>(`/shipments?${params.toString()}`)
@@ -56,11 +59,17 @@ export default function ShipmentsPage() {
         ),
       )
       .finally(() => setIsLoading(false));
-  }, [page, status]);
+  }, [page, status, orderId]);
 
   useEffect(() => {
     fetchShipments();
   }, [fetchShipments]);
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setPage(1);
+    setOrderId(orderIdInput.trim());
+  }
 
   return (
     <div>
@@ -69,7 +78,16 @@ export default function ShipmentsPage() {
         <p className="text-sm text-gray-500">{total} expédition(s)</p>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap gap-3">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <input
+            type="text"
+            placeholder="ID commande..."
+            value={orderIdInput}
+            onChange={(e) => setOrderIdInput(e.target.value)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+          />
+        </form>
         <select
           value={status}
           onChange={(e) => {
