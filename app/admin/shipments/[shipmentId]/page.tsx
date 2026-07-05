@@ -446,7 +446,7 @@ export default function ShipmentDetailPage() {
           </div>
 
           {shipment.label ? (
-            
+            <a
               href={shipment.label.labelUrl}
               target="_blank"
               rel="noopener noreferrer"
