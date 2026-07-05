@@ -3,10 +3,73 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { ProductGrid } from "@/components/ProductGrid";
-import type { Product, Category, Paginated } from "@/lib/types";
+import { formatDate } from "@/lib/format";
+import type {
+  Product,
+  Category,
+  Paginated,
+  PromotionPublic,
+} from "@/lib/types";
+
+function PromotionsSection() {
+  const [promotions, setPromotions] = useState<PromotionPublic[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // ⚠️ Route en attente de création côté backend — voir doc transmise.
+    // Ajuster le chemin ici si le backend choisit un nom de route différent.
+    apiClient
+      .get<PromotionPublic[]>("/promotions/active")
+      .then(setPromotions)
+      .catch(() => setPromotions([]))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  if (isLoading || promotions.length === 0) return null;
+
+  return (
+    <section>
+      <h2 className="mb-4 text-xl font-semibold">Promotions en cours</h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {promotions.map((promo) => (
+          <Link
+            key={promo.id}
+            href={`/promotions/${promo.slug}`}
+            className="group overflow-hidden rounded-lg border border-gray-200 bg-white transition hover:shadow-md"
+          >
+            <div className="relative aspect-3/1 w-full overflow-hidden bg-gray-100">
+              {promo.images[0] ? (
+                <Image
+                  src={promo.images[0]}
+                  alt={promo.name}
+                  fill
+                  className="object-cover transition group-hover:scale-105"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center bg-gray-900">
+                  <span className="text-lg font-semibold text-white">
+                    {promo.name}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="p-4">
+              <h3 className="font-medium text-gray-900">{promo.name}</h3>
+              <p className="mt-1 text-xs text-gray-400">
+                Jusqu'au {formatDate(promo.endDate)}
+              </p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export default function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
@@ -45,6 +108,9 @@ export default function HomePage() {
           Voir le catalogue <ArrowRight size={16} />
         </Link>
       </section>
+
+      {/* Promotions */}
+      <PromotionsSection />
 
       {/* Catégories */}
       {categories.length > 0 && (
