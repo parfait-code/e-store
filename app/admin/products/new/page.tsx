@@ -1,14 +1,11 @@
 // app/admin/products/new/page.tsx
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { ProductForm } from "../_components/ProductForm";
+import { ProductWizard } from "../_components/ProductWizard";
 
 export default function NewProductPage() {
-  const router = useRouter();
-
   return (
     <div>
       <Link
@@ -19,9 +16,7 @@ export default function NewProductPage() {
       </Link>
       <h1 className="mb-6 text-xl font-semibold">Nouveau produit</h1>
 
-      <ProductForm
-        onSuccess={(product) => router.push(`/admin/products/${product.id}`)}
-      />
+      <ProductWizard />
     </div>
   );
 }
