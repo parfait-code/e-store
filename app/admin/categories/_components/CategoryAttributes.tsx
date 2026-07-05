@@ -1,27 +1,14 @@
-// app/admin/categories/[categoryId]/page.tsx
+// app/admin/categories/_components/CategoryAttributes.tsx
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import {
-  ArrowLeft,
-  Loader2,
-  Plus,
-  Trash2,
-  Tag,
-  Check,
-  Pencil,
-  X,
-} from "lucide-react";
+import { Plus, Trash2, Tag, Check, Pencil, X, Loader2 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type {
-  Category,
   AttributeDefinition,
   AttributeDefinitionFormInput,
   AttributeOption,
 } from "@/lib/types";
-import { CategoryWizard } from "../_components/CategoryWizard";
 
 const TYPE_LABELS: Record<AttributeDefinition["type"], string> = {
   TEXT: "Texte",
@@ -236,7 +223,132 @@ function AttributeOptionsEditor({
   );
 }
 
-function CategoryAttributes({ categoryId }: { categoryId: string }) {
+function AttributeDefinitionEditor({
+  definition,
+  onUpdated,
+  onCancel,
+}: {
+  definition: AttributeDefinition;
+  onUpdated: (updated: AttributeDefinition) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: definition.name,
+    slug: definition.slug,
+    unit: definition.unit ?? "",
+    isVariant: definition.isVariant,
+    isFilterable: definition.isFilterable,
+    isRequired: definition.isRequired,
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function handleSave() {
+    setIsSaving(true);
+    setError(null);
+    try {
+      const updated = await apiClient.patch<AttributeDefinition>(
+        `/attributes/${definition.id}`,
+        {
+          name: form.name,
+          slug: form.slug,
+          unit: form.unit || undefined,
+          isVariant: form.isVariant,
+          isFilterable: form.isFilterable,
+          isRequired: form.isRequired,
+        },
+      );
+      onUpdated({ ...updated, options: definition.options });
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  const inputClass =
+    "rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-gray-900";
+
+  return (
+    <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        <input
+          type="text"
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          className={inputClass}
+          placeholder="Nom"
+        />
+        <input
+          type="text"
+          value={form.slug}
+          onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+          className={inputClass}
+          placeholder="Slug"
+        />
+      </div>
+      <input
+        type="text"
+        value={form.unit}
+        onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+        className={`${inputClass} w-full`}
+        placeholder="Unité (optionnel, ex: cm, kg)"
+      />
+      <div className="flex flex-wrap gap-4 text-xs">
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isVariant}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isVariant: e.target.checked }))
+            }
+          />
+          Utilisé pour les variantes
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isFilterable}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isFilterable: e.target.checked }))
+            }
+          />
+          Filtrable
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isRequired}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isRequired: e.target.checked }))
+            }
+          />
+          Obligatoire
+        </label>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+        >
+          {isSaving ? "Enregistrement..." : "Enregistrer"}
+        </button>
+        <button
+          onClick={onCancel}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600"
+        >
+          Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function CategoryAttributes({ categoryId }: { categoryId: string }) {
   const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -466,177 +578,6 @@ function CategoryAttributes({ categoryId }: { categoryId: string }) {
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function AttributeDefinitionEditor({
-  definition,
-  onUpdated,
-  onCancel,
-}: {
-  definition: AttributeDefinition;
-  onUpdated: (updated: AttributeDefinition) => void;
-  onCancel: () => void;
-}) {
-  const [form, setForm] = useState({
-    name: definition.name,
-    slug: definition.slug,
-    unit: definition.unit ?? "",
-    isVariant: definition.isVariant,
-    isFilterable: definition.isFilterable,
-    isRequired: definition.isRequired,
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  async function handleSave() {
-    setIsSaving(true);
-    setError(null);
-    try {
-      const updated = await apiClient.patch<AttributeDefinition>(
-        `/attributes/${definition.id}`,
-        {
-          name: form.name,
-          slug: form.slug,
-          unit: form.unit || undefined,
-          isVariant: form.isVariant,
-          isFilterable: form.isFilterable,
-          isRequired: form.isRequired,
-        },
-      );
-      // La route PATCH ne renvoie pas forcément `options` à jour, on les
-      // préserve depuis la définition connue côté client.
-      onUpdated({ ...updated, options: definition.options });
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  const inputClass =
-    "rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-gray-900";
-
-  return (
-    <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <div className="grid grid-cols-2 gap-3">
-        <input
-          type="text"
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          className={inputClass}
-          placeholder="Nom"
-        />
-        <input
-          type="text"
-          value={form.slug}
-          onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-          className={inputClass}
-          placeholder="Slug"
-        />
-      </div>
-      <input
-        type="text"
-        value={form.unit}
-        onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-        className={`${inputClass} w-full`}
-        placeholder="Unité (optionnel, ex: cm, kg)"
-      />
-      <div className="flex flex-wrap gap-4 text-xs">
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={form.isVariant}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, isVariant: e.target.checked }))
-            }
-          />
-          Utilisé pour les variantes
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={form.isFilterable}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, isFilterable: e.target.checked }))
-            }
-          />
-          Filtrable
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={form.isRequired}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, isRequired: e.target.checked }))
-            }
-          />
-          Obligatoire
-        </label>
-      </div>
-      <div className="flex gap-2">
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-        >
-          {isSaving ? "Enregistrement..." : "Enregistrer"}
-        </button>
-        <button
-          onClick={onCancel}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600"
-        >
-          Annuler
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export default function EditCategoryPage() {
-  const { categoryId } = useParams<{ categoryId: string }>();
-  const [category, setCategory] = useState<Category | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .get<Category>(`/categories/${categoryId}`)
-      .then(setCategory)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [categoryId]);
-
-  if (isLoading)
-    return <Loader2 size={20} className="animate-spin text-gray-400" />;
-  if (error || !category) {
-    return (
-      <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Catégorie introuvable."}
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <Link
-        href="/admin/categories"
-        className="mb-4 flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
-      >
-        <ArrowLeft size={14} /> Retour aux catégories
-      </Link>
-      <h1 className="mb-6 text-xl font-semibold">
-        Modifier « {category.name} »
-      </h1>
-      <CategoryWizard initialCategory={category} />
     </div>
   );
 }
