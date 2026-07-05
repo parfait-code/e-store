@@ -317,8 +317,8 @@ function CombinationSearchPicker({
   onSelect,
 }: {
   productId: number | null;
-  selected: { id: string; sku: string } | null;
-  onSelect: (combination: { id: string; sku: string } | null) => void;
+  selected: { id: string; sku: string | null } | null;
+  onSelect: (combination: { id: string; sku: string | null } | null) => void;
 }) {
   const [combinations, setCombinations] = useState<ProductCombination[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -392,7 +392,8 @@ function CombinationSearchPicker({
           }`}
         >
           <span>
-            {c.values.map((v) => v.attributeOption.value).join(" / ")} — {c.sku}
+            {c.values.map((v) => v.attributeOption.value).join(" / ")}
+            {c.sku ? ` — ${c.sku}` : ""}
           </span>
           {!c.isActive && (
             <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
@@ -421,7 +422,7 @@ function NewInventoryItemForm({
   } | null>(null);
   const [selectedCombination, setSelectedCombination] = useState<{
     id: string;
-    sku: string;
+    sku: string | null;
   } | null>(null);
   const [warehouseId, setWarehouseId] = useState("");
   const [quantity, setQuantity] = useState(0);
