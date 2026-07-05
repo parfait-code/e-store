@@ -27,12 +27,14 @@ export function CategoryForm({
   const isEditing = Boolean(initialCategory);
   const [categories, setCategories] = useState<Category[]>([]);
   const [slugTouched, setSlugTouched] = useState(isEditing);
-  const [form, setForm] = useState<CategoryFormInput>({
+  // imageUrl/iconUrl retirés du formulaire — gérés par upload de fichier
+  // via CategoryAssetsUploader, une fois la catégorie créée.
+  const [form, setForm] = useState<
+    Omit<CategoryFormInput, "imageUrl" | "iconUrl">
+  >({
     name: initialCategory?.name ?? "",
     slug: initialCategory?.slug ?? "",
     description: initialCategory?.description ?? "",
-    imageUrl: initialCategory?.imageUrl ?? "",
-    iconUrl: initialCategory?.iconUrl ?? "",
     metaTitle: initialCategory?.metaTitle ?? "",
     metaDescription: initialCategory?.metaDescription ?? "",
     isActive: initialCategory?.isActive ?? true,
@@ -49,9 +51,9 @@ export function CategoryForm({
       .catch(() => {});
   }, []);
 
-  function update<K extends keyof CategoryFormInput>(
+  function update<K extends keyof typeof form>(
     key: K,
-    value: CategoryFormInput[K],
+    value: (typeof form)[K],
   ) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -98,7 +100,6 @@ export function CategoryForm({
     return fieldErrors[name]?.[0];
   }
 
-  // Empêche de choisir la catégorie elle-même ou un de ses descendants comme parent
   const availableParents = categories.filter(
     (c) => c.id !== initialCategory?.id,
   );
@@ -173,27 +174,6 @@ export function CategoryForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="mb-1 block text-sm font-medium">URL image</label>
-          <input
-            type="text"
-            value={form.imageUrl}
-            onChange={(e) => update("imageUrl", e.target.value)}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">URL icône</label>
-          <input
-            type="text"
-            value={form.iconUrl}
-            onChange={(e) => update("iconUrl", e.target.value)}
-            className={inputClass}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
           <label className="mb-1 block text-sm font-medium">
             Meta titre (SEO)
           </label>
@@ -226,6 +206,12 @@ export function CategoryForm({
         />
         Catégorie active
       </label>
+
+      {!isEditing && (
+        <p className="text-xs text-gray-400">
+          L'image et l'icône se gèrent une fois la catégorie créée.
+        </p>
+      )}
 
       <button
         type="submit"

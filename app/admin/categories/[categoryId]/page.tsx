@@ -22,6 +22,7 @@ import type {
   AttributeOption,
 } from "@/lib/types";
 import { CategoryForm } from "../_components/CategoryForm";
+import { CategoryAssetsUploader } from "../_components/CategoryAssetsUploader";
 
 const TYPE_LABELS: Record<AttributeDefinition["type"], string> = {
   TEXT: "Texte",
@@ -645,6 +646,10 @@ export default function EditCategoryPage() {
           router.refresh();
         }}
       />
+
+      <div className="mt-10">
+        <CategoryAssetsUploader category={category} onUpdated={setCategory} />
+      </div>
 
       <div className="mt-10">
         <CategoryAttributes categoryId={category.id} />

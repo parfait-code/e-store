@@ -2,16 +2,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { Loader2, Ticket, Copy, Percent, DollarSign } from "lucide-react";
+import {
+  Loader2,
+  Ticket,
+  Copy,
+  Percent,
+  DollarSign,
+  ShoppingBag,
+} from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
-import type { PromotionPublic } from "@/lib/types";
+import type { PromotionPublic, PromotionProductsResponse } from "@/lib/types";
 
 export default function PromotionPage() {
   const { slug } = useParams<{ slug: string }>();
+  const router = useRouter();
   const [promotion, setPromotion] = useState<PromotionPublic | null>(null);
+  const [productsInfo, setProductsInfo] =
+    useState<PromotionProductsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -26,12 +36,31 @@ export default function PromotionPage() {
         ),
       )
       .finally(() => setIsLoading(false));
+
+    // Non bloquant — si cet appel échoue, on masque simplement le bouton
+    // "Voir les produits" plutôt que de faire échouer la page entière.
+    apiClient
+      .get<PromotionProductsResponse>(`/promotions/slug/${slug}/products`)
+      .then(setProductsInfo)
+      .catch(() => setProductsInfo(null));
   }, [slug]);
 
   function copyCode(code: string) {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 1500);
+  }
+
+  // count===0 (ex: coupon pur, sans ciblage produit) → pas de redirection possible
+  // count===1 → direct vers la fiche produit
+  // count>1 → page de listing
+  function handleViewProducts() {
+    if (!productsInfo || productsInfo.count === 0) return;
+    if (productsInfo.count === 1) {
+      router.push(`/products/${productsInfo.products[0].id}`);
+    } else {
+      router.push(`/promotions/${slug}/products`);
+    }
   }
 
   if (isLoading) {
@@ -50,24 +79,46 @@ export default function PromotionPage() {
     );
   }
 
+  const canViewProducts = Boolean(productsInfo && productsInfo.count > 0);
+
   return (
     <div className="max-w-3xl">
       {promotion.images[0] && (
-        <div className="relative mb-6 aspect-3/1 w-full overflow-hidden rounded-lg bg-gray-100">
+        <button
+          type="button"
+          onClick={canViewProducts ? handleViewProducts : undefined}
+          disabled={!canViewProducts}
+          className={`relative mb-6 aspect-3/1 w-full overflow-hidden rounded-lg bg-gray-100 ${
+            canViewProducts ? "cursor-pointer" : "cursor-default"
+          }`}
+        >
           <Image
             src={promotion.images[0]}
             alt={promotion.name}
             fill
             className="object-cover"
           />
-        </div>
+        </button>
       )}
 
-      <h1 className="text-2xl font-semibold">{promotion.name}</h1>
-      <p className="mt-1 text-sm text-gray-500">
-        Valable du {formatDate(promotion.startDate)} au{" "}
-        {formatDate(promotion.endDate)}
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{promotion.name}</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Valable du {formatDate(promotion.startDate)} au{" "}
+            {formatDate(promotion.endDate)}
+          </p>
+        </div>
+        {canViewProducts && (
+          <button
+            onClick={handleViewProducts}
+            className="flex shrink-0 items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            <ShoppingBag size={16} />
+            Voir les produits ({productsInfo!.count})
+          </button>
+        )}
+      </div>
 
       {promotion.description && (
         <p className="mt-4 text-sm leading-relaxed text-gray-600">

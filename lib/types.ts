@@ -405,7 +405,7 @@ export interface CouponCode {
   startDate: string | null;
   endDate: string | null;
   isActive: boolean;
-  effectiveIsActive?: boolean; 
+  effectiveIsActive?: boolean;
 }
 
 export interface Promotion {
@@ -868,4 +868,11 @@ export interface AddressValidateResponse {
     country: string;
     postal_code: string; // corrigé (était postalCode)
   };
+}
+
+export interface PromotionProductsResponse {
+  promotionId: string;
+  promotionName: string;
+  count: number;
+  products: Product[];
 }
