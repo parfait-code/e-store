@@ -732,6 +732,11 @@ function PromotionCoupons({
                     Inactif
                   </span>
                 )}
+                {c.isActive && c.effectiveIsActive === false && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+                    Épuisé / expiré
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => handleDelete(c.id)}

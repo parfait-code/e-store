@@ -7,6 +7,7 @@ import { Loader2, Trash2, UserPlus, Search } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import type { User, Role } from "@/lib/types";
+import { useAuth } from "@/lib/auth/auth-context";
 
 const ROLE_OPTIONS: Role[] = ["USER", "ADMIN", "MANAGER", "SUPPORT"];
 
@@ -63,7 +64,57 @@ function RoleSelect({
   );
 }
 
+function StatusToggle({
+  user,
+  onChanged,
+}: {
+  user: User;
+  onChanged: (u: User) => void;
+}) {
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function toggle() {
+    const action = user.isActive ? "suspendre" : "réactiver";
+    if (!confirm(`Voulez-vous ${action} le compte de ${user.username} ?`)) return;
+    setIsSaving(true);
+    try {
+      const updated = await apiClient.patch<User>(`/user/${user.id}/status`, {
+        isActive: !user.isActive,
+      });
+      onChanged(updated);
+    } catch (err) {
+      alert(
+        err instanceof ApiError ? err.message : "Erreur lors du changement de statut",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={isSaving}
+      className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium disabled:opacity-50 ${
+        user.isActive
+          ? "bg-green-100 text-green-700 hover:bg-green-200"
+          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+      }`}
+      title={user.isActive ? "Cliquer pour suspendre" : "Cliquer pour réactiver"}
+    >
+      {isSaving ? (
+        <Loader2 size={12} className="animate-spin" />
+      ) : user.isActive ? (
+        "Actif"
+      ) : (
+        "Inactif"
+      )}
+    </button>
+  );
+}
+
 export default function UsersPage() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -204,15 +255,14 @@ export default function UsersPage() {
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs font-medium ${
-                        user.isActive
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
-                    >
-                      {user.isActive ? "Actif" : "Inactif"}
-                    </span>
+                    <StatusToggle
+                      user={user}
+                      onChanged={(updated) =>
+                        setUsers((prev) =>
+                          prev.map((u) => (u.id === updated.id ? updated : u)),
+                        )
+                      }
+                    />
                   </td>
                   <td className="px-4 py-3 text-gray-500">
                     {formatDate(user.createdAt)}
@@ -220,8 +270,13 @@ export default function UsersPage() {
                   <td className="px-4 py-3">
                     <button
                       onClick={() => handleDelete(user.id, user.username)}
-                      disabled={deletingId === user.id}
-                      className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      disabled={deletingId === user.id || user.id === currentUser?.id}
+                      title={
+                        user.id === currentUser?.id
+                          ? "Vous ne pouvez pas supprimer votre propre compte"
+                          : undefined
+                      }
+                      className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                     >
                       {deletingId === user.id ? (
                         <Loader2 size={16} className="animate-spin" />

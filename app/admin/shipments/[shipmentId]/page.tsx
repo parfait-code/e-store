@@ -243,6 +243,50 @@ function AddTrackingForm({
   );
 }
 
+function GenerateLabelButton({
+  shipmentId,
+  onGenerated,
+}: {
+  shipmentId: string;
+  onGenerated: (label: { id: string; labelUrl: string }) => void;
+}) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleClick() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get<{ label_id: string; label_url: string }>(
+        `/labels/${shipmentId}`,
+      );
+      onGenerated({ id: res.label_id, labelUrl: res.label_url });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Erreur de génération");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4">
+      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+      <button
+        onClick={handleClick}
+        disabled={isLoading}
+        className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+      >
+        {isLoading ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : (
+          <FileText size={16} />
+        )}
+        Générer l'étiquette
+      </button>
+    </div>
+  );
+}
+
 export default function ShipmentDetailPage() {
   const { shipmentId } = useParams<{ shipmentId: string }>();
   const [shipment, setShipment] = useState<Shipment | null>(null);
@@ -401,8 +445,8 @@ export default function ShipmentDetailPage() {
             )}
           </div>
 
-          {shipment.label && (
-            <a
+          {shipment.label ? (
+            
               href={shipment.label.labelUrl}
               target="_blank"
               rel="noopener noreferrer"
@@ -410,6 +454,13 @@ export default function ShipmentDetailPage() {
             >
               <FileText size={16} /> Voir l'étiquette
             </a>
+          ) : (
+            <GenerateLabelButton
+              shipmentId={shipment.id}
+              onGenerated={(label) =>
+                setShipment((prev) => (prev ? { ...prev, label } : prev))
+              }
+            />
           )}
         </div>
       </div>

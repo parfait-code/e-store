@@ -105,7 +105,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const syncToServer = useCallback(async () => {
     if (items.length === 0) return;
     try {
-      const basket = await apiClient.post<Basket>("/basket");
+      const basket = await apiClient.get<Basket>("/user/basket"); // get-or-create, plus de doublon
       for (const item of items) {
         await apiClient.post(`/basket/${basket.id}/product`, {
           product_id: item.productId,

@@ -349,7 +349,7 @@ export default function OrderDetailPage() {
           <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
             {STATUS_LABELS[order.status]}
           </span>
-          {["PENDING", "CONFIRMED"].includes(order.status) && (
+          {["PENDING", "CONFIRMED", "PROCESSING"].includes(order.status) && (
             <button
               onClick={handleCancelOrder}
               disabled={isCancelling}

@@ -46,7 +46,7 @@ export default function CategoriesPage() {
   const fetchCategories = useCallback(() => {
     setIsLoading(true);
     apiClient
-      .get<Category[]>("/categories")
+      .get<Category[]>("/categories?includeInactive=true")
       .then(setCategories)
       .catch((err) =>
         setError(

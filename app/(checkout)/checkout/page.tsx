@@ -190,9 +190,6 @@ export default function CheckoutPage() {
     }
   }
 
-  // La validation nécessite un basketId côté API — on en crée un vide à la
-  // volée juste pour cette vérification (le panier réel de la commande reste
-  // géré localement, cf. cart-context).
   async function handleValidateCoupon() {
     if (!couponCode.trim()) return;
     setIsValidatingCoupon(true);
@@ -200,7 +197,7 @@ export default function CheckoutPage() {
     try {
       let basketId = couponBasketId;
       if (!basketId) {
-        const basket = await apiClient.post<Basket>("/basket");
+        const basket = await apiClient.get<Basket>("/user/basket"); // au lieu de POST /basket
         basketId = basket.id;
         setCouponBasketId(basketId);
       }
@@ -224,6 +221,7 @@ export default function CheckoutPage() {
       setIsValidatingCoupon(false);
     }
   }
+  
   if (isLoading)
     return <Loader2 size={24} className="animate-spin text-gray-400" />;
 

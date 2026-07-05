@@ -87,7 +87,13 @@ export default function WishlistPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() =>
+                      onClick={() => {
+                        if (item.combinationId && !item.combination) {
+                          alert(
+                            "Cette variante n'est plus disponible et ne peut plus être ajoutée au panier.",
+                          );
+                          return;
+                        }
                         addItem({
                           productId: item.productId,
                           combinationId: item.combinationId,
@@ -96,8 +102,8 @@ export default function WishlistPage() {
                           price,
                           image: image ?? null,
                           sku: item.combination?.sku ?? "",
-                        })
-                      }
+                        });
+                      }}
                       className="flex items-center gap-1 rounded-md bg-gray-900 px-2 py-1 text-xs text-white hover:bg-gray-800"
                     >
                       <ShoppingCart size={12} /> Ajouter

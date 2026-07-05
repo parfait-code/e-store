@@ -55,6 +55,16 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   REFUNDED: "Remboursée",
 };
 
+const ORDER_ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  PENDING: ["CONFIRMED", "CANCELLED"],
+  CONFIRMED: ["PROCESSING", "CANCELLED"],
+  PROCESSING: ["SHIPPED", "CANCELLED"],
+  SHIPPED: ["DELIVERED"],
+  DELIVERED: ["REFUNDED"],
+  CANCELLED: [],
+  REFUNDED: [],
+};
+
 const SHIPMENT_STATUS_LABELS: Record<string, string> = {
   PENDING: "En attente",
   IN_TRANSIT: "En transit",
@@ -79,7 +89,9 @@ function StatusUpdateForm({
   isLoadingShipment: boolean;
   onSuccess: (order: Order) => void;
 }) {
-  const [status, setStatus] = useState<OrderStatus>(order.status);
+  const [status, setStatus] = useState<OrderStatus>(
+    ORDER_ALLOWED_TRANSITIONS[order.status][0] ?? order.status,
+  );
   const [reason, setReason] = useState("");
   const [shippingCarrier, setShippingCarrier] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
@@ -165,13 +177,21 @@ function StatusUpdateForm({
           onChange={(e) => setStatus(e.target.value as OrderStatus)}
           className={inputClass}
         >
-          {STATUS_OPTIONS.map((s) => (
+          <option value={order.status} disabled>
+            {STATUS_LABELS[order.status]} (actuel)
+          </option>
+          {ORDER_ALLOWED_TRANSITIONS[order.status].map((s) => (
             <option key={s} value={s}>
               {STATUS_LABELS[s]}
             </option>
           ))}
         </select>
-      </div>
+        {ORDER_ALLOWED_TRANSITIONS[order.status].length === 0 && (
+          <p className="mt-1 text-xs text-gray-400">
+            Statut terminal — aucune transition possible.
+          </p>
+        )}
+  </div>
 
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -309,7 +329,12 @@ function StatusUpdateForm({
 
       <button
         type="submit"
-        disabled={isSubmitting || status === order.status || isBlocked}
+        disabled={
+          isSubmitting ||
+          status === order.status ||
+          isBlocked ||
+          ORDER_ALLOWED_TRANSITIONS[order.status].length === 0
+        }
         className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
         {isSubmitting ? (

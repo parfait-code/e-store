@@ -155,7 +155,7 @@ export interface ProductCombination {
   id: string;
   productId: number;
   optionsKey: string;
-  sku: string;
+  sku: string | null; // corrigé — peut être absent
   price: number | null;
   isActive: boolean;
   values: CombinationValue[];
@@ -405,6 +405,7 @@ export interface CouponCode {
   startDate: string | null;
   endDate: string | null;
   isActive: boolean;
+  effectiveIsActive?: boolean; 
 }
 
 export interface Promotion {
@@ -865,6 +866,6 @@ export interface AddressValidateResponse {
     city: string;
     state?: string;
     country: string;
-    postalCode: string;
+    postal_code: string; // corrigé (était postalCode)
   };
 }
