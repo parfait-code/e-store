@@ -6,8 +6,8 @@ import { PriceDisplay } from "./PriceDisplay";
 import type { Product } from "@/lib/types";
 
 export function ProductCard({ product }: { product: Product }) {
-  const primaryImage =
-    product.images.find((img) => img.isPrimary) ?? product.images[0];
+  const images = product.images ?? [];
+  const primaryImage = images.find((img) => img.isPrimary) ?? images[0];
 
   return (
     <Link
