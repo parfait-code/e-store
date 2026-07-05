@@ -110,7 +110,6 @@ function AttributeSelectionEditor({
     </div>
   );
 }
-
 function CombinationEditRow({
   productId,
   combination,
@@ -124,7 +123,7 @@ function CombinationEditRow({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState<CombinationFormInput>({
-    sku: combination.sku,
+    sku: combination.sku ?? undefined,
     price: combination.price ?? undefined,
     isActive: combination.isActive,
   });
@@ -240,7 +239,7 @@ function CombinationEditRow({
     <div className="flex items-center justify-between rounded-md border border-gray-200 bg-white p-3">
       <div>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">{combination.sku}</span>
+          <span className="text-sm font-medium">{combination.sku ?? "—"}</span>
           <span
             className={`rounded-full px-2 py-0.5 text-xs ${
               combination.isActive
