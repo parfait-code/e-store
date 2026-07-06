@@ -31,8 +31,6 @@ const STEPS: StepDefinition[] = [
 ];
 
 // ---------- Étape Images ----------
-// Toute la sélection/retrait se fait en local (aucun appel API) ; un seul
-// passage d'appels séquentiels est déclenché au clic sur "Enregistrer".
 function ImagesStep({
   product,
   onUpdated,
@@ -59,26 +57,33 @@ function ImagesStep({
     onUpdated(updated);
   }
 
-  const existingImages = product.images
+  const sortedImages = product.images
     .slice()
-    .sort((a, b) => a.position - b.position)
-    .map((img) => ({
-      key: img.id,
-      url: img.url,
-      badge: img.isPrimary ? "Principale" : undefined,
-    }));
+    .sort((a, b) => a.position - b.position);
+  // Une seule image doit porter le badge "Principale" — si le backend en
+  // renvoyait plusieurs à isPrimary:true, on ne badge quand même que la
+  // première trouvée (ou la première du tri à défaut) pour éviter que
+  // toutes les vignettes affichent "Principale".
+  const primaryImage =
+    sortedImages.find((img) => img.isPrimary) ?? sortedImages[0];
+  const existingImages = sortedImages.map((img) => ({
+    key: img.id,
+    url: img.url,
+    badge:
+      primaryImage && img.id === primaryImage.id ? "Principale" : undefined,
+  }));
 
   return (
     <div className="max-w-2xl">
-      <h2 className="mb-1 text-sm font-medium">Images du produit</h2>
+      <h2 className="mb-3 text-sm font-medium">Images du produit</h2>
       <StagedImagesManager
         existingImages={existingImages}
         deleteOne={deleteOne}
         uploadOne={uploadOne}
-        helpText="Choisissez, retirez ou remplacez les images librement — rien n'est envoyé au serveur avant de cliquer sur « Enregistrer les images ». La première image marquée d'une étoile devient l'image principale du catalogue."
+        maxTotal={5}
       />
       <p className="mt-3 text-xs text-gray-400">
-        JPEG, PNG, WEBP ou GIF · 5 Mo max par fichier
+        JPEG, PNG, WEBP ou GIF · 5 Mo max par fichier · 5 images max au total
       </p>
     </div>
   );
@@ -429,8 +434,20 @@ export function ProductWizard({
     !productExists ? STEPS.map((_, i) => i).filter((i) => i > 0) : [],
   );
 
+  // Toute étape traversée (qu'on quitte en avançant) est marquée comme
+  // complétée — corrige le bug où seule "info" était jamais cochée, quelle
+  // que soit la progression réelle dans les autres étapes.
   function goTo(index: number) {
     if (disabledIndexes.has(index)) return;
+    if (index > currentStep) {
+      setCompletedSteps((prev) => {
+        const next = new Set(prev);
+        for (let i = currentStep; i < index; i++) {
+          next.add(STEPS[i].id);
+        }
+        return next;
+      });
+    }
     setCurrentStep(index);
   }
 
@@ -474,7 +491,7 @@ export function ProductWizard({
 
       <div className="mt-4 flex items-center justify-between">
         <button
-          onClick={() => goTo(currentStep - 1)}
+          onClick={() => setCurrentStep((s) => Math.max(0, s - 1))}
           disabled={currentStep === 0}
           className="flex items-center gap-1.5 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
         >

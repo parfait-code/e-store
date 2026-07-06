@@ -33,14 +33,21 @@ export function CategoryWizard({
 
   const categoryExists = Boolean(category);
 
-  // Tant que la catégorie n'existe pas (création), les étapes 2+ sont
-  // verrouillées : elles nécessitent toutes un categoryId.
   const disabledIndexes = new Set<number>(
     !categoryExists ? STEPS.map((_, i) => i).filter((i) => i > 0) : [],
   );
 
   function goTo(index: number) {
     if (disabledIndexes.has(index)) return;
+    if (index > currentStep) {
+      setCompletedSteps((prev) => {
+        const next = new Set(prev);
+        for (let i = currentStep; i < index; i++) {
+          next.add(STEPS[i].id);
+        }
+        return next;
+      });
+    }
     setCurrentStep(index);
   }
 
@@ -49,7 +56,7 @@ export function CategoryWizard({
     setCategory(saved);
     setCompletedSteps((prev) => new Set(prev).add("info"));
     if (wasNew) {
-      setCurrentStep(1); // avance automatiquement vers "Image & icône"
+      setCurrentStep(1);
     }
   }
 
@@ -82,7 +89,7 @@ export function CategoryWizard({
 
       <div className="mt-4 flex items-center justify-between">
         <button
-          onClick={() => goTo(currentStep - 1)}
+          onClick={() => setCurrentStep((s) => Math.max(0, s - 1))}
           disabled={currentStep === 0}
           className="flex items-center gap-1.5 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
         >

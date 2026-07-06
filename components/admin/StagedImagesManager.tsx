@@ -27,6 +27,29 @@ interface StagedImagesManagerProps {
   helpText?: string;
 }
 
+// Petit wrapper qui fait apparaître une vignette en fondu à son montage —
+// utilisé pour les images existantes ET pour les images en attente, afin
+// qu'une image nouvellement affichée (après un upload réussi, ou au chargement
+// initial) s'anime en douceur au lieu d'apparaître brutalement.
+function FadeInThumb({ children }: { children: React.ReactNode }) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return (
+    <div
+      className={`transition-all duration-300 ease-out ${
+        visible ? "scale-100 opacity-100" : "scale-90 opacity-0"
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function StagedImagesManager({
   existingImages,
   deleteOne,
@@ -50,7 +73,6 @@ export function StagedImagesManager({
   const [error, setError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
 
-  // Nettoie les object URLs en mémoire au démontage
   useEffect(() => {
     return () => {
       staged.forEach((s) => URL.revokeObjectURL(s.previewUrl));
@@ -119,9 +141,15 @@ export function StagedImagesManager({
       setProgress({ done: doneCount, total });
     }
 
+    // Upload une image à la fois, en retirant sa vignette "en attente" dès que
+    // SON upload à elle réussit — plutôt que de vider tout le lot à la fin —
+    // pour que le remplacement par l'image réelle enregistrée soit visible
+    // progressivement, surtout avec plusieurs images à la fois.
     for (const s of staged) {
       try {
         await uploadOne(s.file);
+        URL.revokeObjectURL(s.previewUrl);
+        setStaged((prev) => prev.filter((item) => item.id !== s.id));
       } catch {
         failures += 1;
       }
@@ -129,11 +157,9 @@ export function StagedImagesManager({
       setProgress({ done: doneCount, total });
     }
 
-    staged.forEach((s) => URL.revokeObjectURL(s.previewUrl));
-    setStaged([]);
-    setPendingDeletions(new Set());
     setIsSaving(false);
     setProgress(null);
+    setPendingDeletions(new Set());
 
     if (failures > 0) {
       setError(
@@ -159,53 +185,55 @@ export function StagedImagesManager({
 
       <div className="flex flex-wrap gap-3">
         {visibleExisting.map((img) => (
-          <div
-            key={img.key}
-            className="group relative h-24 w-24 overflow-hidden rounded-md border border-gray-200"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={img.url} alt="" className="h-full w-full object-cover" />
-            {img.badge && (
-              <span className="absolute left-1 top-1 rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-gray-700">
-                {img.badge}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => toggleDeleteExisting(img.key)}
-              disabled={isSaving}
-              className="absolute right-1 top-1 rounded-full bg-white/90 p-1 opacity-0 transition group-hover:opacity-100 hover:bg-red-50 disabled:opacity-50"
-              title="Retirer (supprimée à l'enregistrement)"
-            >
-              <X size={12} className="text-red-600" />
-            </button>
-          </div>
+          <FadeInThumb key={img.key}>
+            <div className="group relative h-24 w-24 overflow-hidden rounded-md border border-gray-200">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={img.url}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+              {img.badge && (
+                <span className="absolute left-1 top-1 rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-gray-700">
+                  {img.badge}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => toggleDeleteExisting(img.key)}
+                disabled={isSaving}
+                className="absolute right-1 top-1 rounded-full bg-white/90 p-1 opacity-0 transition group-hover:opacity-100 hover:bg-red-50 disabled:opacity-50"
+                title="Retirer (supprimée à l'enregistrement)"
+              >
+                <X size={12} className="text-red-600" />
+              </button>
+            </div>
+          </FadeInThumb>
         ))}
 
         {staged.map((s) => (
-          <div
-            key={s.id}
-            className="group relative h-24 w-24 overflow-hidden rounded-md border-2 border-dashed border-gray-300"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={s.previewUrl}
-              alt=""
-              className="h-full w-full object-cover opacity-90"
-            />
-            <span className="absolute left-1 top-1 rounded-full bg-gray-900/80 px-1.5 py-0.5 text-[10px] font-medium text-white">
-              Nouvelle
-            </span>
-            <button
-              type="button"
-              onClick={() => removeStaged(s.id)}
-              disabled={isSaving}
-              className="absolute right-1 top-1 rounded-full bg-white/90 p-1 opacity-0 transition group-hover:opacity-100 hover:bg-red-50 disabled:opacity-50"
-              title="Retirer cette image (pas encore envoyée)"
-            >
-              <X size={12} className="text-red-600" />
-            </button>
-          </div>
+          <FadeInThumb key={s.id}>
+            <div className="group relative h-24 w-24 overflow-hidden rounded-md border-2 border-dashed border-gray-300">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={s.previewUrl}
+                alt=""
+                className="h-full w-full object-cover opacity-90"
+              />
+              <span className="absolute left-1 top-1 rounded-full bg-gray-900/80 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                Nouvelle
+              </span>
+              <button
+                type="button"
+                onClick={() => removeStaged(s.id)}
+                disabled={isSaving}
+                className="absolute right-1 top-1 rounded-full bg-white/90 p-1 opacity-0 transition group-hover:opacity-100 hover:bg-red-50 disabled:opacity-50"
+                title="Retirer cette image (pas encore envoyée)"
+              >
+                <X size={12} className="text-red-600" />
+              </button>
+            </div>
+          </FadeInThumb>
         ))}
 
         {canAddMore && (

@@ -41,6 +41,15 @@ export function PromotionWizard({
 
   function goTo(index: number) {
     if (disabledIndexes.has(index)) return;
+    if (index > currentStep) {
+      setCompletedSteps((prev) => {
+        const next = new Set(prev);
+        for (let i = currentStep; i < index; i++) {
+          next.add(STEPS[i].id);
+        }
+        return next;
+      });
+    }
     setCurrentStep(index);
   }
 
@@ -49,7 +58,7 @@ export function PromotionWizard({
     setPromotion(saved);
     setCompletedSteps((prev) => new Set(prev).add("info"));
     if (wasNew) {
-      setCurrentStep(1); // avance automatiquement vers "Images"
+      setCurrentStep(1);
     }
   }
 
@@ -85,7 +94,7 @@ export function PromotionWizard({
 
       <div className="mt-4 flex items-center justify-between">
         <button
-          onClick={() => goTo(currentStep - 1)}
+          onClick={() => setCurrentStep((s) => Math.max(0, s - 1))}
           disabled={currentStep === 0}
           className="flex items-center gap-1.5 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
         >
