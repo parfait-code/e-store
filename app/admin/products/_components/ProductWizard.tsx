@@ -1,14 +1,10 @@
 // app/admin/products/_components/ProductWizard.tsx
 "use client";
 
-import { useState, useEffect, useRef, ChangeEvent } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
-  Upload,
-  Star,
-  X,
   Loader2,
   Boxes,
   ArrowRight,
@@ -23,6 +19,7 @@ import type {
   ProductCombination,
 } from "@/lib/types";
 import { Stepper, type StepDefinition } from "@/components/admin/Stepper";
+import { StagedImagesManager } from "@/components/admin/StagedImagesManager";
 import { ProductForm } from "./ProductForm";
 
 const STEPS: StepDefinition[] = [
@@ -34,6 +31,8 @@ const STEPS: StepDefinition[] = [
 ];
 
 // ---------- Étape Images ----------
+// Toute la sélection/retrait se fait en local (aucun appel API) ; un seul
+// passage d'appels séquentiels est déclenché au clic sur "Enregistrer".
 function ImagesStep({
   product,
   onUpdated,
@@ -41,118 +40,45 @@ function ImagesStep({
   product: Product;
   onUpdated: (p: Product) => void;
 }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
-
-  async function handleImageUpload(e: ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    if (files.length > 5) {
-      alert("5 images maximum par envoi.");
-      return;
-    }
+  async function uploadOne(file: File) {
     const formData = new FormData();
-    Array.from(files).forEach((file) => formData.append("images", file));
-
-    setIsUploading(true);
-    try {
-      const updated = await apiClient.post<Product>(
-        `/product/${product.id}/images`,
-        formData,
-        { isFormData: true },
-      );
-      onUpdated(updated);
-    } catch (err) {
-      alert(
-        err instanceof ApiError ? err.message : "Échec de l'envoi des images",
-      );
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+    formData.append("images", file);
+    const updated = await apiClient.post<Product>(
+      `/product/${product.id}/images`,
+      formData,
+      { isFormData: true },
+    );
+    onUpdated(updated);
   }
 
-  async function handleDeleteImage(imageId: string) {
-    if (!confirm("Supprimer cette image ?")) return;
-    setDeletingImageId(imageId);
-    try {
-      const updated = await apiClient.delete<Product>(
-        `/product/${product.id}/images`,
-        { imageId },
-      );
-      onUpdated(updated);
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Échec de la suppression");
-    } finally {
-      setDeletingImageId(null);
-    }
+  async function deleteOne(imageId: string) {
+    const updated = await apiClient.delete<Product>(
+      `/product/${product.id}/images`,
+      { imageId },
+    );
+    onUpdated(updated);
   }
+
+  const existingImages = product.images
+    .slice()
+    .sort((a, b) => a.position - b.position)
+    .map((img) => ({
+      key: img.id,
+      url: img.url,
+      badge: img.isPrimary ? "Principale" : undefined,
+    }));
 
   return (
     <div className="max-w-2xl">
       <h2 className="mb-1 text-sm font-medium">Images du produit</h2>
-      <p className="mb-4 text-xs text-gray-400">
-        La première image marquée d'une étoile est utilisée comme image
-        principale dans le catalogue.
-      </p>
-      <div className="flex flex-wrap gap-3">
-        {product.images
-          .slice()
-          .sort((a, b) => a.position - b.position)
-          .map((img) => (
-            <div
-              key={img.id}
-              className="group relative h-24 w-24 overflow-hidden rounded-md border border-gray-200"
-            >
-              <Image
-                src={img.url}
-                alt={img.altText ?? ""}
-                fill
-                className="object-cover"
-              />
-              {img.isPrimary && (
-                <span className="absolute left-1 top-1 rounded-full bg-white/90 p-1">
-                  <Star size={12} className="fill-amber-400 text-amber-400" />
-                </span>
-              )}
-              <button
-                onClick={() => handleDeleteImage(img.id)}
-                disabled={deletingImageId === img.id}
-                className="absolute right-1 top-1 rounded-full bg-white/90 p-1 opacity-0 transition group-hover:opacity-100 hover:bg-red-50"
-              >
-                {deletingImageId === img.id ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <X size={12} className="text-red-600" />
-                )}
-              </button>
-            </div>
-          ))}
-
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-600 disabled:opacity-50"
-        >
-          {isUploading ? (
-            <Loader2 size={18} className="animate-spin" />
-          ) : (
-            <Upload size={18} />
-          )}
-          <span className="text-xs">Ajouter</span>
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          multiple
-          hidden
-          onChange={handleImageUpload}
-        />
-      </div>
+      <StagedImagesManager
+        existingImages={existingImages}
+        deleteOne={deleteOne}
+        uploadOne={uploadOne}
+        helpText="Choisissez, retirez ou remplacez les images librement — rien n'est envoyé au serveur avant de cliquer sur « Enregistrer les images ». La première image marquée d'une étoile devient l'image principale du catalogue."
+      />
       <p className="mt-3 text-xs text-gray-400">
-        JPEG, PNG, WEBP ou GIF · 5 Mo max · 5 fichiers max
+        JPEG, PNG, WEBP ou GIF · 5 Mo max par fichier
       </p>
     </div>
   );
@@ -499,8 +425,6 @@ export function ProductWizard({
 
   const productExists = Boolean(product);
 
-  // Tant que le produit n'existe pas encore (création), les étapes 2+ sont
-  // verrouillées : elles nécessitent toutes un productId.
   const disabledIndexes = new Set<number>(
     !productExists ? STEPS.map((_, i) => i).filter((i) => i > 0) : [],
   );
@@ -515,7 +439,7 @@ export function ProductWizard({
     setProduct(saved);
     setCompletedSteps((prev) => new Set(prev).add("info"));
     if (wasNew) {
-      setCurrentStep(1); // avance automatiquement vers "Images" après création
+      setCurrentStep(1);
     }
   }
 
