@@ -73,16 +73,15 @@ function NewTagForm({ onCreated }: { onCreated: (tag: Tag) => void }) {
   );
 }
 
-function TagCard({
+function EditTagModal({
   tag,
+  onClose,
   onUpdated,
-  onDeleteRequested,
 }: {
   tag: Tag;
+  onClose: () => void;
   onUpdated: (tag: Tag) => void;
-  onDeleteRequested: (tag: Tag) => void;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(tag.name);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +95,7 @@ function TagCard({
         slug: slugify(name),
       });
       onUpdated(updated);
-      setIsEditing(false);
+      onClose();
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
@@ -106,53 +105,62 @@ function TagCard({
     }
   }
 
-  if (isEditing) {
-    return (
-      <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3">
-        {error && <p className="text-xs text-red-600">{error}</p>}
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div className="w-full max-w-sm rounded-lg bg-white p-5">
+        <h2 className="mb-4 text-sm font-semibold">Modifier le tag</h2>
+        {error && (
+          <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+            {error}
+          </p>
+        )}
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           autoFocus
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-gray-900"
+          className="mb-5 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
         />
-        <div className="flex items-center gap-2">
+        <div className="flex justify-end gap-2">
           <button
-            onClick={handleSave}
+            type="button"
+            onClick={onClose}
             disabled={isSaving}
-            className="flex items-center gap-1 rounded-md bg-gray-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           >
-            {isSaving ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <Check size={12} />
-            )}
-            Enregistrer
+            Annuler
           </button>
           <button
-            onClick={() => {
-              setIsEditing(false);
-              setName(tag.name);
-              setError(null);
-            }}
-            className="rounded-md p-1 text-gray-500 hover:bg-gray-100"
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving || !name.trim()}
+            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
           >
-            <X size={14} />
+            {isSaving ? "..." : "Enregistrer"}
           </button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
+function TagCard({
+  tag,
+  onEditRequested,
+  onDeleteRequested,
+}: {
+  tag: Tag;
+  onEditRequested: (tag: Tag) => void;
+  onDeleteRequested: (tag: Tag) => void;
+}) {
   return (
     <div className="group flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5">
       <div className="flex min-w-0 items-center gap-2">
         <TagIcon size={14} className="shrink-0 text-gray-400" />
         <span className="truncate text-sm font-medium">{tag.name}</span>
       </div>
-      <div className="flex shrink-0 items-center gap-1  transition">
+      <div className="flex shrink-0 items-center gap-1">
         <button
-          onClick={() => setIsEditing(true)}
+          onClick={() => onEditRequested(tag)}
           className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
         >
           <Pencil size={14} />
@@ -173,6 +181,7 @@ export default function TagsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
+  const [tagToEdit, setTagToEdit] = useState<Tag | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
@@ -226,15 +235,23 @@ export default function TagsPage() {
             <TagCard
               key={tag.id}
               tag={tag}
-              onUpdated={(updated) =>
-                setTags((prev) =>
-                  prev.map((t) => (t.id === updated.id ? updated : t)),
-                )
-              }
+              onEditRequested={setTagToEdit}
               onDeleteRequested={setTagToDelete}
             />
           ))}
         </div>
+      )}
+
+      {tagToEdit && (
+        <EditTagModal
+          tag={tagToEdit}
+          onClose={() => setTagToEdit(null)}
+          onUpdated={(updated) =>
+            setTags((prev) =>
+              prev.map((t) => (t.id === updated.id ? updated : t)),
+            )
+          }
+        />
       )}
 
       <ConfirmDialog

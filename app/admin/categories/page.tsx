@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { Category } from "@/lib/types";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
 // Construit un ordre "arbre affiché à plat" : racines puis leurs enfants juste après
 function flattenTree(
@@ -42,6 +43,7 @@ export default function CategoriesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const fetchCategories = useCallback(() => {
     setIsLoading(true);
@@ -60,19 +62,19 @@ export default function CategoriesPage() {
     fetchCategories();
   }, [fetchCategories]);
 
-  async function handleDelete(categoryId: string) {
-    if (!confirm("Supprimer cette catégorie ?")) return;
-    setDeletingId(categoryId);
+  async function confirmDelete() {
+    if (!confirmDeleteId) return;
+    setDeletingId(confirmDeleteId);
     try {
-      await apiClient.delete(`/categories/${categoryId}`);
-      setCategories((prev) => prev.filter((c) => c.id !== categoryId));
+      await apiClient.delete(`/categories/${confirmDeleteId}`);
+      setCategories((prev) => prev.filter((c) => c.id !== confirmDeleteId));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Suppression impossible");
     } finally {
       setDeletingId(null);
+      setConfirmDeleteId(null);
     }
   }
-
   const rows = flattenTree(categories);
 
   return (
@@ -172,7 +174,7 @@ export default function CategoriesPage() {
                         <Pencil size={16} />
                       </Link>
                       <button
-                        onClick={() => handleDelete(category.id)}
+                        onClick={() => setConfirmDeleteId(category.id)}
                         disabled={
                           deletingId === category.id ||
                           category._count.products > 0
@@ -198,6 +200,15 @@ export default function CategoriesPage() {
           </tbody>
         </table>
       </div>
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Supprimer la catégorie"
+        message="Cette action est irréversible. Voulez-vous vraiment continuer ?"
+        confirmLabel="Supprimer"
+        isLoading={deletingId !== null}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

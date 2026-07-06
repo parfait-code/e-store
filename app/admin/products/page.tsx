@@ -22,6 +22,7 @@ import type {
   Paginated,
   ProductStatus,
 } from "@/lib/types";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
 const STATUS_STYLES: Record<ProductStatus, string> = {
   ACTIVE: "bg-green-100 text-green-700",
@@ -47,6 +48,7 @@ export default function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   // Debounce : évite un appel API à chaque frappe
   useEffect(() => {
@@ -90,13 +92,12 @@ export default function ProductsPage() {
       .catch(() => {});
   }, []);
 
-  async function handleDelete(productId: number) {
-    if (!confirm("Supprimer ce produit ? Cette action est irréversible."))
-      return;
-    setDeletingId(productId);
+  async function confirmDelete() {
+    if (confirmDeleteId === null) return;
+    setDeletingId(confirmDeleteId);
     try {
-      await apiClient.delete(`/product/${productId}`);
-      setProducts((prev) => prev.filter((p) => p.id !== productId));
+      await apiClient.delete(`/product/${confirmDeleteId}`);
+      setProducts((prev) => prev.filter((p) => p.id !== confirmDeleteId));
       setTotal((t) => t - 1);
     } catch (err) {
       alert(
@@ -104,6 +105,7 @@ export default function ProductsPage() {
       );
     } finally {
       setDeletingId(null);
+      setConfirmDeleteId(null);
     }
   }
 
@@ -257,7 +259,7 @@ export default function ProductsPage() {
                           <Pencil size={16} />
                         </Link>
                         <button
-                          onClick={() => handleDelete(product.id)}
+                          onClick={() => setConfirmDeleteId(product.id)}
                           disabled={deletingId === product.id}
                           className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                         >
@@ -300,6 +302,16 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Supprimer le produit"
+        message="Cette action est irréversible. Voulez-vous vraiment continuer ?"
+        confirmLabel="Supprimer"
+        isLoading={deletingId !== null}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

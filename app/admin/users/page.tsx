@@ -8,6 +8,7 @@ import { apiClient, ApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import type { User, Role } from "@/lib/types";
 import { useAuth } from "@/lib/auth/auth-context";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
 const ROLE_OPTIONS: Role[] = ["USER", "ADMIN", "MANAGER", "SUPPORT"];
 
@@ -18,24 +19,32 @@ const ROLE_STYLES: Record<Role, string> = {
   SUPPORT: "bg-purple-100 text-purple-700",
 };
 
-function RoleSelect({
+function ChangeRoleModal({
   user,
+  onClose,
   onChanged,
 }: {
   user: User;
+  onClose: () => void;
   onChanged: (u: User) => void;
 }) {
+  const [role, setRole] = useState<Role>(user.role);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleChange(role: Role) {
-    if (role === user.role) return;
-    if (!confirm(`Changer le rôle de ${user.username} en ${role} ?`)) return;
+  async function handleConfirm() {
+    if (role === user.role) {
+      onClose();
+      return;
+    }
     setIsSaving(true);
+    setError(null);
     try {
       await apiClient.patch(`/user/change-role/${user.id}`, { role });
       onChanged({ ...user, role });
+      onClose();
     } catch (err) {
-      alert(
+      setError(
         err instanceof ApiError
           ? err.message
           : "Erreur lors du changement de rôle",
@@ -46,20 +55,46 @@ function RoleSelect({
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <select
-        value={user.role}
-        onChange={(e) => handleChange(e.target.value as Role)}
-        disabled={isSaving}
-        className={`rounded-full border-0 px-2 py-1 text-xs font-medium outline-none ${ROLE_STYLES[user.role]} disabled:opacity-50`}
-      >
-        {ROLE_OPTIONS.map((r) => (
-          <option key={r} value={r}>
-            {r}
-          </option>
-        ))}
-      </select>
-      {isSaving && <Loader2 size={12} className="animate-spin text-gray-400" />}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div className="w-full max-w-sm rounded-lg bg-white p-5">
+        <h2 className="mb-4 text-sm font-semibold">
+          Changer le rôle de {user.username}
+        </h2>
+        {error && (
+          <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+            {error}
+          </p>
+        )}
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as Role)}
+          className="mb-5 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+        >
+          {ROLE_OPTIONS.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={isSaving}
+            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          >
+            {isSaving ? "..." : "Confirmer"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -75,7 +110,8 @@ function StatusToggle({
 
   async function toggle() {
     const action = user.isActive ? "suspendre" : "réactiver";
-    if (!confirm(`Voulez-vous ${action} le compte de ${user.username} ?`)) return;
+    if (!confirm(`Voulez-vous ${action} le compte de ${user.username} ?`))
+      return;
     setIsSaving(true);
     try {
       const updated = await apiClient.patch<User>(`/user/${user.id}/status`, {
@@ -84,7 +120,9 @@ function StatusToggle({
       onChanged(updated);
     } catch (err) {
       alert(
-        err instanceof ApiError ? err.message : "Erreur lors du changement de statut",
+        err instanceof ApiError
+          ? err.message
+          : "Erreur lors du changement de statut",
       );
     } finally {
       setIsSaving(false);
@@ -100,7 +138,9 @@ function StatusToggle({
           ? "bg-green-100 text-green-700 hover:bg-green-200"
           : "bg-gray-100 text-gray-500 hover:bg-gray-200"
       }`}
-      title={user.isActive ? "Cliquer pour suspendre" : "Cliquer pour réactiver"}
+      title={
+        user.isActive ? "Cliquer pour suspendre" : "Cliquer pour réactiver"
+      }
     >
       {isSaving ? (
         <Loader2 size={12} className="animate-spin" />
@@ -120,6 +160,8 @@ export default function UsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<User | null>(null);
+  const [roleEditUser, setRoleEditUser] = useState<User | null>(null);
 
   useEffect(() => {
     apiClient
@@ -133,16 +175,17 @@ export default function UsersPage() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  async function handleDelete(userId: number, username: string) {
-    if (!confirm(`Supprimer l'utilisateur « ${username} » ?`)) return;
-    setDeletingId(userId);
+  async function confirmDelete() {
+    if (!confirmDeleteUser) return;
+    setDeletingId(confirmDeleteUser.id);
     try {
-      await apiClient.delete(`/user/${userId}`);
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      await apiClient.delete(`/user/${confirmDeleteUser.id}`);
+      setUsers((prev) => prev.filter((u) => u.id !== confirmDeleteUser.id));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Suppression impossible");
     } finally {
       setDeletingId(null);
+      setConfirmDeleteUser(null);
     }
   }
 
@@ -245,14 +288,12 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-500">{user.email}</td>
                   <td className="px-4 py-3">
-                    <RoleSelect
-                      user={user}
-                      onChanged={(updated) =>
-                        setUsers((prev) =>
-                          prev.map((u) => (u.id === updated.id ? updated : u)),
-                        )
-                      }
-                    />
+                    <button
+                      onClick={() => setRoleEditUser(user)}
+                      className={`rounded-full px-2 py-1 text-xs font-medium ${ROLE_STYLES[user.role]}`}
+                    >
+                      {user.role}
+                    </button>
                   </td>
                   <td className="px-4 py-3">
                     <StatusToggle
@@ -269,8 +310,10 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3">
                     <button
-                      onClick={() => handleDelete(user.id, user.username)}
-                      disabled={deletingId === user.id || user.id === currentUser?.id}
+                      onClick={() => setConfirmDeleteUser(user)}
+                      disabled={
+                        deletingId === user.id || user.id === currentUser?.id
+                      }
                       title={
                         user.id === currentUser?.id
                           ? "Vous ne pouvez pas supprimer votre propre compte"
@@ -291,6 +334,28 @@ export default function UsersPage() {
           </tbody>
         </table>
       </div>
+
+      {roleEditUser && (
+        <ChangeRoleModal
+          user={roleEditUser}
+          onClose={() => setRoleEditUser(null)}
+          onChanged={(updated) =>
+            setUsers((prev) =>
+              prev.map((u) => (u.id === updated.id ? updated : u)),
+            )
+          }
+        />
+      )}
+
+      <ConfirmDialog
+        open={confirmDeleteUser !== null}
+        title="Supprimer l'utilisateur"
+        message={`Voulez-vous vraiment supprimer « ${confirmDeleteUser?.username} » ?`}
+        confirmLabel="Supprimer"
+        isLoading={deletingId !== null}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmDeleteUser(null)}
+      />
     </div>
   );
 }

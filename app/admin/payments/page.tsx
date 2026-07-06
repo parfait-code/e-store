@@ -54,22 +54,21 @@ const ALLOWED_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
   CANCELLED: [],
 };
 
-function PaymentStatusEditor({
+function ChangeStatusModal({
   payment,
+  onClose,
   onUpdated,
 }: {
   payment: Payment;
+  onClose: () => void;
   onUpdated: (p: Payment) => void;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [status, setStatus] = useState<PaymentStatus>(payment.status);
+  const options = ALLOWED_TRANSITIONS[payment.status];
+  const [status, setStatus] = useState<PaymentStatus>(options[0]);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const options = ALLOWED_TRANSITIONS[payment.status];
-  const isTerminal = options.length === 0;
-
-  async function handleSave() {
+  async function handleConfirm() {
     setIsSaving(true);
     setError(null);
     try {
@@ -78,7 +77,7 @@ function PaymentStatusEditor({
         { status },
       );
       onUpdated(updated);
-      setIsEditing(false);
+      onClose();
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
@@ -88,64 +87,47 @@ function PaymentStatusEditor({
     }
   }
 
-  if (!isEditing) {
-    return (
-      <div className="flex items-center gap-1.5">
-        <span
-          className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[payment.status]}`}
-        >
-          {payment.status}
-        </span>
-        {!isTerminal && (
-          <button
-            onClick={() => {
-              setStatus(options[0]);
-              setIsEditing(true);
-            }}
-            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-900"
-            title="Changer le statut"
-          >
-            <Pencil size={12} />
-          </button>
-        )}
-      </div>
-    );
-  }
-
   return (
-    <div className="flex items-center gap-1.5">
-      <select
-        value={status}
-        onChange={(e) => setStatus(e.target.value as PaymentStatus)}
-        className="rounded-md border border-gray-300 px-1.5 py-1 text-xs outline-none focus:border-gray-900"
-      >
-        {options.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </select>
-      <button
-        onClick={handleSave}
-        disabled={isSaving}
-        className="rounded-md p-1 text-green-600 hover:bg-green-50 disabled:opacity-50"
-      >
-        {isSaving ? (
-          <Loader2 size={12} className="animate-spin" />
-        ) : (
-          <Check size={12} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div className="w-full max-w-sm rounded-lg bg-white p-5">
+        <h2 className="mb-4 text-sm font-semibold">
+          Changer le statut du paiement
+        </h2>
+        {error && (
+          <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+            {error}
+          </p>
         )}
-      </button>
-      <button
-        onClick={() => {
-          setIsEditing(false);
-          setError(null);
-        }}
-        className="rounded-md p-1 text-gray-400 hover:bg-gray-100"
-      >
-        <X size={12} />
-      </button>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value as PaymentStatus)}
+          className="mb-5 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+        >
+          {options.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={isSaving}
+            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          >
+            {isSaving ? "..." : "Confirmer"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -159,6 +141,9 @@ export default function PaymentsPage() {
   const [method, setMethod] = useState("");
   const [orderIdInput, setOrderIdInput] = useState("");
   const [orderId, setOrderId] = useState("");
+  const [statusEditPayment, setStatusEditPayment] = useState<Payment | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -311,14 +296,22 @@ export default function PaymentsPage() {
                     {formatXAF(p.amount)}
                   </td>
                   <td className="px-4 py-3">
-                    <PaymentStatusEditor
-                      payment={p}
-                      onUpdated={(updated) =>
-                        setPayments((prev) =>
-                          prev.map((x) => (x.id === updated.id ? updated : x)),
-                        )
-                      }
-                    />
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[p.status]}`}
+                      >
+                        {p.status}
+                      </span>
+                      {ALLOWED_TRANSITIONS[p.status].length > 0 && (
+                        <button
+                          onClick={() => setStatusEditPayment(p)}
+                          className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-900"
+                          title="Changer le statut"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-gray-500">
                     {formatDate(p.createdAt)}
@@ -352,6 +345,18 @@ export default function PaymentsPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {statusEditPayment && (
+        <ChangeStatusModal
+          payment={statusEditPayment}
+          onClose={() => setStatusEditPayment(null)}
+          onUpdated={(updated) =>
+            setPayments((prev) =>
+              prev.map((x) => (x.id === updated.id ? updated : x)),
+            )
+          }
+        />
       )}
     </div>
   );
