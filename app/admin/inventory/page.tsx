@@ -15,6 +15,7 @@ import {
   Save,
   Plus,
   Trash2,
+  Check,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type {
@@ -206,8 +207,7 @@ function TransferModal({
   );
 }
 
-// Recherche live d'un produit par nom/SKU — remplace le champ "ID produit"
-// qu'aucun admin n'a réellement sous la main.
+// Recherche live d'un produit par nom/SKU
 function ProductSearchPicker({
   selected,
   onSelect,
@@ -309,8 +309,7 @@ function ProductSearchPicker({
   );
 }
 
-// Liste les combinaisons réelles du produit sélectionné — remplace le champ
-// "ID variante" en texte libre. Se recharge à chaque changement de produit.
+// Liste les combinaisons réelles du produit sélectionné
 function CombinationSearchPicker({
   productId,
   selected,
@@ -337,8 +336,6 @@ function CombinationSearchPicker({
         setError("Impossible de charger les combinaisons pour ce produit."),
       )
       .finally(() => setIsLoading(false));
-    // onSelect volontairement exclu des deps : ne doit se relancer que sur
-    // changement de produit, pas à chaque re-render du parent.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
 
@@ -412,7 +409,7 @@ function NewInventoryItemForm({
   onCancel,
 }: {
   warehouses: Warehouse[];
-  onCreated: (item: InventoryItem) => void;
+  onCreated: () => void;
   onCancel: () => void;
 }) {
   const [selectedProduct, setSelectedProduct] = useState<{
@@ -438,13 +435,13 @@ function NewInventoryItemForm({
     }
     setIsSubmitting(true);
     try {
-      const created = await apiClient.post<InventoryItem>("/inventory", {
+      await apiClient.post<InventoryItem>("/inventory", {
         product_id: selectedProduct.id,
         warehouse_id: warehouseId,
         combination_id: selectedCombination?.id,
         quantity,
       });
-      onCreated(created);
+      onCreated();
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -460,10 +457,7 @@ function NewInventoryItemForm({
     "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="mb-4 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4"
-    >
+    <form onSubmit={handleSubmit} className="space-y-3">
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
           {error}
@@ -545,6 +539,321 @@ function NewInventoryItemForm({
   );
 }
 
+// Crée en une seule opération un article d'inventaire pour CHAQUE combinaison
+// active du produit sélectionné, dans le même entrepôt. Chaque combinaison a
+// sa propre quantité modifiable ; l'enregistrement se fait combinaison par
+// combinaison (l'API n'a pas de route batch), d'où la barre de progression.
+function BulkCombinationForm({
+  warehouses,
+  onCreated,
+  onCancel,
+}: {
+  warehouses: Warehouse[];
+  onCreated: () => void;
+  onCancel: () => void;
+}) {
+  const [selectedProduct, setSelectedProduct] = useState<{
+    id: number;
+    name: string;
+    sku: string;
+  } | null>(null);
+  const [combinations, setCombinations] = useState<ProductCombination[]>([]);
+  const [isLoadingCombos, setIsLoadingCombos] = useState(false);
+  const [warehouseId, setWarehouseId] = useState("");
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [progress, setProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const [results, setResults] = useState<Record<string, "ok" | "error">>({});
+
+  useEffect(() => {
+    setCombinations([]);
+    setQuantities({});
+    setResults({});
+    if (!selectedProduct) return;
+    setIsLoadingCombos(true);
+    apiClient
+      .get<ProductCombination[]>(`/product/${selectedProduct.id}/combinations`)
+      .then((combos) => {
+        setCombinations(combos);
+        const initial: Record<string, number> = {};
+        combos.forEach((c) => {
+          initial[c.id] = 0;
+        });
+        setQuantities(initial);
+      })
+      .catch(() =>
+        setError("Impossible de charger les combinaisons pour ce produit."),
+      )
+      .finally(() => setIsLoadingCombos(false));
+  }, [selectedProduct]);
+
+  function labelFor(combo: ProductCombination) {
+    const attrs = combo.values
+      .map((v) => `${v.attributeDefinition.name}: ${v.attributeOption.value}`)
+      .join(" · ");
+    return combo.sku ? `${attrs} — ${combo.sku}` : attrs;
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (!selectedProduct || !warehouseId) {
+      setError("Sélectionnez un produit et un entrepôt.");
+      return;
+    }
+    const targets = combinations.filter((c) => (quantities[c.id] ?? 0) > 0);
+    if (targets.length === 0) {
+      setError("Renseignez une quantité pour au moins une combinaison.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setProgress({ done: 0, total: targets.length });
+    setResults({});
+    let successCount = 0;
+
+    for (const combo of targets) {
+      try {
+        await apiClient.post<InventoryItem>("/inventory", {
+          product_id: selectedProduct.id,
+          warehouse_id: warehouseId,
+          combination_id: combo.id,
+          quantity: quantities[combo.id],
+        });
+        successCount += 1;
+        setResults((prev) => ({ ...prev, [combo.id]: "ok" }));
+      } catch {
+        setResults((prev) => ({ ...prev, [combo.id]: "error" }));
+      }
+      setProgress((prev) => (prev ? { ...prev, done: prev.done + 1 } : prev));
+    }
+
+    setIsSubmitting(false);
+    if (successCount > 0) onCreated();
+
+    const failedCount = targets.length - successCount;
+    if (failedCount > 0) {
+      setError(
+        `${successCount}/${targets.length} article(s) créé(s). ${failedCount} échec(s) — probablement un article déjà existant pour ce couple entrepôt/combinaison (utilisez l'édition directe dans la liste).`,
+      );
+    }
+  }
+
+  const inputClass =
+    "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
+  const percent = progress
+    ? Math.round((progress.done / progress.total) * 100)
+    : 0;
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <p className="text-xs text-gray-500">
+        Crée un article d'inventaire pour chaque combinaison active du produit,
+        dans le même entrepôt, en une seule opération.
+      </p>
+      {error && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+          {error}
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Produit
+          </label>
+          <ProductSearchPicker
+            selected={selectedProduct}
+            onSelect={setSelectedProduct}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Entrepôt
+          </label>
+          <select
+            required
+            value={warehouseId}
+            onChange={(e) => setWarehouseId(e.target.value)}
+            disabled={isSubmitting}
+            className={inputClass}
+          >
+            <option value="">Sélectionner...</option>
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {isLoadingCombos ? (
+        <Loader2 size={16} className="animate-spin text-gray-400" />
+      ) : !selectedProduct ? (
+        <p className="rounded-md border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-400">
+          Sélectionnez d'abord un produit.
+        </p>
+      ) : combinations.length === 0 ? (
+        <p className="rounded-md border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-400">
+          Ce produit n'a pas de combinaisons actives — utilisez le mode «
+          Article simple ».
+        </p>
+      ) : (
+        <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border border-gray-200 p-2">
+          {combinations.map((c) => (
+            <div
+              key={c.id}
+              className="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-xs"
+            >
+              <span className="flex-1 truncate text-gray-700">
+                {labelFor(c)}
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={quantities[c.id] ?? 0}
+                onChange={(e) =>
+                  setQuantities((prev) => ({
+                    ...prev,
+                    [c.id]: Number(e.target.value),
+                  }))
+                }
+                disabled={isSubmitting}
+                className="w-20 rounded-md border border-gray-300 px-2 py-1 text-xs outline-none focus:border-gray-900 disabled:opacity-50"
+              />
+              {results[c.id] === "ok" && (
+                <Check size={14} className="shrink-0 text-green-600" />
+              )}
+              {results[c.id] === "error" && (
+                <X size={14} className="shrink-0 text-red-600" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {progress && (
+        <div>
+          <div className="mb-1 flex items-center justify-between text-xs text-gray-500">
+            <span>Enregistrement en cours...</span>
+            <span>
+              {percent}% ({progress.done}/{progress.total})
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+            <div
+              className="h-full bg-gray-900 transition-all"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={isSubmitting || combinations.length === 0}
+          className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {isSubmitting ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Plus size={16} />
+          )}
+          Créer les articles
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 disabled:opacity-50"
+        >
+          Annuler
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// Panneau de création avec bascule entre article simple et création en masse
+// pour toutes les combinaisons d'un produit.
+function CreateItemPanel({
+  warehouses,
+  onCreated,
+  onCancel,
+}: {
+  warehouses: Warehouse[];
+  onCreated: () => void;
+  onCancel: () => void;
+}) {
+  const [mode, setMode] = useState<"single" | "bulk">("single");
+
+  const tabBtn = (active: boolean) =>
+    `rounded-md px-3 py-1.5 text-xs font-medium ${
+      active ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-200"
+    }`;
+
+  return (
+    <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <div className="mb-4 flex gap-2 rounded-md bg-gray-100 p-1">
+        <button
+          type="button"
+          onClick={() => setMode("single")}
+          className={tabBtn(mode === "single")}
+        >
+          Article simple
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("bulk")}
+          className={tabBtn(mode === "bulk")}
+        >
+          Toutes les combinaisons
+        </button>
+      </div>
+
+      {mode === "single" ? (
+        <NewInventoryItemForm
+          warehouses={warehouses}
+          onCreated={onCreated}
+          onCancel={onCancel}
+        />
+      ) : (
+        <BulkCombinationForm
+          warehouses={warehouses}
+          onCreated={onCreated}
+          onCancel={onCancel}
+        />
+      )}
+    </div>
+  );
+}
+
+// Regroupe les lignes d'inventaire par produit, en conservant l'ordre
+// d'apparition — un produit avec plusieurs combinaisons n'occupe alors
+// qu'une seule ligne "parente" repliable.
+function groupByProduct(items: InventoryItem[]) {
+  const order: number[] = [];
+  const map = new Map<number, InventoryItem[]>();
+  items.forEach((item) => {
+    if (!map.has(item.productId)) {
+      map.set(item.productId, []);
+      order.push(item.productId);
+    }
+    map.get(item.productId)!.push(item);
+  });
+  return order.map((productId) => ({
+    productId,
+    items: map.get(productId)!,
+  }));
+}
+
 export default function InventoryPage() {
   const [tab, setTab] = useState<Tab>("all");
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -560,6 +869,17 @@ export default function InventoryPage() {
   const [transferItem, setTransferItem] = useState<InventoryItem | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Regroupement produit → combinaisons dans la liste
+  const [expandedProductIds, setExpandedProductIds] = useState<Set<number>>(
+    new Set(),
+  );
+  const [combosByProduct, setCombosByProduct] = useState<
+    Record<number, ProductCombination[]>
+  >({});
+  const [loadingCombosProductId, setLoadingCombosProductId] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     apiClient
@@ -622,8 +942,7 @@ export default function InventoryPage() {
     setDeletingId(itemId);
     try {
       await apiClient.delete(`/inventory/${itemId}`);
-      setItems((prev) => prev.filter((i) => i.id !== itemId));
-      setTotal((t) => t - 1);
+      fetchItems();
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Suppression impossible");
     } finally {
@@ -638,10 +957,59 @@ export default function InventoryPage() {
     setKeywordInput("");
   }
 
+  function toggleExpand(productId: number) {
+    setExpandedProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+        if (!combosByProduct[productId]) {
+          setLoadingCombosProductId(productId);
+          apiClient
+            .get<ProductCombination[]>(`/product/${productId}/combinations`)
+            .then((combos) =>
+              setCombosByProduct((prevMap) => ({
+                ...prevMap,
+                [productId]: combos,
+              })),
+            )
+            .catch(() =>
+              setCombosByProduct((prevMap) => ({
+                ...prevMap,
+                [productId]: [],
+              })),
+            )
+            .finally(() => setLoadingCombosProductId(null));
+        }
+      }
+      return next;
+    });
+  }
+
+  // Résout le libellé d'une combinaison à partir de ses valeurs d'attributs
+  // (taille, couleur...) plutôt que du SKU, souvent absent ou dupliqué entre
+  // combinaisons — c'est ce qui permettait de les confondre dans la liste.
+  function combinationLabel(
+    productId: number,
+    combinationId: string | null,
+    fallbackSku: string | null,
+  ) {
+    if (!combinationId) return "Produit simple";
+    const combos = combosByProduct[productId];
+    const combo = combos?.find((c) => c.id === combinationId);
+    if (combo && combo.values.length > 0) {
+      return combo.values.map((v) => v.attributeOption.value).join(" / ");
+    }
+    return fallbackSku ?? `Combinaison #${combinationId.slice(0, 6)}`;
+  }
+
   const tabClass = (t: Tab) =>
     `flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium ${
       tab === t ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
     }`;
+
+  const groups = groupByProduct(items);
 
   return (
     <div>
@@ -670,11 +1038,10 @@ export default function InventoryPage() {
       </div>
 
       {showCreateForm && (
-        <NewInventoryItemForm
+        <CreateItemPanel
           warehouses={warehouses}
-          onCreated={(item) => {
-            setItems((prev) => [item, ...prev]);
-            setTotal((t) => t + 1);
+          onCreated={() => {
+            fetchItems();
             setShowCreateForm(false);
           }}
           onCancel={() => setShowCreateForm(false)}
@@ -742,7 +1109,7 @@ export default function InventoryPage() {
                   <Loader2 size={20} className="mx-auto animate-spin" />
                 </td>
               </tr>
-            ) : items.length === 0 ? (
+            ) : groups.length === 0 ? (
               <tr>
                 <td
                   colSpan={5}
@@ -752,80 +1119,224 @@ export default function InventoryPage() {
                 </td>
               </tr>
             ) : (
-              items.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-b border-gray-100 last:border-0"
-                >
-                  <td className="px-4 py-3 font-medium">{item.product.name}</td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {item.product.sku}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {item.warehouse.name}
-                  </td>
-                  <td className="px-4 py-3">
-                    {editingId === item.id ? (
-                      <QuantityEditor
-                        item={item}
-                        onUpdated={(updated) => {
-                          setItems((prev) =>
-                            prev.map((i) =>
-                              i.id === updated.id ? updated : i,
-                            ),
-                          );
-                          setEditingId(null);
-                        }}
-                        onCancel={() => setEditingId(null)}
-                      />
-                    ) : (
-                      <span
-                        className={`font-medium ${
-                          item.quantity === 0
-                            ? "text-red-600"
-                            : item.quantity <= 10
-                              ? "text-amber-600"
-                              : ""
-                        }`}
-                      >
-                        {item.quantity}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {editingId !== item.id && (
-                      <div className="flex items-center justify-end gap-2">
+              groups.map((group) => {
+                // Produit sans combinaison (ou une seule ligne au total) :
+                // on garde l'affichage plat d'origine, sans repli.
+                if (group.items.length === 1) {
+                  const item = group.items[0];
+                  return (
+                    <tr
+                      key={item.id}
+                      className="border-b border-gray-100 last:border-0"
+                    >
+                      <td className="px-4 py-3 font-medium">
+                        {item.product.name}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {item.combination?.sku ?? item.product.sku}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {item.warehouse.name}
+                      </td>
+                      <td className="px-4 py-3">
+                        {editingId === item.id ? (
+                          <QuantityEditor
+                            item={item}
+                            onUpdated={() => {
+                              fetchItems();
+                              setEditingId(null);
+                            }}
+                            onCancel={() => setEditingId(null)}
+                          />
+                        ) : (
+                          <span
+                            className={`font-medium ${
+                              item.quantity === 0
+                                ? "text-red-600"
+                                : item.quantity <= 10
+                                  ? "text-amber-600"
+                                  : ""
+                            }`}
+                          >
+                            {item.quantity}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {editingId !== item.id && (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setEditingId(item.id)}
+                              className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                              title="Modifier la quantité"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
+                              onClick={() => setTransferItem(item)}
+                              className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                              title="Transférer"
+                            >
+                              <ArrowLeftRight size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(item.id)}
+                              disabled={deletingId === item.id}
+                              className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                              title="Supprimer"
+                            >
+                              {deletingId === item.id ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={16} />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                }
+
+                // Produit avec plusieurs lignes (combinaisons et/ou entrepôts
+                // multiples) : une ligne parente repliable, résumé + détail.
+                const isExpanded = expandedProductIds.has(group.productId);
+                const totalQty = group.items.reduce(
+                  (sum, i) => sum + i.quantity,
+                  0,
+                );
+                const productName = group.items[0].product.name;
+                const productSku = group.items[0].product.sku;
+
+                return (
+                  <>
+                    <tr
+                      key={`group-${group.productId}`}
+                      className="border-b border-gray-100 bg-gray-50/60"
+                    >
+                      <td colSpan={5} className="px-4 py-2.5">
                         <button
-                          onClick={() => setEditingId(item.id)}
-                          className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                          title="Modifier la quantité"
+                          type="button"
+                          onClick={() => toggleExpand(group.productId)}
+                          className="flex w-full items-center gap-2 text-left"
                         >
-                          <Pencil size={16} />
+                          <ChevronRight
+                            size={14}
+                            className={`shrink-0 text-gray-400 transition-transform ${
+                              isExpanded ? "rotate-90" : ""
+                            }`}
+                          />
+                          <span className="font-medium">{productName}</span>
+                          <span className="text-xs text-gray-400">
+                            {productSku}
+                          </span>
+                          <span className="ml-auto whitespace-nowrap text-xs text-gray-500">
+                            {group.items.length} ligne(s) ·{" "}
+                            <span
+                              className={totalQty === 0 ? "text-red-600" : ""}
+                            >
+                              {totalQty} unité(s)
+                            </span>{" "}
+                            au total
+                          </span>
                         </button>
-                        <button
-                          onClick={() => setTransferItem(item)}
-                          className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                          title="Transférer"
-                        >
-                          <ArrowLeftRight size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem(item.id)}
-                          disabled={deletingId === item.id}
-                          className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                          title="Supprimer"
-                        >
-                          {deletingId === item.id ? (
-                            <Loader2 size={16} className="animate-spin" />
-                          ) : (
-                            <Trash2 size={16} />
-                          )}
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
+                      </td>
+                    </tr>
+
+                    {isExpanded &&
+                      (loadingCombosProductId === group.productId ? (
+                        <tr key={`loading-${group.productId}`}>
+                          <td colSpan={5} className="px-8 py-3">
+                            <Loader2
+                              size={14}
+                              className="animate-spin text-gray-400"
+                            />
+                          </td>
+                        </tr>
+                      ) : (
+                        group.items.map((item) => (
+                          <tr
+                            key={item.id}
+                            className="border-b border-gray-100 bg-white last:border-0"
+                          >
+                            <td className="px-4 py-2.5 pl-10 text-gray-600">
+                              {combinationLabel(
+                                group.productId,
+                                item.combinationId,
+                                item.combination?.sku ?? null,
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-gray-500">
+                              {item.combination?.sku ?? "—"}
+                            </td>
+                            <td className="px-4 py-2.5 text-gray-500">
+                              {item.warehouse.name}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              {editingId === item.id ? (
+                                <QuantityEditor
+                                  item={item}
+                                  onUpdated={() => {
+                                    fetchItems();
+                                    setEditingId(null);
+                                  }}
+                                  onCancel={() => setEditingId(null)}
+                                />
+                              ) : (
+                                <span
+                                  className={`font-medium ${
+                                    item.quantity === 0
+                                      ? "text-red-600"
+                                      : item.quantity <= 10
+                                        ? "text-amber-600"
+                                        : ""
+                                  }`}
+                                >
+                                  {item.quantity}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              {editingId !== item.id && (
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() => setEditingId(item.id)}
+                                    className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                                    title="Modifier la quantité"
+                                  >
+                                    <Pencil size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => setTransferItem(item)}
+                                    className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                                    title="Transférer"
+                                  >
+                                    <ArrowLeftRight size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteItem(item.id)}
+                                    disabled={deletingId === item.id}
+                                    className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                    title="Supprimer"
+                                  >
+                                    {deletingId === item.id ? (
+                                      <Loader2
+                                        size={16}
+                                        className="animate-spin"
+                                      />
+                                    ) : (
+                                      <Trash2 size={16} />
+                                    )}
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      ))}
+                  </>
+                );
+              })
             )}
           </tbody>
         </table>
