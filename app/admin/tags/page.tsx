@@ -150,7 +150,7 @@ function TagCard({
         <TagIcon size={14} className="shrink-0 text-gray-400" />
         <span className="truncate text-sm font-medium">{tag.name}</span>
       </div>
-      <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
+      <div className="flex shrink-0 items-center gap-1  transition">
         <button
           onClick={() => setIsEditing(true)}
           className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
