@@ -2,10 +2,12 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
+import Link from "next/link";
 import { Plus, Pencil, Trash2, Loader2, Check, X, Route } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF } from "@/lib/format";
 import type { ShippingMethod, ShippingMethodFormInput } from "@/lib/types";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
 function ShippingMethodForm({
   initial,
@@ -198,9 +200,9 @@ export default function ShippingMethodsPage() {
   const [methods, setMethods] = useState<ShippingMethod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     apiClient
@@ -214,15 +216,6 @@ export default function ShippingMethodsPage() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  async function handleCreate(input: ShippingMethodFormInput) {
-    const created = await apiClient.post<ShippingMethod>(
-      "/shipping-methods",
-      input,
-    );
-    setMethods((prev) => [...prev, created]);
-    setShowCreateForm(false);
-  }
-
   async function handleUpdate(id: string, input: ShippingMethodFormInput) {
     const updated = await apiClient.patch<ShippingMethod>(
       `/shipping-methods/${id}`,
@@ -232,16 +225,17 @@ export default function ShippingMethodsPage() {
     setEditingId(null);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Supprimer cette méthode de livraison ?")) return;
-    setDeletingId(id);
+  async function confirmDelete() {
+    if (!confirmDeleteId) return;
+    setDeletingId(confirmDeleteId);
     try {
-      await apiClient.delete(`/shipping-methods/${id}`);
-      setMethods((prev) => prev.filter((m) => m.id !== id));
+      await apiClient.delete(`/shipping-methods/${confirmDeleteId}`);
+      setMethods((prev) => prev.filter((m) => m.id !== confirmDeleteId));
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Suppression impossible");
     } finally {
       setDeletingId(null);
+      setConfirmDeleteId(null);
     }
   }
 
@@ -252,29 +246,18 @@ export default function ShippingMethodsPage() {
           <h1 className="text-xl font-semibold">Méthodes de livraison</h1>
           <p className="text-sm text-gray-500">{methods.length} méthode(s)</p>
         </div>
-        {!showCreateForm && (
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-          >
-            <Plus size={16} />
-            Nouvelle méthode
-          </button>
-        )}
+        <Link
+          href="/admin/shipping-methods/new"
+          className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+        >
+          <Plus size={16} />
+          Nouvelle méthode
+        </Link>
       </div>
 
       {error && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
-        </div>
-      )}
-
-      {showCreateForm && (
-        <div className="mb-4">
-          <ShippingMethodForm
-            onSubmit={handleCreate}
-            onCancel={() => setShowCreateForm(false)}
-          />
         </div>
       )}
 
@@ -330,7 +313,7 @@ export default function ShippingMethodsPage() {
                     <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => handleDelete(method.id)}
+                    onClick={() => setConfirmDeleteId(method.id)}
                     disabled={deletingId === method.id}
                     className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                   >
@@ -346,6 +329,16 @@ export default function ShippingMethodsPage() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Supprimer la méthode de livraison"
+        message="Cette action est irréversible. Voulez-vous vraiment continuer ?"
+        confirmLabel="Supprimer"
+        isLoading={deletingId !== null}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

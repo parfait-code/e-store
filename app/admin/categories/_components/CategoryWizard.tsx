@@ -1,10 +1,11 @@
 // app/admin/categories/_components/CategoryWizard.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
-import type { Category } from "@/lib/types";
+import { apiClient } from "@/lib/api-client";
+import type { Category, AttributeDefinition } from "@/lib/types";
 import { Stepper, type StepDefinition } from "@/components/admin/Stepper";
 import { CategoryForm } from "./CategoryForm";
 import { CategoryAssetsUploader } from "./CategoryAssetsUploader";
@@ -37,17 +38,37 @@ export function CategoryWizard({
     !categoryExists ? STEPS.map((_, i) => i).filter((i) => i > 0) : [],
   );
 
+  // Calcule les étapes réellement complétées à partir des données existantes.
+  useEffect(() => {
+    if (!category) return;
+    let cancelled = false;
+
+    async function computeCompleted() {
+      const next = new Set<string>(["info"]);
+      if (category!.imageUrl || category!.iconUrl) next.add("assets");
+
+      try {
+        const defs = await apiClient.get<AttributeDefinition[]>(
+          `/categories/${category!.id}/attributes`,
+        );
+        if (defs.length > 0) next.add("attributes");
+      } catch {
+        // ignore
+      }
+
+      if (!cancelled) {
+        setCompletedSteps((prev) => new Set([...prev, ...next]));
+      }
+    }
+
+    computeCompleted();
+    return () => {
+      cancelled = true;
+    };
+  }, [category]);
+
   function goTo(index: number) {
     if (disabledIndexes.has(index)) return;
-    if (index > currentStep) {
-      setCompletedSteps((prev) => {
-        const next = new Set(prev);
-        for (let i = currentStep; i < index; i++) {
-          next.add(STEPS[i].id);
-        }
-        return next;
-      });
-    }
     setCurrentStep(index);
   }
 

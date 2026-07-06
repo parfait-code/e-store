@@ -26,6 +26,7 @@ import type {
   Product,
   ProductCombination,
 } from "@/lib/types";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
 type Tab = "all" | "low-stock" | "out-of-stock";
 
@@ -309,100 +310,7 @@ function ProductSearchPicker({
   );
 }
 
-// Liste les combinaisons réelles du produit sélectionné
-function CombinationSearchPicker({
-  productId,
-  selected,
-  onSelect,
-}: {
-  productId: number | null;
-  selected: { id: string; sku: string | null } | null;
-  onSelect: (combination: { id: string; sku: string | null } | null) => void;
-}) {
-  const [combinations, setCombinations] = useState<ProductCombination[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    onSelect(null);
-    setCombinations([]);
-    if (!productId) return;
-    setIsLoading(true);
-    setError(null);
-    apiClient
-      .get<ProductCombination[]>(`/product/${productId}/combinations`)
-      .then(setCombinations)
-      .catch(() =>
-        setError("Impossible de charger les combinaisons pour ce produit."),
-      )
-      .finally(() => setIsLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId]);
-
-  if (!productId) {
-    return (
-      <p className="rounded-md border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-400">
-        Sélectionnez d'abord un produit.
-      </p>
-    );
-  }
-
-  if (isLoading) {
-    return <Loader2 size={14} className="animate-spin text-gray-400" />;
-  }
-
-  if (error) {
-    return <p className="text-xs text-red-600">{error}</p>;
-  }
-
-  if (combinations.length === 0) {
-    return (
-      <p className="rounded-md border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-400">
-        Ce produit n'a pas de combinaisons — l'article sera rattaché au produit
-        seul.
-      </p>
-    );
-  }
-
-  return (
-    <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-gray-200 p-2">
-      <button
-        type="button"
-        onClick={() => onSelect(null)}
-        className={`flex w-full items-center rounded px-2 py-1.5 text-left text-xs ${
-          !selected
-            ? "bg-gray-900 text-white"
-            : "text-gray-600 hover:bg-gray-50"
-        }`}
-      >
-        Aucune (produit simple)
-      </button>
-      {combinations.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => onSelect({ id: c.id, sku: c.sku })}
-          className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs ${
-            selected?.id === c.id
-              ? "bg-gray-900 text-white"
-              : "text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          <span>
-            {c.values.map((v) => v.attributeOption.value).join(" / ")}
-            {c.sku ? ` — ${c.sku}` : ""}
-          </span>
-          {!c.isActive && (
-            <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
-              inactive
-            </span>
-          )}
-        </button>
-      ))}
-    </div>
-  );
-}
-
+// ---------- Article simple : plus AUCUNE recherche de combinaison ----------
 function NewInventoryItemForm({
   warehouses,
   onCreated,
@@ -416,10 +324,6 @@ function NewInventoryItemForm({
     id: number;
     name: string;
     sku: string;
-  } | null>(null);
-  const [selectedCombination, setSelectedCombination] = useState<{
-    id: string;
-    sku: string | null;
   } | null>(null);
   const [warehouseId, setWarehouseId] = useState("");
   const [quantity, setQuantity] = useState(0);
@@ -438,7 +342,6 @@ function NewInventoryItemForm({
       await apiClient.post<InventoryItem>("/inventory", {
         product_id: selectedProduct.id,
         warehouse_id: warehouseId,
-        combination_id: selectedCombination?.id,
         quantity,
       });
       onCreated();
@@ -446,7 +349,7 @@ function NewInventoryItemForm({
       setError(
         err instanceof ApiError
           ? err.message
-          : "Erreur lors de la création (doublon produit/entrepôt/combinaison ?)",
+          : "Erreur lors de la création (doublon produit/entrepôt ?)",
       );
     } finally {
       setIsSubmitting(false);
@@ -470,10 +373,7 @@ function NewInventoryItemForm({
           </label>
           <ProductSearchPicker
             selected={selectedProduct}
-            onSelect={(p) => {
-              setSelectedProduct(p);
-              setSelectedCombination(null);
-            }}
+            onSelect={setSelectedProduct}
           />
         </div>
         <div>
@@ -495,29 +395,21 @@ function NewInventoryItemForm({
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">
-            Combinaison (optionnel)
-          </label>
-          <CombinationSearchPicker
-            productId={selectedProduct?.id ?? null}
-            selected={selectedCombination}
-            onSelect={setSelectedCombination}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">
-            Quantité initiale
-          </label>
-          <input
-            type="number"
-            min={0}
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
-            className={inputClass}
-          />
-        </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-600">
+          Quantité initiale
+        </label>
+        <input
+          type="number"
+          min={0}
+          value={quantity}
+          onChange={(e) => setQuantity(Number(e.target.value))}
+          className={`${inputClass} max-w-[200px]`}
+        />
+        <p className="mt-1 text-xs text-gray-400">
+          Pour un produit avec des combinaisons (taille, couleur...), utilisez
+          l'onglet « Combinaisons du produit » ci-dessus.
+        </p>
       </div>
       <div className="flex gap-2">
         <button
@@ -539,10 +431,11 @@ function NewInventoryItemForm({
   );
 }
 
-// Crée en une seule opération un article d'inventaire pour CHAQUE combinaison
-// active du produit sélectionné, dans le même entrepôt. Chaque combinaison a
-// sa propre quantité modifiable ; l'enregistrement se fait combinaison par
-// combinaison (l'API n'a pas de route batch), d'où la barre de progression.
+// Crée/met à jour, pour chaque combinaison active du produit, l'article
+// d'inventaire correspondant dans un même entrepôt. Vérifie désormais le
+// stock déjà existant (product+warehouse+combination) au lieu de partir du
+// principe qu'il n'y a jamais rien (0) — évite les 409 silencieux et permet
+// d'ajuster un stock déjà présent plutôt que d'essayer de le recréer.
 function BulkCombinationForm({
   warehouses,
   onCreated,
@@ -561,6 +454,9 @@ function BulkCombinationForm({
   const [isLoadingCombos, setIsLoadingCombos] = useState(false);
   const [warehouseId, setWarehouseId] = useState("");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [existingByCombo, setExistingByCombo] = useState<
+    Record<string, { itemId: string; quantity: number }>
+  >({});
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progress, setProgress] = useState<{
@@ -569,9 +465,11 @@ function BulkCombinationForm({
   } | null>(null);
   const [results, setResults] = useState<Record<string, "ok" | "error">>({});
 
+  // Étape 1 : charger les combinaisons du produit choisi.
   useEffect(() => {
     setCombinations([]);
     setQuantities({});
+    setExistingByCombo({});
     setResults({});
     if (!selectedProduct) return;
     setIsLoadingCombos(true);
@@ -591,6 +489,43 @@ function BulkCombinationForm({
       .finally(() => setIsLoadingCombos(false));
   }, [selectedProduct]);
 
+  // Étape 2 : dès que produit + entrepôt sont connus, vérifier le stock déjà
+  // enregistré (pas seulement supposer 0) pour préremplir les quantités.
+  useEffect(() => {
+    if (!selectedProduct || !warehouseId || combinations.length === 0) return;
+    let cancelled = false;
+    apiClient
+      .get<InventoryItem[]>(
+        `/inventory/search?keyword=${encodeURIComponent(selectedProduct.sku)}`,
+      )
+      .then((items) => {
+        if (cancelled) return;
+        const map: Record<string, { itemId: string; quantity: number }> = {};
+        const initialQuantities: Record<string, number> = {};
+        combinations.forEach((c) => {
+          initialQuantities[c.id] = 0;
+        });
+        items.forEach((item) => {
+          if (item.warehouseId !== warehouseId) return;
+          if (!item.combinationId) return;
+          if (!combinations.some((c) => c.id === item.combinationId)) return;
+          map[item.combinationId] = {
+            itemId: item.id,
+            quantity: item.quantity,
+          };
+          initialQuantities[item.combinationId] = item.quantity;
+        });
+        setExistingByCombo(map);
+        setQuantities(initialQuantities);
+      })
+      .catch(() => {
+        // Recherche indisponible — on retombe silencieusement sur 0 par défaut
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProduct, warehouseId, combinations]);
+
   function labelFor(combo: ProductCombination) {
     const attrs = combo.values
       .map((v) => `${v.attributeDefinition.name}: ${v.attributeOption.value}`)
@@ -606,9 +541,16 @@ function BulkCombinationForm({
       setError("Sélectionnez un produit et un entrepôt.");
       return;
     }
-    const targets = combinations.filter((c) => (quantities[c.id] ?? 0) > 0);
+
+    // Une combinaison est une "cible" si sa quantité a changé par rapport à
+    // l'existant connu (ou si elle n'existe pas encore et qu'on renseigne >0).
+    const targets = combinations.filter((c) => {
+      const existing = existingByCombo[c.id];
+      const current = quantities[c.id] ?? 0;
+      return existing ? current !== existing.quantity : current > 0;
+    });
     if (targets.length === 0) {
-      setError("Renseignez une quantité pour au moins une combinaison.");
+      setError("Modifiez la quantité d'au moins une combinaison.");
       return;
     }
 
@@ -618,13 +560,20 @@ function BulkCombinationForm({
     let successCount = 0;
 
     for (const combo of targets) {
+      const existing = existingByCombo[combo.id];
       try {
-        await apiClient.post<InventoryItem>("/inventory", {
-          product_id: selectedProduct.id,
-          warehouse_id: warehouseId,
-          combination_id: combo.id,
-          quantity: quantities[combo.id],
-        });
+        if (existing) {
+          await apiClient.put<InventoryItem>(`/inventory/${existing.itemId}`, {
+            quantity: quantities[combo.id],
+          });
+        } else {
+          await apiClient.post<InventoryItem>("/inventory", {
+            product_id: selectedProduct.id,
+            warehouse_id: warehouseId,
+            combination_id: combo.id,
+            quantity: quantities[combo.id],
+          });
+        }
         successCount += 1;
         setResults((prev) => ({ ...prev, [combo.id]: "ok" }));
       } catch {
@@ -639,7 +588,7 @@ function BulkCombinationForm({
     const failedCount = targets.length - successCount;
     if (failedCount > 0) {
       setError(
-        `${successCount}/${targets.length} article(s) créé(s). ${failedCount} échec(s) — probablement un article déjà existant pour ce couple entrepôt/combinaison (utilisez l'édition directe dans la liste).`,
+        `${successCount}/${targets.length} article(s) mis à jour. ${failedCount} échec(s).`,
       );
     }
   }
@@ -653,8 +602,9 @@ function BulkCombinationForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-xs text-gray-500">
-        Crée un article d'inventaire pour chaque combinaison active du produit,
-        dans le même entrepôt, en une seule opération.
+        Crée ou met à jour l'article d'inventaire de chaque combinaison active
+        du produit, dans le même entrepôt, en une seule opération. Le stock déjà
+        présent est automatiquement détecté et préaffiché.
       </p>
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -706,35 +656,43 @@ function BulkCombinationForm({
         </p>
       ) : (
         <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border border-gray-200 p-2">
-          {combinations.map((c) => (
-            <div
-              key={c.id}
-              className="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-xs"
-            >
-              <span className="flex-1 truncate text-gray-700">
-                {labelFor(c)}
-              </span>
-              <input
-                type="number"
-                min={0}
-                value={quantities[c.id] ?? 0}
-                onChange={(e) =>
-                  setQuantities((prev) => ({
-                    ...prev,
-                    [c.id]: Number(e.target.value),
-                  }))
-                }
-                disabled={isSubmitting}
-                className="w-20 rounded-md border border-gray-300 px-2 py-1 text-xs outline-none focus:border-gray-900 disabled:opacity-50"
-              />
-              {results[c.id] === "ok" && (
-                <Check size={14} className="shrink-0 text-green-600" />
-              )}
-              {results[c.id] === "error" && (
-                <X size={14} className="shrink-0 text-red-600" />
-              )}
-            </div>
-          ))}
+          {combinations.map((c) => {
+            const existing = existingByCombo[c.id];
+            return (
+              <div
+                key={c.id}
+                className="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-xs"
+              >
+                <span className="flex-1 truncate text-gray-700">
+                  {labelFor(c)}
+                  {existing && (
+                    <span className="ml-2 text-gray-400">
+                      (déjà {existing.quantity} en stock)
+                    </span>
+                  )}
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  value={quantities[c.id] ?? 0}
+                  onChange={(e) =>
+                    setQuantities((prev) => ({
+                      ...prev,
+                      [c.id]: Number(e.target.value),
+                    }))
+                  }
+                  disabled={isSubmitting}
+                  className="w-20 rounded-md border border-gray-300 px-2 py-1 text-xs outline-none focus:border-gray-900 disabled:opacity-50"
+                />
+                {results[c.id] === "ok" && (
+                  <Check size={14} className="shrink-0 text-green-600" />
+                )}
+                {results[c.id] === "error" && (
+                  <X size={14} className="shrink-0 text-red-600" />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -766,7 +724,7 @@ function BulkCombinationForm({
           ) : (
             <Plus size={16} />
           )}
-          Créer les articles
+          Enregistrer les quantités
         </button>
         <button
           type="button"
@@ -781,18 +739,18 @@ function BulkCombinationForm({
   );
 }
 
-// Panneau de création avec bascule entre article simple et création en masse
-// pour toutes les combinaisons d'un produit.
-function CreateItemPanel({
+// Panneau de création affiché dans une modale (plutôt qu'au-dessus de la
+// liste), avec bascule entre article simple et combinaisons du produit.
+function CreateItemModal({
   warehouses,
+  onClose,
   onCreated,
-  onCancel,
 }: {
   warehouses: Warehouse[];
+  onClose: () => void;
   onCreated: () => void;
-  onCancel: () => void;
 }) {
-  const [mode, setMode] = useState<"single" | "bulk">("single");
+  const [mode, setMode] = useState<"single" | "combinations">("single");
 
   const tabBtn = (active: boolean) =>
     `rounded-md px-3 py-1.5 text-xs font-medium ${
@@ -800,44 +758,54 @@ function CreateItemPanel({
     }`;
 
   return (
-    <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-      <div className="mb-4 flex gap-2 rounded-md bg-gray-100 p-1">
-        <button
-          type="button"
-          onClick={() => setMode("single")}
-          className={tabBtn(mode === "single")}
-        >
-          Article simple
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("bulk")}
-          className={tabBtn(mode === "bulk")}
-        >
-          Toutes les combinaisons
-        </button>
-      </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Nouvel article d'inventaire</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-      {mode === "single" ? (
-        <NewInventoryItemForm
-          warehouses={warehouses}
-          onCreated={onCreated}
-          onCancel={onCancel}
-        />
-      ) : (
-        <BulkCombinationForm
-          warehouses={warehouses}
-          onCreated={onCreated}
-          onCancel={onCancel}
-        />
-      )}
+        <div className="mb-4 flex gap-2 rounded-md bg-gray-100 p-1">
+          <button
+            type="button"
+            onClick={() => setMode("single")}
+            className={tabBtn(mode === "single")}
+          >
+            Article simple
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("combinations")}
+            className={tabBtn(mode === "combinations")}
+          >
+            Combinaisons du produit
+          </button>
+        </div>
+
+        {mode === "single" ? (
+          <NewInventoryItemForm
+            warehouses={warehouses}
+            onCreated={onCreated}
+            onCancel={onClose}
+          />
+        ) : (
+          <BulkCombinationForm
+            warehouses={warehouses}
+            onCreated={onCreated}
+            onCancel={onClose}
+          />
+        )}
+      </div>
     </div>
   );
 }
 
-// Regroupe les lignes d'inventaire par produit, en conservant l'ordre
-// d'apparition — un produit avec plusieurs combinaisons n'occupe alors
-// qu'une seule ligne "parente" repliable.
+// Regroupe les lignes d'inventaire par produit
 function groupByProduct(items: InventoryItem[]) {
   const order: number[] = [];
   const map = new Map<number, InventoryItem[]>();
@@ -867,10 +835,10 @@ export default function InventoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [transferItem, setTransferItem] = useState<InventoryItem | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Regroupement produit → combinaisons dans la liste
   const [expandedProductIds, setExpandedProductIds] = useState<Set<number>>(
     new Set(),
   );
@@ -937,16 +905,17 @@ export default function InventoryPage() {
     setKeyword(keywordInput.trim());
   }
 
-  async function handleDeleteItem(itemId: string) {
-    if (!confirm("Supprimer cet article d'inventaire ?")) return;
-    setDeletingId(itemId);
+  async function confirmDelete() {
+    if (!confirmDeleteId) return;
+    setDeletingId(confirmDeleteId);
     try {
-      await apiClient.delete(`/inventory/${itemId}`);
+      await apiClient.delete(`/inventory/${confirmDeleteId}`);
       fetchItems();
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Suppression impossible");
     } finally {
       setDeletingId(null);
+      setConfirmDeleteId(null);
     }
   }
 
@@ -987,9 +956,6 @@ export default function InventoryPage() {
     });
   }
 
-  // Résout le libellé d'une combinaison à partir de ses valeurs d'attributs
-  // (taille, couleur...) plutôt que du SKU, souvent absent ou dupliqué entre
-  // combinaisons — c'est ce qui permettait de les confondre dans la liste.
   function combinationLabel(
     productId: number,
     combinationId: string | null,
@@ -1025,28 +991,15 @@ export default function InventoryPage() {
           >
             Gérer les entrepôts →
           </Link>
-          {!showCreateForm && (
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-            >
-              <Plus size={16} />
-              Nouvel article
-            </button>
-          )}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            <Plus size={16} />
+            Nouvel article
+          </button>
         </div>
       </div>
-
-      {showCreateForm && (
-        <CreateItemPanel
-          warehouses={warehouses}
-          onCreated={() => {
-            fetchItems();
-            setShowCreateForm(false);
-          }}
-          onCancel={() => setShowCreateForm(false)}
-        />
-      )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-2">
@@ -1120,8 +1073,6 @@ export default function InventoryPage() {
               </tr>
             ) : (
               groups.map((group) => {
-                // Produit sans combinaison (ou une seule ligne au total) :
-                // on garde l'affichage plat d'origine, sans repli.
                 if (group.items.length === 1) {
                   const item = group.items[0];
                   return (
@@ -1180,7 +1131,7 @@ export default function InventoryPage() {
                               <ArrowLeftRight size={16} />
                             </button>
                             <button
-                              onClick={() => handleDeleteItem(item.id)}
+                              onClick={() => setConfirmDeleteId(item.id)}
                               disabled={deletingId === item.id}
                               className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                               title="Supprimer"
@@ -1198,8 +1149,6 @@ export default function InventoryPage() {
                   );
                 }
 
-                // Produit avec plusieurs lignes (combinaisons et/ou entrepôts
-                // multiples) : une ligne parente repliable, résumé + détail.
                 const isExpanded = expandedProductIds.has(group.productId);
                 const totalQty = group.items.reduce(
                   (sum, i) => sum + i.quantity,
@@ -1314,7 +1263,7 @@ export default function InventoryPage() {
                                     <ArrowLeftRight size={16} />
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteItem(item.id)}
+                                    onClick={() => setConfirmDeleteId(item.id)}
                                     disabled={deletingId === item.id}
                                     className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                                     title="Supprimer"
@@ -1374,6 +1323,27 @@ export default function InventoryPage() {
           onTransferred={fetchItems}
         />
       )}
+
+      {showCreateModal && (
+        <CreateItemModal
+          warehouses={warehouses}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={() => {
+            fetchItems();
+            setShowCreateModal(false);
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Supprimer l'article d'inventaire"
+        message="Cette action est irréversible. Voulez-vous vraiment continuer ?"
+        confirmLabel="Supprimer"
+        isLoading={deletingId !== null}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

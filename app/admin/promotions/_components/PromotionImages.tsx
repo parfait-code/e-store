@@ -43,7 +43,7 @@ export function PromotionImages({
         existingImages={existingImages}
         deleteOne={deleteOne}
         uploadOne={uploadOne}
-        helpText="Choisissez, retirez ou remplacez les images librement — rien n'est envoyé au serveur avant de cliquer sur « Enregistrer les images »."
+        helpText="5 fichiers maximum par envoi. Vous pouvez répéter l'opération pour en ajouter davantage — aucune limite totale n'est actuellement imposée par l'API pour une promotion."
       />
     </div>
   );

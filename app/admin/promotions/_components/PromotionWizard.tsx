@@ -1,7 +1,7 @@
 // app/admin/promotions/_components/PromotionWizard.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import type { Promotion } from "@/lib/types";
@@ -39,17 +39,19 @@ export function PromotionWizard({
     !promotionExists ? STEPS.map((_, i) => i).filter((i) => i > 0) : [],
   );
 
+  // Ici, toutes les données sont déjà sur l'objet `Promotion` — pas besoin
+  // d'appel réseau supplémentaire pour savoir ce qui est réellement complété.
+  useEffect(() => {
+    if (!promotion) return;
+    const next = new Set<string>(["info"]);
+    if (promotion.images.length > 0) next.add("images");
+    if (promotion.discounts.length > 0) next.add("discounts");
+    if (promotion.coupons.length > 0) next.add("coupons");
+    setCompletedSteps((prev) => new Set([...prev, ...next]));
+  }, [promotion]);
+
   function goTo(index: number) {
     if (disabledIndexes.has(index)) return;
-    if (index > currentStep) {
-      setCompletedSteps((prev) => {
-        const next = new Set(prev);
-        for (let i = currentStep; i < index; i++) {
-          next.add(STEPS[i].id);
-        }
-        return next;
-      });
-    }
     setCurrentStep(index);
   }
 

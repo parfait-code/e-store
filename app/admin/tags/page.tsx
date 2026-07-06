@@ -4,7 +4,8 @@
 import { useEffect, useState, FormEvent } from "react";
 import { Plus, Pencil, Trash2, Loader2, Check, X, TagIcon } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
-import type { Tag, TagFormInput } from "@/lib/types";
+import type { Tag } from "@/lib/types";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
 function slugify(text: string) {
   return text
@@ -17,8 +18,6 @@ function slugify(text: string) {
 
 function NewTagForm({ onCreated }: { onCreated: (tag: Tag) => void }) {
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,11 +26,12 @@ function NewTagForm({ onCreated }: { onCreated: (tag: Tag) => void }) {
     setError(null);
     setIsSubmitting(true);
     try {
-      const created = await apiClient.post<Tag>("/tags", { name, slug });
+      const created = await apiClient.post<Tag>("/tags", {
+        name,
+        slug: slugify(name),
+      });
       onCreated(created);
       setName("");
-      setSlug("");
-      setSlugTouched(false);
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Erreur lors de la création",
@@ -41,44 +41,19 @@ function NewTagForm({ onCreated }: { onCreated: (tag: Tag) => void }) {
     }
   }
 
-  const inputClass =
-    "rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="mb-6 flex flex-wrap items-end gap-3"
-    >
-      <div>
+    <form onSubmit={handleSubmit} className="mb-6 flex items-end gap-3">
+      <div className="flex-1 max-w-xs">
         <label className="mb-1 block text-xs font-medium text-gray-600">
-          Nom
+          Nom du tag
         </label>
         <input
           type="text"
           required
           value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            if (!slugTouched) setSlug(slugify(e.target.value));
-          }}
-          className={inputClass}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
           placeholder="Ex: Nouveauté"
-        />
-      </div>
-      <div>
-        <label className="mb-1 block text-xs font-medium text-gray-600">
-          Slug
-        </label>
-        <input
-          type="text"
-          required
-          value={slug}
-          onChange={(e) => {
-            setSlugTouched(true);
-            setSlug(e.target.value);
-          }}
-          className={inputClass}
-          placeholder="nouveaute"
         />
       </div>
       <button
@@ -98,20 +73,18 @@ function NewTagForm({ onCreated }: { onCreated: (tag: Tag) => void }) {
   );
 }
 
-function TagRow({
+function TagCard({
   tag,
   onUpdated,
-  onDeleted,
+  onDeleteRequested,
 }: {
   tag: Tag;
   onUpdated: (tag: Tag) => void;
-  onDeleted: (tagId: string) => void;
+  onDeleteRequested: (tag: Tag) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(tag.name);
-  const [slug, setSlug] = useState(tag.slug);
   const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
@@ -120,7 +93,7 @@ function TagRow({
     try {
       const updated = await apiClient.patch<Tag>(`/tags/${tag.id}`, {
         name,
-        slug,
+        slug: slugify(name),
       });
       onUpdated(updated);
       setIsEditing(false);
@@ -133,100 +106,65 @@ function TagRow({
     }
   }
 
-  async function handleDelete() {
-    if (!confirm(`Supprimer le tag « ${tag.name} » ?`)) return;
-    setIsDeleting(true);
-    try {
-      await apiClient.delete(`/tags/${tag.id}`);
-      onDeleted(tag.id);
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-      setIsDeleting(false);
-    }
-  }
-
-  const inputClass =
-    "rounded-md border border-gray-300 px-2 py-1 text-sm outline-none focus:border-gray-900";
-
   if (isEditing) {
     return (
-      <tr className="border-b border-gray-100 last:border-0">
-        <td className="px-4 py-2">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={inputClass}
-          />
-        </td>
-        <td className="px-4 py-2">
-          <input
-            value={slug}
-            onChange={(e) => setSlug(e.target.value)}
-            className={inputClass}
-          />
-          {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-        </td>
-        <td className="px-4 py-2">
-          <div className="flex items-center justify-end gap-2">
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="rounded-md p-1.5 text-green-600 hover:bg-green-50"
-            >
-              {isSaving ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Check size={16} />
-              )}
-            </button>
-            <button
-              onClick={() => {
-                setIsEditing(false);
-                setName(tag.name);
-                setSlug(tag.slug);
-                setError(null);
-              }}
-              className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </td>
-      </tr>
+      <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3">
+        {error && <p className="text-xs text-red-600">{error}</p>}
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-gray-900"
+        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-1 rounded-md bg-gray-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+          >
+            {isSaving ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Check size={12} />
+            )}
+            Enregistrer
+          </button>
+          <button
+            onClick={() => {
+              setIsEditing(false);
+              setName(tag.name);
+              setError(null);
+            }}
+            className="rounded-md p-1 text-gray-500 hover:bg-gray-100"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <tr className="border-b border-gray-100 last:border-0">
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <TagIcon size={14} className="text-gray-400" />
-          <span className="font-medium">{tag.name}</span>
-        </div>
-      </td>
-      <td className="px-4 py-3 text-gray-500">{tag.slug}</td>
-      <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-2">
-          <button
-            onClick={() => setIsEditing(true)}
-            className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-          >
-            <Pencil size={16} />
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-          >
-            {isDeleting ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Trash2 size={16} />
-            )}
-          </button>
-        </div>
-      </td>
-    </tr>
+    <div className="group flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+      <div className="flex min-w-0 items-center gap-2">
+        <TagIcon size={14} className="shrink-0 text-gray-400" />
+        <span className="truncate text-sm font-medium">{tag.name}</span>
+      </div>
+      <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
+        <button
+          onClick={() => setIsEditing(true)}
+          className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+        >
+          <Pencil size={14} />
+        </button>
+        <button
+          onClick={() => onDeleteRequested(tag)}
+          className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -234,6 +172,8 @@ export default function TagsPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     apiClient
@@ -246,6 +186,20 @@ export default function TagsPage() {
       )
       .finally(() => setIsLoading(false));
   }, []);
+
+  async function confirmDelete() {
+    if (!tagToDelete) return;
+    setIsDeleting(true);
+    try {
+      await apiClient.delete(`/tags/${tagToDelete.id}`);
+      setTags((prev) => prev.filter((t) => t.id !== tagToDelete.id));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Suppression impossible");
+    } finally {
+      setIsDeleting(false);
+      setTagToDelete(null);
+    }
+  }
 
   return (
     <div>
@@ -262,53 +216,36 @@ export default function TagsPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
-              <th className="px-4 py-3">Nom</th>
-              <th className="px-4 py-3">Slug</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="px-4 py-10 text-center text-gray-500"
-                >
-                  <Loader2 size={20} className="mx-auto animate-spin" />
-                </td>
-              </tr>
-            ) : tags.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="px-4 py-10 text-center text-gray-500"
-                >
-                  Aucun tag.
-                </td>
-              </tr>
-            ) : (
-              tags.map((tag) => (
-                <TagRow
-                  key={tag.id}
-                  tag={tag}
-                  onUpdated={(updated) =>
-                    setTags((prev) =>
-                      prev.map((t) => (t.id === updated.id ? updated : t)),
-                    )
-                  }
-                  onDeleted={(id) =>
-                    setTags((prev) => prev.filter((t) => t.id !== id))
-                  }
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {isLoading ? (
+        <Loader2 size={20} className="animate-spin text-gray-400" />
+      ) : tags.length === 0 ? (
+        <p className="text-sm text-gray-400">Aucun tag.</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {tags.map((tag) => (
+            <TagCard
+              key={tag.id}
+              tag={tag}
+              onUpdated={(updated) =>
+                setTags((prev) =>
+                  prev.map((t) => (t.id === updated.id ? updated : t)),
+                )
+              }
+              onDeleteRequested={setTagToDelete}
+            />
+          ))}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={tagToDelete !== null}
+        title="Supprimer le tag"
+        message={`Voulez-vous vraiment supprimer le tag « ${tagToDelete?.name} » ?`}
+        confirmLabel="Supprimer"
+        isLoading={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setTagToDelete(null)}
+      />
     </div>
   );
 }

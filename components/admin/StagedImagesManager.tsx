@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { Upload, X, Loader2, Check } from "lucide-react";
 
 export interface ExistingStagedImage {
-  key: string; // identifiant unique utilisé pour la suppression + la clé React
+  key: string;
   url: string;
-  badge?: string; // ex: "Principale"
+  badge?: string;
 }
 
 interface StagedFile {
@@ -21,16 +21,12 @@ interface StagedImagesManagerProps {
   deleteOne: (key: string) => Promise<void>;
   uploadOne: (file: File) => Promise<void>;
   accept?: string;
-  maxNewPerSelection?: number; // limite par sélection de fichiers
-  maxTotal?: number; // limite globale (existantes visibles + en attente)
+  maxNewPerSelection?: number;
+  maxTotal?: number;
   addLabel?: string;
   helpText?: string;
 }
 
-// Petit wrapper qui fait apparaître une vignette en fondu à son montage —
-// utilisé pour les images existantes ET pour les images en attente, afin
-// qu'une image nouvellement affichée (après un upload réussi, ou au chargement
-// initial) s'anime en douceur au lieu d'apparaître brutalement.
 function FadeInThumb({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(false);
 
@@ -69,9 +65,12 @@ export function StagedImagesManager({
   const [progress, setProgress] = useState<{
     done: number;
     total: number;
+    phase: "deleting" | "uploading";
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [justSaved, setJustSaved] = useState(false);
+  // Message final distinct selon la nature de l'opération (au lieu d'un
+  // "Enregistrée" générique affiché même pour une suppression pure).
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -100,7 +99,7 @@ export function StagedImagesManager({
       previewUrl: URL.createObjectURL(file),
     }));
     setStaged((prev) => [...prev, ...next]);
-    setJustSaved(false);
+    setResultMessage(null);
   }
 
   function removeStaged(id: string) {
@@ -118,43 +117,48 @@ export function StagedImagesManager({
       else next.add(key);
       return next;
     });
-    setJustSaved(false);
+    setResultMessage(null);
   }
 
   const hasChanges = staged.length > 0 || pendingDeletions.size > 0;
 
   async function handleCommit() {
     setError(null);
+    setResultMessage(null);
     setIsSaving(true);
-    const total = pendingDeletions.size + staged.length;
-    setProgress({ done: 0, total });
+
+    const deletionsCount = pendingDeletions.size;
+    const uploadsCount = staged.length;
+    const total = deletionsCount + uploadsCount;
     let doneCount = 0;
     let failures = 0;
 
-    for (const key of pendingDeletions) {
-      try {
-        await deleteOne(key);
-      } catch {
-        failures += 1;
+    if (deletionsCount > 0) {
+      setProgress({ done: 0, total, phase: "deleting" });
+      for (const key of pendingDeletions) {
+        try {
+          await deleteOne(key);
+        } catch {
+          failures += 1;
+        }
+        doneCount += 1;
+        setProgress({ done: doneCount, total, phase: "deleting" });
       }
-      doneCount += 1;
-      setProgress({ done: doneCount, total });
     }
 
-    // Upload une image à la fois, en retirant sa vignette "en attente" dès que
-    // SON upload à elle réussit — plutôt que de vider tout le lot à la fin —
-    // pour que le remplacement par l'image réelle enregistrée soit visible
-    // progressivement, surtout avec plusieurs images à la fois.
-    for (const s of staged) {
-      try {
-        await uploadOne(s.file);
-        URL.revokeObjectURL(s.previewUrl);
-        setStaged((prev) => prev.filter((item) => item.id !== s.id));
-      } catch {
-        failures += 1;
+    if (uploadsCount > 0) {
+      for (const s of staged) {
+        setProgress({ done: doneCount, total, phase: "uploading" });
+        try {
+          await uploadOne(s.file);
+          URL.revokeObjectURL(s.previewUrl);
+          setStaged((prev) => prev.filter((item) => item.id !== s.id));
+        } catch {
+          failures += 1;
+        }
+        doneCount += 1;
+        setProgress({ done: doneCount, total, phase: "uploading" });
       }
-      doneCount += 1;
-      setProgress({ done: doneCount, total });
     }
 
     setIsSaving(false);
@@ -165,8 +169,16 @@ export function StagedImagesManager({
       setError(
         `${failures} opération(s) ont échoué sur ${total}. Vérifiez la liste ci-dessous et réessayez si besoin.`,
       );
-    } else {
-      setJustSaved(true);
+    } else if (deletionsCount > 0 && uploadsCount > 0) {
+      setResultMessage("Modifications enregistrées");
+    } else if (deletionsCount > 0) {
+      setResultMessage(
+        deletionsCount > 1 ? "Images supprimées" : "Image supprimée",
+      );
+    } else if (uploadsCount > 0) {
+      setResultMessage(
+        uploadsCount > 1 ? "Images enregistrées" : "Image enregistrée",
+      );
     }
   }
 
@@ -270,7 +282,11 @@ export function StagedImagesManager({
       {progress && (
         <div className="mt-3">
           <div className="mb-1 flex items-center justify-between text-xs text-gray-500">
-            <span>Enregistrement en cours...</span>
+            <span>
+              {progress.phase === "deleting"
+                ? "Suppression en cours..."
+                : "Enregistrement en cours..."}
+            </span>
             <span>
               {percent}% ({progress.done}/{progress.total})
             </span>
@@ -298,9 +314,9 @@ export function StagedImagesManager({
           )}
           Enregistrer les images
         </button>
-        {justSaved && !hasChanges && (
+        {resultMessage && !hasChanges && (
           <span className="flex items-center gap-1 text-xs text-green-600">
-            <Check size={14} /> Enregistré
+            <Check size={14} /> {resultMessage}
           </span>
         )}
         {hasChanges && !isSaving && (

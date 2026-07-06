@@ -60,10 +60,6 @@ function ImagesStep({
   const sortedImages = product.images
     .slice()
     .sort((a, b) => a.position - b.position);
-  // Une seule image doit porter le badge "Principale" — si le backend en
-  // renvoyait plusieurs à isPrimary:true, on ne badge quand même que la
-  // première trouvée (ou la première du tri à défaut) pour éviter que
-  // toutes les vignettes affichent "Principale".
   const primaryImage =
     sortedImages.find((img) => img.isPrimary) ?? sortedImages[0];
   const existingImages = sortedImages.map((img) => ({
@@ -434,20 +430,69 @@ export function ProductWizard({
     !productExists ? STEPS.map((_, i) => i).filter((i) => i > 0) : [],
   );
 
-  // Toute étape traversée (qu'on quitte en avançant) est marquée comme
-  // complétée — corrige le bug où seule "info" était jamais cochée, quelle
-  // que soit la progression réelle dans les autres étapes.
+  // Calcule les étapes RÉELLEMENT complétées à partir des données existantes
+  // (et non plus seulement des étapes traversées manuellement) — corrige le
+  // cas où l'on modifie un produit déjà complet sans re-cliquer "Continuer"
+  // sur chaque étape.
+  useEffect(() => {
+    if (!product) return;
+    let cancelled = false;
+
+    async function computeCompleted() {
+      const next = new Set<string>(["info"]);
+
+      if (product!.images.length > 0) next.add("images");
+
+      try {
+        const defs = await apiClient.get<AttributeDefinition[]>(
+          `/categories/${product!.categoryId}/attributes`,
+        );
+        const nonVariantDefs = defs.filter((d) => !d.isVariant);
+        const requiredNonVariant = nonVariantDefs.filter((d) => d.isRequired);
+        const coveredIds = new Set(
+          product!.attributeValues.map((av) => av.attributeDefinition.id),
+        );
+        const allRequiredCovered = requiredNonVariant.every((d) =>
+          coveredIds.has(d.id),
+        );
+        if (nonVariantDefs.length === 0 || allRequiredCovered) {
+          next.add("attributes");
+        }
+      } catch {
+        // ignore — n'empêche pas l'affichage du reste du stepper
+      }
+
+      try {
+        const productTags = await apiClient.get<{ tag: { id: string } }[]>(
+          `/product/${product!.id}/tags`,
+        );
+        if (productTags.length > 0) next.add("tags");
+      } catch {
+        // ignore
+      }
+
+      try {
+        const combos = await apiClient.get<ProductCombination[]>(
+          `/product/${product!.id}/combinations`,
+        );
+        if (combos.length > 0) next.add("variants");
+      } catch {
+        // ignore
+      }
+
+      if (!cancelled) {
+        setCompletedSteps((prev) => new Set([...prev, ...next]));
+      }
+    }
+
+    computeCompleted();
+    return () => {
+      cancelled = true;
+    };
+  }, [product]);
+
   function goTo(index: number) {
     if (disabledIndexes.has(index)) return;
-    if (index > currentStep) {
-      setCompletedSteps((prev) => {
-        const next = new Set(prev);
-        for (let i = currentStep; i < index; i++) {
-          next.add(STEPS[i].id);
-        }
-        return next;
-      });
-    }
     setCurrentStep(index);
   }
 
