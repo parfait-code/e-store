@@ -20,6 +20,8 @@ function CouponForm({
     perUserLimit: 1,
     isActive: true,
   });
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -28,9 +30,14 @@ function CouponForm({
     setError(null);
     setIsSubmitting(true);
     try {
+      const payload: CouponFormInput = {
+        ...form,
+        startDate: startDate ? new Date(startDate).toISOString() : undefined,
+        endDate: endDate ? new Date(endDate).toISOString() : undefined,
+      };
       const created = await apiClient.post<CouponCode>(
         `/promotions/${promotionId}/coupons`,
-        form,
+        payload,
       );
       onCreated(created);
     } catch (err) {
@@ -55,7 +62,7 @@ function CouponForm({
         <input
           type="text"
           required
-          placeholder="Code (ex: SUMMER25)"
+          placeholder="Code (ex: SUMMER25) *"
           value={form.code}
           onChange={(e) =>
             setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))
@@ -101,6 +108,30 @@ function CouponForm({
           />
           Actif
         </label>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Date de début (optionnel)
+          </label>
+          <input
+            type="datetime-local"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className={`${inputClass} w-full`}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Date de fin (optionnel)
+          </label>
+          <input
+            type="datetime-local"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className={`${inputClass} w-full`}
+          />
+        </div>
       </div>
       <div className="flex gap-2">
         <button

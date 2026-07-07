@@ -32,6 +32,7 @@ function AttributeOptionRow({
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(option.value);
   const [colorHex, setColorHex] = useState(option.colorHex ?? "#000000");
+  const [position, setPosition] = useState(option.position);
   const [isSaving, setIsSaving] = useState(false);
 
   async function handleSave() {
@@ -42,6 +43,7 @@ function AttributeOptionRow({
         {
           value: value.trim(),
           colorHex: definitionType === "COLOR" ? colorHex : undefined,
+          position,
         },
       );
       onUpdated(updated);
@@ -83,6 +85,13 @@ function AttributeOptionRow({
           className="w-20 rounded border border-gray-300 px-1 py-0.5 text-xs outline-none focus:border-gray-900"
           autoFocus
         />
+        <input
+          type="number"
+          value={position}
+          onChange={(e) => setPosition(Number(e.target.value))}
+          title="Position d'affichage"
+          className="w-12 rounded border border-gray-300 px-1 py-0.5 text-xs outline-none focus:border-gray-900"
+        />
         <button
           onClick={handleSave}
           disabled={isSaving}
@@ -99,6 +108,7 @@ function AttributeOptionRow({
             setIsEditing(false);
             setValue(option.value);
             setColorHex(option.colorHex ?? "#000000");
+            setPosition(option.position);
           }}
           className="rounded-full p-0.5 hover:bg-gray-200"
         >
@@ -117,6 +127,7 @@ function AttributeOptionRow({
         />
       )}
       {option.value}
+      <span className="text-gray-400">#{option.position}</span>
       <button
         onClick={() => setIsEditing(true)}
         className="rounded-full p-0.5 hover:bg-gray-200"
@@ -142,6 +153,7 @@ function AttributeOptionsEditor({
 }) {
   const [value, setValue] = useState("");
   const [colorHex, setColorHex] = useState("#000000");
+  const [position, setPosition] = useState(definition.options.length);
   const [isAdding, setIsAdding] = useState(false);
 
   async function addOption() {
@@ -153,10 +165,12 @@ function AttributeOptionsEditor({
         {
           value: value.trim(),
           colorHex: definition.type === "COLOR" ? colorHex : undefined,
+          position,
         },
       );
       onChange({ ...definition, options: [...definition.options, created] });
       setValue("");
+      setPosition((p) => p + 1);
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Erreur lors de l'ajout");
     } finally {
@@ -207,6 +221,13 @@ function AttributeOptionsEditor({
             className="h-7 w-7 rounded border border-gray-300"
           />
         )}
+        <input
+          type="number"
+          value={position}
+          onChange={(e) => setPosition(Number(e.target.value))}
+          title="Position d'affichage"
+          className="w-16 rounded-md border border-gray-300 px-2 py-1 text-xs outline-none focus:border-gray-900"
+        />
         <button
           onClick={addOption}
           disabled={isAdding}
@@ -223,132 +244,7 @@ function AttributeOptionsEditor({
   );
 }
 
-function AttributeDefinitionEditor({
-  definition,
-  onUpdated,
-  onCancel,
-}: {
-  definition: AttributeDefinition;
-  onUpdated: (updated: AttributeDefinition) => void;
-  onCancel: () => void;
-}) {
-  const [form, setForm] = useState({
-    name: definition.name,
-    slug: definition.slug,
-    unit: definition.unit ?? "",
-    isVariant: definition.isVariant,
-    isFilterable: definition.isFilterable,
-    isRequired: definition.isRequired,
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  async function handleSave() {
-    setIsSaving(true);
-    setError(null);
-    try {
-      const updated = await apiClient.patch<AttributeDefinition>(
-        `/attributes/${definition.id}`,
-        {
-          name: form.name,
-          slug: form.slug,
-          unit: form.unit || undefined,
-          isVariant: form.isVariant,
-          isFilterable: form.isFilterable,
-          isRequired: form.isRequired,
-        },
-      );
-      onUpdated({ ...updated, options: definition.options });
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  const inputClass =
-    "rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-gray-900";
-
-  return (
-    <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <div className="grid grid-cols-2 gap-3">
-        <input
-          type="text"
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          className={inputClass}
-          placeholder="Nom"
-        />
-        <input
-          type="text"
-          value={form.slug}
-          onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-          className={inputClass}
-          placeholder="Slug"
-        />
-      </div>
-      <input
-        type="text"
-        value={form.unit}
-        onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-        className={`${inputClass} w-full`}
-        placeholder="Unité (optionnel, ex: cm, kg)"
-      />
-      <div className="flex flex-wrap gap-4 text-xs">
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={form.isVariant}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, isVariant: e.target.checked }))
-            }
-          />
-          Utilisé pour les variantes
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={form.isFilterable}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, isFilterable: e.target.checked }))
-            }
-          />
-          Filtrable
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={form.isRequired}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, isRequired: e.target.checked }))
-            }
-          />
-          Obligatoire
-        </label>
-      </div>
-      <div className="flex gap-2">
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-        >
-          {isSaving ? "Enregistrement..." : "Enregistrer"}
-        </button>
-        <button
-          onClick={onCancel}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600"
-        >
-          Annuler
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export function CategoryAttributes({ categoryId }: { categoryId: string }) {
+function CategoryAttributes({ categoryId }: { categoryId: string }) {
   const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -357,9 +253,11 @@ export function CategoryAttributes({ categoryId }: { categoryId: string }) {
     name: "",
     slug: "",
     type: "TEXT",
+    unit: "",
     isVariant: false,
     isFilterable: false,
     isRequired: false,
+    position: 0,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -378,16 +276,18 @@ export function CategoryAttributes({ categoryId }: { categoryId: string }) {
     try {
       const created = await apiClient.post<AttributeDefinition>(
         `/categories/${categoryId}/attributes`,
-        form,
+        { ...form, unit: form.unit || undefined },
       );
       setAttributes((prev) => [...prev, created]);
       setForm({
         name: "",
         slug: "",
         type: "TEXT",
+        unit: "",
         isVariant: false,
         isFilterable: false,
         isRequired: false,
+        position: attributes.length + 1,
       });
       setShowForm(false);
     } catch (err) {
@@ -434,7 +334,7 @@ export function CategoryAttributes({ categoryId }: { categoryId: string }) {
             <input
               type="text"
               required
-              placeholder="Nom (ex: Couleur)"
+              placeholder="Nom (ex: Couleur) *"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               className={inputClass}
@@ -442,28 +342,50 @@ export function CategoryAttributes({ categoryId }: { categoryId: string }) {
             <input
               type="text"
               required
-              placeholder="Slug (ex: couleur)"
+              placeholder="Slug (ex: couleur) *"
               value={form.slug}
               onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
               className={inputClass}
             />
           </div>
-          <select
-            value={form.type}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                type: e.target.value as AttributeDefinitionFormInput["type"],
-              }))
-            }
-            className={inputClass}
-          >
-            {Object.entries(TYPE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <select
+              value={form.type}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  type: e.target.value as AttributeDefinitionFormInput["type"],
+                }))
+              }
+              className={inputClass}
+            >
+              {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="Unité (optionnel, ex: cm, kg)"
+              value={form.unit}
+              onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              Position d'affichage
+            </label>
+            <input
+              type="number"
+              value={form.position}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, position: Number(e.target.value) }))
+              }
+              className={`${inputClass} w-24`}
+            />
+          </div>
           <div className="flex flex-wrap gap-4 text-xs">
             <label className="flex items-center gap-1.5">
               <input
@@ -539,6 +461,14 @@ export function CategoryAttributes({ categoryId }: { categoryId: string }) {
                     <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
                       {TYPE_LABELS[attr.type]}
                     </span>
+                    {attr.unit && (
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
+                        {attr.unit}
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-400">
+                      pos. {attr.position}
+                    </span>
                     {attr.isVariant && (
                       <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">
                         Variante
@@ -581,3 +511,149 @@ export function CategoryAttributes({ categoryId }: { categoryId: string }) {
     </div>
   );
 }
+
+function AttributeDefinitionEditor({
+  definition,
+  onUpdated,
+  onCancel,
+}: {
+  definition: AttributeDefinition;
+  onUpdated: (updated: AttributeDefinition) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: definition.name,
+    slug: definition.slug,
+    unit: definition.unit ?? "",
+    position: definition.position,
+    isVariant: definition.isVariant,
+    isFilterable: definition.isFilterable,
+    isRequired: definition.isRequired,
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function handleSave() {
+    setIsSaving(true);
+    setError(null);
+    try {
+      const updated = await apiClient.patch<AttributeDefinition>(
+        `/attributes/${definition.id}`,
+        {
+          name: form.name,
+          slug: form.slug,
+          unit: form.unit || undefined,
+          position: form.position,
+          isVariant: form.isVariant,
+          isFilterable: form.isFilterable,
+          isRequired: form.isRequired,
+        },
+      );
+      // La route PATCH ne renvoie pas forcément `options` à jour, on les
+      // préserve depuis la définition connue côté client.
+      onUpdated({ ...updated, options: definition.options });
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  const inputClass =
+    "rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-gray-900";
+
+  return (
+    <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        <input
+          type="text"
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          className={inputClass}
+          placeholder="Nom"
+        />
+        <input
+          type="text"
+          value={form.slug}
+          onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+          className={inputClass}
+          placeholder="Slug"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <input
+          type="text"
+          value={form.unit}
+          onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+          className={inputClass}
+          placeholder="Unité (optionnel, ex: cm, kg)"
+        />
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Position d'affichage
+          </label>
+          <input
+            type="number"
+            value={form.position}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, position: Number(e.target.value) }))
+            }
+            className={`${inputClass} w-full`}
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-4 text-xs">
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isVariant}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isVariant: e.target.checked }))
+            }
+          />
+          Utilisé pour les variantes
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isFilterable}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isFilterable: e.target.checked }))
+            }
+          />
+          Filtrable
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isRequired}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isRequired: e.target.checked }))
+            }
+          />
+          Obligatoire
+        </label>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+        >
+          {isSaving ? "Enregistrement..." : "Enregistrer"}
+        </button>
+        <button
+          onClick={onCancel}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600"
+        >
+          Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export { CategoryAttributes };

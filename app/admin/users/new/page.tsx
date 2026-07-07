@@ -18,6 +18,7 @@ export default function NewUserPage() {
     password: "",
     firstName: "",
     lastName: "",
+    dateOfBirth: "",
     phone: "",
     role: "USER",
   });
@@ -38,7 +39,15 @@ export default function NewUserPage() {
     setFieldErrors({});
     setIsSubmitting(true);
     try {
-      const created = await apiClient.post<User>("/user", form);
+      const payload = {
+        ...form,
+        // <input type="date"> renvoie "YYYY-MM-DD" — le backend attend un
+        // ISO datetime complet.
+        dateOfBirth: form.dateOfBirth
+          ? new Date(form.dateOfBirth).toISOString()
+          : undefined,
+      };
+      const created = await apiClient.post<User>("/user", payload);
       router.push(`/admin/users/${created.id}`);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -81,7 +90,9 @@ export default function NewUserPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium">Prénom</label>
+            <label className="mb-1 block text-sm font-medium">
+              Prénom <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               required
@@ -96,7 +107,9 @@ export default function NewUserPage() {
             )}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Nom</label>
+            <label className="mb-1 block text-sm font-medium">
+              Nom <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               required
@@ -115,7 +128,7 @@ export default function NewUserPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Nom d'utilisateur
+              Nom d'utilisateur <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -131,7 +144,9 @@ export default function NewUserPage() {
             )}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Email</label>
+            <label className="mb-1 block text-sm font-medium">
+              Email <span className="text-red-500">*</span>
+            </label>
             <input
               type="email"
               required
@@ -148,7 +163,7 @@ export default function NewUserPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Mot de passe
+              Mot de passe <span className="text-red-500">*</span>
             </label>
             <input
               type="password"
@@ -175,19 +190,37 @@ export default function NewUserPage() {
           </div>
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">Rôle</label>
-          <select
-            value={form.role}
-            onChange={(e) => update("role", e.target.value as Role)}
-            className={inputClass}
-          >
-            {ROLE_OPTIONS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Date de naissance
+            </label>
+            <input
+              type="date"
+              value={form.dateOfBirth ?? ""}
+              onChange={(e) => update("dateOfBirth", e.target.value)}
+              className={inputClass}
+            />
+            {fieldError("dateOfBirth") && (
+              <p className="mt-1 text-xs text-red-600">
+                {fieldError("dateOfBirth")}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Rôle</label>
+            <select
+              value={form.role}
+              onChange={(e) => update("role", e.target.value as Role)}
+              className={inputClass}
+            >
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <button

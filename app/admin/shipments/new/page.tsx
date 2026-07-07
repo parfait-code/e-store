@@ -6,7 +6,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
-import type { Shipment, ShipmentFormInput, Order, User, Product } from "@/lib/types";
+import type {
+  Shipment,
+  ShipmentFormInput,
+  Order,
+  User,
+  Product,
+} from "@/lib/types";
 
 function NewShipmentForm() {
   const router = useRouter();
@@ -21,15 +27,17 @@ function NewShipmentForm() {
     weight: 1,
     order_id: orderIdFromQuery || undefined,
   });
+  const [useDimensions, setUseDimensions] = useState(false);
+  const [dimensions, setDimensions] = useState({
+    length: 0,
+    width: 0,
+    height: 0,
+  });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPrefilling, setIsPrefilling] = useState(Boolean(orderIdFromQuery));
 
   // Préremplit destinataire + poids à partir de la commande liée.
-  // - Nom : la commande n'a pas de champ nom direct, on le récupère via l'utilisateur.
-  // - Adresse : shippingAddressSnapshot de la commande.
-  // - Poids : somme (poids produit × quantité) — nécessite un fetch par produit
-  //   car OrderItem.product n'inclut pas le poids.
   useEffect(() => {
     if (!orderIdFromQuery) return;
     setIsPrefilling(true);
@@ -52,14 +60,15 @@ function NewShipmentForm() {
         ].filter(Boolean);
 
         const [user, products] = await Promise.all([
-          apiClient
-            .get<User>(`/user/${order.userId}`)
-            .catch(() => null),
+          apiClient.get<User>(`/user/${order.userId}`).catch(() => null),
           Promise.all(
             order.items.map((item) =>
               apiClient
                 .get<Product>(`/product/${item.productId}`)
-                .then((p) => ({ weight: p.weight ?? 0, quantity: item.quantity }))
+                .then((p) => ({
+                  weight: p.weight ?? 0,
+                  quantity: item.quantity,
+                }))
                 .catch(() => ({ weight: 0, quantity: item.quantity })),
             ),
           ),
@@ -72,9 +81,15 @@ function NewShipmentForm() {
 
         setForm((prev) => ({
           ...prev,
-          recipient_name: user ? `${user.firstName} ${user.lastName}` : prev.recipient_name,
-          recipient_address: addressParts.length > 0 ? addressParts.join(", ") : prev.recipient_address,
-          weight: totalWeight > 0 ? Number(totalWeight.toFixed(2)) : prev.weight,
+          recipient_name: user
+            ? `${user.firstName} ${user.lastName}`
+            : prev.recipient_name,
+          recipient_address:
+            addressParts.length > 0
+              ? addressParts.join(", ")
+              : prev.recipient_address,
+          weight:
+            totalWeight > 0 ? Number(totalWeight.toFixed(2)) : prev.weight,
         }));
       })
       .catch(() => {
@@ -97,6 +112,7 @@ function NewShipmentForm() {
     try {
       const payload = {
         ...form,
+        dimensions: useDimensions ? dimensions : undefined,
         // <input type="date"> renvoie "YYYY-MM-DD" — le backend attend un ISO
         // datetime complet, sinon 400 "Invalid ISO datetime".
         estimated_delivery_at: form.estimated_delivery_at
@@ -149,7 +165,7 @@ function NewShipmentForm() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Nom expéditeur
+              Nom expéditeur <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -161,7 +177,7 @@ function NewShipmentForm() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Nom destinataire
+              Nom destinataire <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -176,7 +192,7 @@ function NewShipmentForm() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Adresse expéditeur
+              Adresse expéditeur <span className="text-red-500">*</span>
             </label>
             <textarea
               required
@@ -188,7 +204,7 @@ function NewShipmentForm() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Adresse destinataire
+              Adresse destinataire <span className="text-red-500">*</span>
             </label>
             <textarea
               required
@@ -203,7 +219,7 @@ function NewShipmentForm() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Poids (kg)
+              Poids (kg) <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -228,12 +244,77 @@ function NewShipmentForm() {
             <input
               type="date"
               value={form.estimated_delivery_at ?? ""}
-              onChange={(e) =>
-                update("estimated_delivery_at", e.target.value)
-              }
+              onChange={(e) => update("estimated_delivery_at", e.target.value)}
               className={inputClass}
             />
           </div>
+        </div>
+
+        <div>
+          <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={useDimensions}
+              onChange={(e) => setUseDimensions(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Renseigner les dimensions du colis (optionnel)
+          </label>
+          {useDimensions && (
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Longueur (cm)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={dimensions.length}
+                  onChange={(e) =>
+                    setDimensions((d) => ({
+                      ...d,
+                      length: Number(e.target.value),
+                    }))
+                  }
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Largeur (cm)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={dimensions.width}
+                  onChange={(e) =>
+                    setDimensions((d) => ({
+                      ...d,
+                      width: Number(e.target.value),
+                    }))
+                  }
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Hauteur (cm)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={dimensions.height}
+                  onChange={(e) =>
+                    setDimensions((d) => ({
+                      ...d,
+                      height: Number(e.target.value),
+                    }))
+                  }
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <button
