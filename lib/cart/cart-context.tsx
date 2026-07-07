@@ -12,6 +12,12 @@ import {
 import { apiClient } from "@/lib/api-client";
 import type { Basket, CartLocalItem, CartContextValue } from "@/lib/types";
 
+// NOTE ARCHITECTURE : ce contexte reste volontairement HORS de React Query.
+// Le panier est un état client pur (localStorage), jamais lu depuis le
+// serveur en usage normal — il n'y a donc rien à "cacher" côté serveur ici.
+// Seule exception : syncToServer(), un effet de bord fire-and-forget appelé
+// une fois après login/signup, qui ne bénéficie pas d'un cache de requête.
+
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "cart_items";
@@ -101,11 +107,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => setItems([]), []);
 
-  // Pousse le panier local vers le serveur — appelé juste après login/signup.
   const syncToServer = useCallback(async () => {
     if (items.length === 0) return;
     try {
-      const basket = await apiClient.get<Basket>("/user/basket"); // get-or-create, plus de doublon
+      const basket = await apiClient.get<Basket>("/user/basket");
       for (const item of items) {
         await apiClient.post(`/basket/${basket.id}/product`, {
           product_id: item.productId,

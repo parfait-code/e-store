@@ -1,33 +1,33 @@
 // app/(checkout)/checkout/page.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, CreditCard, MapPin, Truck, Tag, Check } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import { useCart } from "@/lib/cart/cart-context";
 import { formatXAF } from "@/lib/format";
-import type {
-  Address,
-  ShippingMethod,
-  ShippingCostResponse,
-  PaymentMethodOption,
-  PaymentMethodType,
-  Order,
-  OrderCreateInput,
-  Basket,
-  CouponValidateResponse,
-} from "@/lib/types";
+import type { PaymentMethodType, OrderCreateInput } from "@/lib/types";
+import {
+  useAddresses,
+  useShippingMethods,
+  useShippingCosts,
+  usePaymentMethods,
+  useValidateCoupon,
+  useCreateOrder,
+  useCreatePayment,
+} from "@/lib/queries/shop/useCheckout";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, totalAmount, clearCart, isLoaded } = useCart();
 
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[]>(
-    [],
-  );
+  const { data: addresses = [], isLoading: isLoadingAddresses } =
+    useAddresses();
+  const { data: shippingMethods = [], isLoading: isLoadingMethods } =
+    useShippingMethods();
+  const { data: paymentMethods = [], isLoading: isLoadingPayments } =
+    usePaymentMethods();
 
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [newAddress, setNewAddress] = useState({
@@ -43,80 +43,44 @@ export default function CheckoutPage() {
     "",
   );
   const [couponCode, setCouponCode] = useState("");
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [shippingCosts, setShippingCosts] = useState<
-    Record<string, number | null>
-  >({});
-  const [couponBasketId, setCouponBasketId] = useState<string | null>(null);
-  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
   const [couponResult, setCouponResult] = useState<{
     valid: boolean;
     message: string;
   } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const [isLoadingCosts, setIsLoadingCosts] = useState(false);
+  const { mutate: validateCoupon, isPending: isValidatingCoupon } =
+    useValidateCoupon();
+  const { mutateAsync: createOrder, isPending: isCreatingOrder } =
+    useCreateOrder();
+  const { mutateAsync: createPayment } = useCreatePayment();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const totalWeight = items.reduce(
     (sum, i) => sum + (i.weight ?? 0) * i.quantity,
     0,
   );
-
-  useEffect(() => {
-    if (shippingMethods.length === 0) return;
-    setIsLoadingCosts(true);
-    Promise.allSettled(
-      shippingMethods.map((m) =>
-        apiClient.post<ShippingCostResponse>("/shipping-methods/calculate", {
-          shippingMethodId: m.id,
-          weight: totalWeight,
-        }),
-      ),
-    )
-      .then((results) => {
-        const costs: Record<string, number | null> = {};
-        results.forEach((result, i) => {
-          const method = shippingMethods[i];
-          costs[method.id] =
-            result.status === "fulfilled" &&
-            typeof result.value?.cost === "number"
-              ? result.value.cost
-              : null; // échec ou coût absent → on affichera "Livraison gratuite"
-        });
-        setShippingCosts(costs);
-      })
-      .finally(() => setIsLoadingCosts(false));
-  }, [shippingMethods, totalWeight]);
+  const { costsByMethodId: shippingCosts, isLoading: isLoadingCosts } =
+    useShippingCosts(shippingMethods, totalWeight);
 
   const selectedShippingCost = shippingMethodId
     ? (shippingCosts[shippingMethodId] ?? 0)
     : 0;
   const grandTotal = totalAmount + selectedShippingCost;
 
+  const isLoading = isLoadingAddresses || isLoadingMethods || isLoadingPayments;
+
+  // Pré-sélection de l'adresse par défaut une fois les adresses chargées
   useEffect(() => {
-    Promise.all([
-      apiClient.get<Address[]>("/addresses"),
-      apiClient.get<ShippingMethod[]>("/shipping-methods?active=true"),
-      apiClient.get<PaymentMethodOption[]>("/payment-methods"),
-    ])
-      .then(([addrs, methods, payments]) => {
-        setAddresses(addrs);
-        setShippingMethods(methods);
-        setPaymentMethods(payments);
-        const def = addrs.find((a) => a.isDefault) ?? addrs[0];
-        if (def) setSelectedAddressId(def.id);
-        else setUseNewAddress(true);
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, []);
+    if (addresses.length === 0) {
+      setUseNewAddress(true);
+      return;
+    }
+    if (!selectedAddressId) {
+      const def = addresses.find((a) => a.isDefault) ?? addresses[0];
+      setSelectedAddressId(def.id);
+    }
+  }, [addresses, selectedAddressId]);
 
   useEffect(() => {
     if (isLoaded && items.length === 0 && !isSubmitting) {
@@ -167,15 +131,13 @@ export default function CheckoutPage() {
         paymentMethodId: paymentMethod || undefined,
         couponCode: couponCode || undefined,
       };
-      const order = await apiClient.post<Order>("/orders", payload);
+      const order = await createOrder(payload);
 
       try {
-        await apiClient.post("/payments", {
-          order_id: order.id,
-          method: paymentMethod,
-        });
+        await createPayment({ order_id: order.id, method: paymentMethod });
       } catch {
-        // La commande existe déjà même si le paiement échoue (ex: méthode 503) — on redirige quand même.
+        // La commande existe déjà même si le paiement échoue (ex: méthode 503)
+        // — on redirige quand même, cohérent avec le comportement d'origine.
       }
 
       clearCart();
@@ -190,38 +152,28 @@ export default function CheckoutPage() {
     }
   }
 
-  async function handleValidateCoupon() {
+  function handleValidateCoupon() {
     if (!couponCode.trim()) return;
-    setIsValidatingCoupon(true);
     setCouponResult(null);
-    try {
-      let basketId = couponBasketId;
-      if (!basketId) {
-        const basket = await apiClient.get<Basket>("/user/basket"); // au lieu de POST /basket
-        basketId = basket.id;
-        setCouponBasketId(basketId);
-      }
-      const res = await apiClient.post<CouponValidateResponse>(
-        "/coupons/validate",
-        { code: couponCode.trim(), basketId },
-      );
-      setCouponResult({
-        valid: res.valid,
-        message: res.valid
-          ? "Code valide — il sera appliqué à la confirmation."
-          : (res.message ?? "Code invalide."),
-      });
-    } catch (err) {
-      setCouponResult({
-        valid: false,
-        message:
-          err instanceof ApiError ? err.message : "Code invalide ou expiré.",
-      });
-    } finally {
-      setIsValidatingCoupon(false);
-    }
+    validateCoupon(couponCode.trim(), {
+      onSuccess: (res) => {
+        setCouponResult({
+          valid: res.valid,
+          message: res.valid
+            ? "Code valide — il sera appliqué à la confirmation."
+            : (res.message ?? "Code invalide."),
+        });
+      },
+      onError: (err) => {
+        setCouponResult({
+          valid: false,
+          message:
+            err instanceof ApiError ? err.message : "Code invalide ou expiré.",
+        });
+      },
+    });
   }
-  
+
   if (isLoading)
     return <Loader2 size={24} className="animate-spin text-gray-400" />;
 
@@ -487,10 +439,10 @@ export default function CheckoutPage() {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isCreatingOrder}
             className="mt-5 flex w-full items-center justify-center gap-2 rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
           >
-            {isSubmitting ? (
+            {isSubmitting || isCreatingOrder ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
               <Check size={16} />

@@ -1,7 +1,7 @@
 // app/(account)/account/addresses/page.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import {
   Plus,
   Pencil,
@@ -11,21 +11,30 @@ import {
   Check,
   Star,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import type {
   Address,
   AddressFormInput,
   AddressValidateResponse,
 } from "@/lib/types";
+import {
+  useAddresses,
+  useCreateAddress,
+  useUpdateAddress,
+  useDeleteAddress,
+  useValidateAddress,
+} from "@/lib/queries/shop/useCheckout";
 
 function AddressForm({
   initial,
   onSubmit,
   onCancel,
+  isSubmitting,
 }: {
   initial?: Address;
-  onSubmit: (input: AddressFormInput) => Promise<void>;
+  onSubmit: (input: AddressFormInput) => void;
   onCancel: () => void;
+  isSubmitting: boolean;
 }) {
   const [form, setForm] = useState<AddressFormInput>({
     street: initial?.street ?? "",
@@ -36,60 +45,42 @@ function AddressForm({
     isDefault: initial?.isDefault ?? false,
   });
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
+  const { mutate: validateAddress, isPending: isValidating } =
+    useValidateAddress();
   const [validation, setValidation] = useState<{
     valid: boolean;
     message: string;
   } | null>(null);
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
-    // La validation reste informative uniquement — elle ne doit jamais
-    // empêcher l'enregistrement. Avant, un retour `valid: false` du service
-    // (fréquent selon les pays/codes postaux supportés côté back) stoppait
-    // toute la soumission avec un `return` prématuré, rendant la sauvegarde
-    // impossible même avec une adresse parfaitement correcte.
-    setIsValidating(true);
+    // La validation reste purement informative — elle ne doit jamais
+    // bloquer la soumission, même si le service renvoie `valid: false`.
     setValidation(null);
-    try {
-      const res = await apiClient.post<AddressValidateResponse>(
-        "/address/validate",
-        {
-          street: form.street,
-          city: form.city,
-          state: form.state || undefined,
-          country: form.country,
-          postal_code: form.postalCode,
+    validateAddress(
+      {
+        street: form.street,
+        city: form.city,
+        state: form.state || undefined,
+        country: form.country,
+        postal_code: form.postalCode,
+      },
+      {
+        onSuccess: (res: AddressValidateResponse) => {
+          setValidation({
+            valid: res.valid,
+            message: res.valid
+              ? "Adresse valide."
+              : "Adresse non reconnue par le service de validation — vous pouvez tout de même l'enregistrer.",
+          });
         },
-      );
-      setValidation({
-        valid: res.valid,
-        message: res.valid
-          ? "Adresse valide."
-          : "Adresse non reconnue par le service de validation — vous pouvez tout de même l'enregistrer.",
-      });
-    } catch {
-      // Route indisponible : pas de confirmation visuelle, on ne bloque pas.
-      setValidation(null);
-    } finally {
-      setIsValidating(false);
-    }
+        onError: () => setValidation(null), // route indisponible : pas de confirmation visuelle, on ne bloque pas
+      },
+    );
 
-    setIsSubmitting(true);
-    try {
-      await onSubmit(form);
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Erreur lors de l'enregistrement",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    onSubmit(form);
   }
 
   const inputClass =
@@ -107,11 +98,7 @@ function AddressForm({
       )}
       {validation && (
         <p
-          className={`rounded-md px-3 py-2 text-xs ${
-            validation.valid
-              ? "bg-green-50 text-green-700"
-              : "bg-amber-50 text-amber-700"
-          }`}
+          className={`rounded-md px-3 py-2 text-xs ${validation.valid ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}
         >
           {validation.message}
         </p>
@@ -219,61 +206,34 @@ function AddressForm({
 }
 
 export default function AddressesPage() {
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: addresses = [], isLoading, isError } = useAddresses();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiClient
-      .get<Address[]>("/addresses")
-      .then(setAddresses)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
+  const { mutate: createAddress, isPending: isCreating } = useCreateAddress();
+  const { mutate: deleteAddress, isPending: isDeleting } = useDeleteAddress();
+
+  function handleCreate(input: import("@/lib/types").AddressFormInput) {
+    createAddress(input, {
+      onSuccess: () => setShowCreateForm(false),
+      onError: (err) =>
+        setMutationError(
+          err instanceof ApiError
+            ? err.message
+            : "Erreur lors de l'enregistrement",
         ),
-      )
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  async function handleCreate(input: AddressFormInput) {
-    const created = await apiClient.post<Address>("/addresses", input);
-    setAddresses((prev) =>
-      (input.isDefault
-        ? prev.map((a) => ({ ...a, isDefault: false }))
-        : prev
-      ).concat(created),
-    );
-    setShowCreateForm(false);
+    });
   }
 
-  async function handleUpdate(id: string, input: AddressFormInput) {
-    const updated = await apiClient.patch<Address>(`/addresses/${id}`, input);
-    setAddresses((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? updated
-          : input.isDefault
-            ? { ...a, isDefault: false }
-            : a,
-      ),
-    );
-    setEditingId(null);
-  }
-
-  async function handleDelete(id: string) {
+  function handleDelete(id: string) {
     if (!confirm("Supprimer cette adresse ?")) return;
-    setDeletingId(id);
-    try {
-      await apiClient.delete(`/addresses/${id}`);
-      setAddresses((prev) => prev.filter((a) => a.id !== id));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-    } finally {
-      setDeletingId(null);
-    }
+    deleteAddress(id, {
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+      onSettled: () => setConfirmDeleteId(null),
+    });
   }
 
   return (
@@ -290,9 +250,9 @@ export default function AddressesPage() {
         )}
       </div>
 
-      {error && (
+      {(isError || mutationError) && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          {mutationError ?? "Erreur de chargement"}
         </div>
       )}
 
@@ -301,6 +261,7 @@ export default function AddressesPage() {
           <AddressForm
             onSubmit={handleCreate}
             onCancel={() => setShowCreateForm(false)}
+            isSubmitting={isCreating}
           />
         </div>
       )}
@@ -313,10 +274,9 @@ export default function AddressesPage() {
         <div className="space-y-3">
           {addresses.map((addr) =>
             editingId === addr.id ? (
-              <AddressForm
+              <EditAddressRow
                 key={addr.id}
-                initial={addr}
-                onSubmit={(input) => handleUpdate(addr.id, input)}
+                address={addr}
                 onCancel={() => setEditingId(null)}
               />
             ) : (
@@ -353,11 +313,14 @@ export default function AddressesPage() {
                     <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => handleDelete(addr.id)}
-                    disabled={deletingId === addr.id}
+                    onClick={() => {
+                      setConfirmDeleteId(addr.id);
+                      handleDelete(addr.id);
+                    }}
+                    disabled={isDeleting}
                     className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                   >
-                    {deletingId === addr.id ? (
+                    {isDeleting && confirmDeleteId === addr.id ? (
                       <Loader2 size={16} className="animate-spin" />
                     ) : (
                       <Trash2 size={16} />
@@ -370,5 +333,23 @@ export default function AddressesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function EditAddressRow({
+  address,
+  onCancel,
+}: {
+  address: Address;
+  onCancel: () => void;
+}) {
+  const { mutate: updateAddress, isPending } = useUpdateAddress(address.id);
+  return (
+    <AddressForm
+      initial={address}
+      isSubmitting={isPending}
+      onCancel={onCancel}
+      onSubmit={(input) => updateAddress(input, { onSuccess: onCancel })}
+    />
   );
 }

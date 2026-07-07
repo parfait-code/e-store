@@ -14,6 +14,12 @@ export const queryKeys = {
     order: (id: string) => ["shop", "order", id] as const,
     orderReturns: (orderId: string) =>
       ["shop", "order", orderId, "returns"] as const,
+    addresses: ["shop", "addresses"] as const,
+    address: (id: string) => ["shop", "address", id] as const,
+    shippingMethods: ["shop", "shipping-methods"] as const,
+    shippingCost: (methodId: string, weight: number) =>
+      ["shop", "shipping-cost", methodId, weight] as const,
+    paymentMethods: ["shop", "payment-methods"] as const,
   },
   admin: {
     products: (params: Record<string, unknown>) =>
