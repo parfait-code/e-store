@@ -1,12 +1,12 @@
 // app/admin/orders/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Search, ChevronLeft, ChevronRight, Loader2, Eye } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
-import type { Order, OrderStatus, Paginated } from "@/lib/types";
+import type { OrderStatus } from "@/lib/types";
+import { useAdminOrders } from "@/lib/queries/admin/useOrders";
 
 const STATUS_OPTIONS: OrderStatus[] = [
   "PENDING",
@@ -39,41 +39,19 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
 };
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [status, setStatus] = useState<OrderStatus | "">("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerInput, setCustomerInput] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchOrders = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    const params = new URLSearchParams({ page: String(page), limit: "20" });
-    if (status) params.set("status", status);
-    if (customerEmail) params.set("customer", customerEmail);
-
-    apiClient
-      .get<Paginated<Order>>(`/orders?${params.toString()}`)
-      .then((res) => {
-        setOrders(res.items);
-        setTotalPages(res.totalPages);
-        setTotal(res.total);
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [page, status, customerEmail]);
-
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+  const { data, isLoading, isError } = useAdminOrders({
+    page,
+    status,
+    customer: customerEmail,
+  });
+  const orders = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -119,9 +97,9 @@ export default function OrdersPage() {
         </select>
       </div>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 

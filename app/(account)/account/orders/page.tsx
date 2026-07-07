@@ -1,12 +1,11 @@
 // app/(account)/account/orders/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, Package, ChevronRight } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
-import type { Order, OrderStatus, Paginated } from "@/lib/types";
+import type { OrderStatus } from "@/lib/types";
+import { useMyOrders } from "@/lib/queries/shop/useOrders";
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
   PENDING: "bg-gray-100 text-gray-600",
@@ -19,29 +18,16 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
 };
 
 export default function OrdersHistoryPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .get<Paginated<Order>>("/orders?limit=50")
-      .then((res) => setOrders(res.items))
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, []);
+  const { data, isLoading, isError } = useMyOrders();
+  const orders = data?.items ?? [];
 
   return (
     <div>
       <h1 className="mb-6 text-xl font-semibold">Mes commandes</h1>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 

@@ -1,7 +1,7 @@
 // app/(account)/account/orders/[orderId]/page.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -16,16 +16,23 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
 import type {
   Order,
   OrderStatus,
-  ReviewCreateInput,
-  ReturnCreateInput,
   ProductReview,
-  ReturnRequest,
+  ReturnCreateInput,
 } from "@/lib/types";
+import {
+  useMyOrder,
+  useOrderReturns,
+  useCancelOrder,
+  useCreateReturn,
+  useCreateReview,
+  useUpdateReview,
+  useDeleteReview,
+} from "@/lib/queries/shop/useOrders";
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   PENDING: "En attente",
@@ -54,37 +61,47 @@ function ReviewForm({
   const [rating, setRating] = useState(existingReview?.rating ?? 5);
   const [comment, setComment] = useState(existingReview?.comment ?? "");
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: createReview, isPending: isCreating } = useCreateReview();
+  const { mutate: updateReview, isPending: isUpdating } = useUpdateReview();
+  const isSubmitting = isCreating || isUpdating;
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setIsSubmitting(true);
-    try {
-      let review: ProductReview;
-      if (isEditing) {
-        review = await apiClient.put<ProductReview>(
-          `/reviews/${existingReview!.id}`,
-          { rating, comment: comment || undefined },
-        );
-      } else {
-        const payload: ReviewCreateInput = {
+    if (isEditing) {
+      updateReview(
+        {
+          reviewId: existingReview!.id,
+          payload: { rating, comment: comment || undefined },
+        },
+        {
+          onSuccess: onDone,
+          onError: (err) =>
+            setError(
+              err instanceof ApiError
+                ? err.message
+                : "Erreur lors de l'envoi de l'avis",
+            ),
+        },
+      );
+    } else {
+      createReview(
+        {
           order_item_id: orderItemId,
           product_id: productId,
           rating,
           comment: comment || undefined,
-        };
-        review = await apiClient.post<ProductReview>("/reviews", payload);
-      }
-      onDone(review);
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Erreur lors de l'envoi de l'avis",
+        },
+        {
+          onSuccess: onDone,
+          onError: (err) =>
+            setError(
+              err instanceof ApiError
+                ? err.message
+                : "Erreur lors de l'envoi de l'avis",
+            ),
+        },
       );
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
@@ -143,16 +160,16 @@ function ReviewForm({
 function ReturnRequestForm({
   order,
   onClose,
-  onCreated,
 }: {
   order: Order;
   onClose: () => void;
-  onCreated: () => void;
 }) {
   const [reason, setReason] = useState("");
   const [selected, setSelected] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: createReturn, isPending: isSubmitting } = useCreateReturn(
+    order.id,
+  );
 
   function toggleItem(itemId: string, maxQty: number) {
     setSelected((prev) => {
@@ -163,7 +180,7 @@ function ReturnRequestForm({
     });
   }
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     const items = Object.entries(selected).map(([order_item_id, quantity]) => ({
@@ -174,20 +191,19 @@ function ReturnRequestForm({
       setError("Sélectionnez au moins un article à retourner.");
       return;
     }
-    setIsSubmitting(true);
-    try {
-      const payload: ReturnCreateInput = { order_id: order.id, reason, items };
-      await apiClient.post("/returns", payload);
-      onCreated();
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Erreur lors de la demande de retour",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    const payload: ReturnCreateInput = { order_id: order.id, reason, items };
+    createReturn(payload, {
+      onSuccess: () => {
+        onClose();
+        alert("Votre demande de retour a été envoyée.");
+      },
+      onError: (err) =>
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Erreur lors de la demande de retour",
+        ),
+    });
   }
 
   return (
@@ -252,79 +268,60 @@ function ReturnRequestForm({
 
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: order, isLoading, isError } = useMyOrder(orderId);
+  const { data: returns = [] } = useOrderReturns(orderId);
+  const { mutate: cancelOrder, isPending: isCancelling } =
+    useCancelOrder(orderId);
+  const {
+    mutate: deleteReview,
+    isPending: isDeletingReview,
+    variables: deletingReviewId,
+  } = useDeleteReview();
+
   const [showReturnForm, setShowReturnForm] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
   const [reviewingItemId, setReviewingItemId] = useState<string | null>(null);
-  const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [editingReviewItemId, setEditingReviewItemId] = useState<string | null>(
     null,
   );
   const [reviewsByItem, setReviewsByItem] = useState<
     Record<string, ProductReview>
   >({});
-  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
 
-  async function handleDeleteReview(itemId: string, reviewId: string) {
+  function handleDeleteReview(itemId: string, reviewId: string) {
     if (!confirm("Supprimer cet avis ?")) return;
-    setDeletingReviewId(reviewId);
-    try {
-      await apiClient.delete(`/reviews/${reviewId}`);
-      setReviewsByItem((prev) => {
-        const next = { ...prev };
-        delete next[itemId];
-        return next;
-      });
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-    } finally {
-      setDeletingReviewId(null);
-    }
+    deleteReview(reviewId, {
+      onSuccess: () => {
+        setReviewsByItem((prev) => {
+          const next = { ...prev };
+          delete next[itemId];
+          return next;
+        });
+      },
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+    });
   }
-  useEffect(() => {
-    apiClient
-      .get<Order>(`/orders/${orderId}`)
-      .then(setOrder)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
 
-    apiClient
-      .get<ReturnRequest[]>(`/orders/${orderId}/returns`)
-      .then(setReturns)
-      .catch(() => {}); // non bloquant — historique vide si échec
-  }, [orderId]);
+  function handleCancelOrder() {
+    if (!confirm("Annuler cette commande ? Cette action est irréversible."))
+      return;
+    cancelOrder(undefined, {
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Annulation impossible"),
+    });
+  }
 
   if (isLoading)
     return <Loader2 size={20} className="animate-spin text-gray-400" />;
-  if (error || !order) {
+  if (isError || !order) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Commande introuvable."}
+        Commande introuvable.
       </div>
     );
   }
 
   const canReturn = order.status === "DELIVERED";
-
-  async function handleCancelOrder() {
-    if (!confirm("Annuler cette commande ? Cette action est irréversible."))
-      return;
-    setIsCancelling(true);
-    try {
-      await apiClient.delete(`/orders/${order!.id}`);
-      setOrder((prev) => (prev ? { ...prev, status: "CANCELLED" } : prev));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Annulation impossible");
-    } finally {
-      setIsCancelling(false);
-    }
-  }
 
   return (
     <div>
@@ -344,7 +341,6 @@ export default function OrderDetailPage() {
             Passée le {formatDate(order.createdAt)}
           </p>
         </div>
-
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
             {STATUS_LABELS[order.status]}
@@ -423,7 +419,10 @@ export default function OrderDetailPage() {
                       onClick={() =>
                         handleDeleteReview(item.id, reviewsByItem[item.id].id)
                       }
-                      disabled={deletingReviewId === reviewsByItem[item.id].id}
+                      disabled={
+                        isDeletingReview &&
+                        deletingReviewId === reviewsByItem[item.id].id
+                      }
                       className="flex items-center gap-1 text-gray-500 hover:text-red-600 disabled:opacity-50"
                     >
                       <Trash2 size={12} /> Supprimer
@@ -492,14 +491,6 @@ export default function OrderDetailPage() {
         <ReturnRequestForm
           order={order}
           onClose={() => setShowReturnForm(false)}
-          onCreated={() => {
-            setShowReturnForm(false);
-            apiClient
-              .get<ReturnRequest[]>(`/orders/${order.id}/returns`)
-              .then(setReturns)
-              .catch(() => {});
-            alert("Votre demande de retour a été envoyée.");
-          }}
         />
       )}
     </div>
