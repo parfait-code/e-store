@@ -1,7 +1,7 @@
 // app/admin/products/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -14,15 +14,15 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF } from "@/lib/format";
-import type {
-  Product,
-  CategoryRef,
-  Paginated,
-  ProductStatus,
-} from "@/lib/types";
+import type { ProductStatus } from "@/lib/types";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import {
+  useAdminProducts,
+  useAdminCategories,
+  useDeleteProduct,
+} from "@/lib/queries/admin/useCatalog";
+import { ApiError } from "@/lib/api-client";
 
 const STATUS_STYLES: Record<ProductStatus, string> = {
   ACTIVE: "bg-green-100 text-green-700",
@@ -37,20 +37,12 @@ const STATUS_LABELS: Record<ProductStatus, string> = {
 };
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<CategoryRef[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [categoryId, setCategoryId] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
-  // Debounce : évite un appel API à chaque frappe
   useEffect(() => {
     const timeout = setTimeout(() => {
       setSearch(searchInput.trim());
@@ -59,54 +51,29 @@ export default function ProductsPage() {
     return () => clearTimeout(timeout);
   }, [searchInput]);
 
-  const fetchProducts = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    const params = new URLSearchParams({ page: String(page), limit: "20" });
-    if (categoryId) params.set("categoryId", categoryId);
-    if (search) params.set("search", search);
+  const { data, isLoading } = useAdminProducts({
+    page,
+    categoryId: categoryId || undefined,
+    search: search || undefined,
+  });
+  const { data: categories = [] } = useAdminCategories();
+  const { mutate: deleteProduct, isPending: isDeleting } = useDeleteProduct();
 
-    apiClient
-      .get<Paginated<Product>>(`/product?${params.toString()}`)
-      .then((res) => {
-        setProducts(res.items);
-        setTotalPages(res.totalPages);
-        setTotal(res.total);
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [page, categoryId, search]);
+  const products = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
-
-  useEffect(() => {
-    apiClient
-      .get<CategoryRef[]>("/categories")
-      .then(setCategories)
-      .catch(() => {});
-  }, []);
-
-  async function confirmDelete() {
+  function confirmDelete() {
     if (confirmDeleteId === null) return;
-    setDeletingId(confirmDeleteId);
-    try {
-      await apiClient.delete(`/product/${confirmDeleteId}`);
-      setProducts((prev) => prev.filter((p) => p.id !== confirmDeleteId));
-      setTotal((t) => t - 1);
-    } catch (err) {
-      alert(
-        err instanceof ApiError ? err.message : "Erreur lors de la suppression",
-      );
-    } finally {
-      setDeletingId(null);
-      setConfirmDeleteId(null);
-    }
+    deleteProduct(confirmDeleteId, {
+      onError: (err) =>
+        alert(
+          err instanceof ApiError
+            ? err.message
+            : "Erreur lors de la suppression",
+        ),
+      onSettled: () => setConfirmDeleteId(null),
+    });
   }
 
   return (
@@ -155,12 +122,6 @@ export default function ProductsPage() {
           ))}
         </select>
       </div>
-
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
         <table className="w-full text-sm">
@@ -234,9 +195,6 @@ export default function ProductsPage() {
                           <span className="ml-1 text-xs text-gray-400 line-through">
                             {formatXAF(product.pricing.originalPrice)}
                           </span>
-                          <span className="ml-1 text-xs text-green-600">
-                            -{product.pricing.discountPercentage}%
-                          </span>
                         </div>
                       ) : (
                         formatXAF(product.price)
@@ -249,7 +207,6 @@ export default function ProductsPage() {
                         {STATUS_LABELS[product.status]}
                       </span>
                     </td>
-
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
                         <Link
@@ -260,14 +217,10 @@ export default function ProductsPage() {
                         </Link>
                         <button
                           onClick={() => setConfirmDeleteId(product.id)}
-                          disabled={deletingId === product.id}
+                          disabled={isDeleting}
                           className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                         >
-                          {deletingId === product.id ? (
-                            <Loader2 size={16} className="animate-spin" />
-                          ) : (
-                            <Trash2 size={16} />
-                          )}
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </td>
@@ -308,7 +261,7 @@ export default function ProductsPage() {
         title="Supprimer le produit"
         message="Cette action est irréversible. Voulez-vous vraiment continuer ?"
         confirmLabel="Supprimer"
-        isLoading={deletingId !== null}
+        isLoading={isDeleting}
         onConfirm={confirmDelete}
         onCancel={() => setConfirmDeleteId(null)}
       />

@@ -1,8 +1,7 @@
 // app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
-import { AuthProvider } from "@/lib/auth/auth-context";
-import { CartProvider } from "@/lib/cart/cart-context";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "E-Commerce",
@@ -17,9 +16,7 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className="bg-gray-50 text-gray-900 antialiased">
-        <CartProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </CartProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

@@ -1,28 +1,21 @@
 // components/PublicHeader.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, User, Menu, X } from "lucide-react";
-import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useCategories } from "@/lib/queries/shop/useCatalog";
 import { CartIndicator } from "./CartIndicator";
-import type { Category } from "@/lib/types";
 
 export function PublicHeader() {
   const router = useRouter();
   const { user } = useAuth();
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { data: allCategories = [] } = useCategories();
+  const categories = allCategories.filter((c) => c.parentId === null);
   const [searchInput, setSearchInput] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    apiClient
-      .get<Category[]>("/categories")
-      .then((all) => setCategories(all.filter((c) => c.parentId === null)))
-      .catch(() => {});
-  }, []);
 
   function handleSearch(e: FormEvent) {
     e.preventDefault();
@@ -75,7 +68,6 @@ export function PublicHeader() {
         </div>
       </div>
 
-      {/* Recherche mobile */}
       <form
         onSubmit={handleSearch}
         className="relative border-t border-gray-100 px-4 py-2 md:hidden"
@@ -93,7 +85,6 @@ export function PublicHeader() {
         />
       </form>
 
-      {/* Nav catégories desktop */}
       <nav className="hidden border-t border-gray-100 md:block">
         <div className="mx-auto flex max-w-7xl gap-6 overflow-x-auto px-4 py-2 text-sm sm:px-6">
           <Link
@@ -102,22 +93,18 @@ export function PublicHeader() {
           >
             Tous les produits
           </Link>
-          {categories
-            .filter((c) => !("parentId" in c) || true) // CategoryRef n'a pas parentId — top-level via /categories
-            .slice(0, 8)
-            .map((c) => (
-              <Link
-                key={c.id}
-                href={`/categories/${c.slug}`}
-                className="whitespace-nowrap text-gray-600 hover:text-gray-900"
-              >
-                {c.name}
-              </Link>
-            ))}
+          {categories.slice(0, 8).map((c) => (
+            <Link
+              key={c.id}
+              href={`/categories/${c.slug}`}
+              className="whitespace-nowrap text-gray-600 hover:text-gray-900"
+            >
+              {c.name}
+            </Link>
+          ))}
         </div>
       </nav>
 
-      {/* Nav catégories mobile */}
       {mobileMenuOpen && (
         <nav className="border-t border-gray-100 md:hidden">
           <div className="flex flex-col px-4 py-2 text-sm">

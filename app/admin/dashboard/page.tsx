@@ -1,7 +1,7 @@
 // app/admin/dashboard/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Package,
   ShoppingCart,
@@ -14,10 +14,6 @@ import {
   TrendingDown,
   Loader2,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import type { DashboardStats } from "@/lib/types";
-import type { SalesChartResponse } from "@/lib/types";
-
 import {
   LineChart,
   Line,
@@ -27,6 +23,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import {
+  useDashboardStats,
+  useSalesChart,
+} from "@/lib/queries/admin/useDashboard";
 
 function formatXAF(amount: number) {
   return (
@@ -40,9 +40,7 @@ function TrendBadge({ value }: { value: number }) {
   const positive = value >= 0;
   return (
     <span
-      className={`flex items-center gap-1 text-xs font-medium ${
-        positive ? "text-green-600" : "text-red-600"
-      }`}
+      className={`flex items-center gap-1 text-xs font-medium ${positive ? "text-green-600" : "text-red-600"}`}
     >
       {positive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
       {Math.abs(value)}%
@@ -76,19 +74,8 @@ function StatCard({
 }
 
 function SalesChart() {
-  const [data, setData] = useState<SalesChartResponse | null>(null);
   const [year, setYear] = useState(new Date().getFullYear());
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setIsLoading(true);
-    apiClient
-      .get<SalesChartResponse>(`/dashboard/sales-chart?year=${year}&period=monthly`)
-      .then(setData)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Erreur de chargement"))
-      .finally(() => setIsLoading(false));
-  }, [year]);
+  const { data, isLoading, isError } = useSalesChart(year);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5">
@@ -111,8 +98,8 @@ function SalesChart() {
         <div className="flex h-64 items-center justify-center">
           <Loader2 size={20} className="animate-spin text-gray-400" />
         </div>
-      ) : error || !data ? (
-        <p className="text-sm text-red-600">{error ?? "Erreur de chargement"}</p>
+      ) : isError || !data ? (
+        <p className="text-sm text-red-600">Erreur de chargement</p>
       ) : (
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={data.points}>
@@ -124,12 +111,18 @@ function SalesChart() {
                 const formattedValue =
                   typeof value === "number"
                     ? `${new Intl.NumberFormat("fr-FR").format(value)} XAF`
-                    : value ?? "";
+                    : (value ?? "");
                 return [formattedValue, "Revenu"];
               }}
               contentStyle={{ fontSize: 12, borderRadius: 8 }}
             />
-            <Line type="monotone" dataKey="amount" stroke="#111827" strokeWidth={2} dot={{ r: 3 }} />
+            <Line
+              type="monotone"
+              dataKey="amount"
+              stroke="#111827"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
           </LineChart>
         </ResponsiveContainer>
       )}
@@ -137,23 +130,8 @@ function SalesChart() {
   );
 }
 
-
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    apiClient
-      .get<DashboardStats>("/dashboard/stats")
-      .then(setStats)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, []);
+  const { data: stats, isLoading, isError } = useDashboardStats();
 
   if (isLoading) {
     return (
@@ -161,10 +139,10 @@ export default function DashboardPage() {
     );
   }
 
-  if (error || !stats) {
+  if (isError || !stats) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Impossible de charger les statistiques."}
+        Impossible de charger les statistiques.
       </div>
     );
   }

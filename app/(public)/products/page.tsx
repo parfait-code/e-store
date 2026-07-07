@@ -1,48 +1,26 @@
 // app/(public)/products/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { apiClient } from "@/lib/api-client";
+import { useState } from "react";
+import { useCategories } from "@/lib/queries/shop/useCatalog";
+import { useProducts } from "@/lib/queries/shop/useCatalog";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Pagination } from "@/components/Pagination";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import type { Product, CategoryRef, Paginated } from "@/lib/types";
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<CategoryRef[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchProducts = useCallback(() => {
-    setIsLoading(true);
-    const params = new URLSearchParams({ page: String(page), limit: "24" });
-    if (categoryId) params.set("categoryId", categoryId);
+  const { data: categories = [] } = useCategories();
+  const { data, isLoading } = useProducts({
+    page,
+    categoryId: categoryId || undefined,
+  });
 
-    apiClient
-      .get<Paginated<Product>>(`/product?${params.toString()}`)
-      .then((res) => {
-        setProducts(res.items);
-        setTotalPages(res.totalPages);
-        setTotal(res.total);
-      })
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, [page, categoryId]);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
-
-  useEffect(() => {
-    apiClient
-      .get<CategoryRef[]>("/categories")
-      .then(setCategories)
-      .catch(() => {});
-  }, []);
+  const products = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   return (
     <div>
@@ -62,11 +40,13 @@ export default function ProductsPage() {
           className="rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
         >
           <option value="">Toutes les catégories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
+          {categories
+            .filter((c) => c.parentId === null)
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
         </select>
       </div>
 
