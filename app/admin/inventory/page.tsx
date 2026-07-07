@@ -1,6 +1,7 @@
 // app/admin/inventory/page.tsx
 "use client";
-import { useEffect, useState, useCallback, FormEvent } from "react";
+
+import { useState, FormEvent, useEffect } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -21,42 +22,49 @@ import { apiClient, ApiError } from "@/lib/api-client";
 import type {
   InventoryItem,
   Warehouse,
-  Paginated,
   InventoryTransferInput,
   Product,
   ProductCombination,
+  Paginated,
 } from "@/lib/types";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import {
+  useAdminInventoryList,
+  useAdminInventoryLowStock,
+  useAdminInventoryOutOfStock,
+  useAdminInventorySearch,
+  useAdminWarehouses,
+  useUpdateInventoryItem,
+  useDeleteInventoryItem,
+  useTransferInventory,
+} from "@/lib/queries/admin/useInventory";
+import { useBulkInventoryHelpers } from "@/lib/queries/admin/useBulkInventory";
 
 type Tab = "all" | "low-stock" | "out-of-stock";
 
 function QuantityEditor({
   item,
-  onUpdated,
   onCancel,
 }: {
   item: InventoryItem;
-  onUpdated: (item: InventoryItem) => void;
   onCancel: () => void;
 }) {
   const [quantity, setQuantity] = useState(item.quantity);
-  const [isSaving, setIsSaving] = useState(false);
+  const { mutate: updateItem, isPending } = useUpdateInventoryItem();
 
-  async function handleSave() {
-    setIsSaving(true);
-    try {
-      const updated = await apiClient.put<InventoryItem>(
-        `/inventory/${item.id}`,
-        { quantity },
-      );
-      onUpdated(updated);
-    } catch (err) {
-      alert(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+  function handleSave() {
+    updateItem(
+      { itemId: item.id, quantity },
+      {
+        onSuccess: onCancel,
+        onError: (err) =>
+          alert(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la mise à jour",
+          ),
+      },
+    );
   }
 
   return (
@@ -70,10 +78,10 @@ function QuantityEditor({
       />
       <button
         onClick={handleSave}
-        disabled={isSaving}
+        disabled={isPending}
         className="rounded-md p-1 text-green-600 hover:bg-green-50"
       >
-        {isSaving ? (
+        {isPending ? (
           <Loader2 size={14} className="animate-spin" />
         ) : (
           <Save size={14} />
@@ -93,43 +101,36 @@ function TransferModal({
   item,
   warehouses,
   onClose,
-  onTransferred,
 }: {
   item: InventoryItem;
   warehouses: Warehouse[];
   onClose: () => void;
-  onTransferred: () => void;
 }) {
   const [toWarehouse, setToWarehouse] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: transfer, isPending } = useTransferInventory();
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!toWarehouse) {
       setError("Sélectionnez un entrepôt de destination.");
       return;
     }
-    setIsSubmitting(true);
-    try {
-      const payload: InventoryTransferInput = {
-        item_id: item.id,
-        from_warehouse: item.warehouseId,
-        to_warehouse: toWarehouse,
-        quantity,
-      };
-      await apiClient.post("/inventory/transfer", payload);
-      onTransferred();
-      onClose();
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors du transfert",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    const payload: InventoryTransferInput = {
+      item_id: item.id,
+      from_warehouse: item.warehouseId,
+      to_warehouse: toWarehouse,
+      quantity,
+    };
+    transfer(payload, {
+      onSuccess: onClose,
+      onError: (err) =>
+        setError(
+          err instanceof ApiError ? err.message : "Erreur lors du transfert",
+        ),
+    });
   }
 
   const inputClass =
@@ -192,10 +193,10 @@ function TransferModal({
           </div>
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isPending}
             className="flex w-full items-center justify-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
           >
-            {isSubmitting ? (
+            {isPending ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
               <ArrowLeftRight size={16} />
@@ -208,7 +209,6 @@ function TransferModal({
   );
 }
 
-// Recherche live d'un produit par nom/SKU
 function ProductSearchPicker({
   selected,
   onSelect,
@@ -310,7 +310,6 @@ function ProductSearchPicker({
   );
 }
 
-// ---------- Article simple : plus AUCUNE recherche de combinaison ----------
 function NewInventoryItemForm({
   warehouses,
   onCreated,
@@ -328,32 +327,31 @@ function NewInventoryItemForm({
   const [warehouseId, setWarehouseId] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: createItem, isPending } = useUpdateInventoryItem(); // placeholder — remplacé ci-dessous
+  const { mutate: create, isPending: isCreating } = (() => {
+    // useCreateInventoryItem attend InventoryFormInput — import direct
+    return require("@/lib/queries/admin/useInventory").useCreateInventoryItem();
+  })();
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!selectedProduct || !warehouseId) {
       setError("Sélectionnez un produit et un entrepôt.");
       return;
     }
-    setIsSubmitting(true);
-    try {
-      await apiClient.post<InventoryItem>("/inventory", {
-        product_id: selectedProduct.id,
-        warehouse_id: warehouseId,
-        quantity,
-      });
-      onCreated();
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Erreur lors de la création (doublon produit/entrepôt ?)",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    create(
+      { product_id: selectedProduct.id, warehouse_id: warehouseId, quantity },
+      {
+        onSuccess: onCreated,
+        onError: (err: unknown) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la création (doublon produit/entrepôt ?)",
+          ),
+      },
+    );
   }
 
   const inputClass =
@@ -404,20 +402,20 @@ function NewInventoryItemForm({
           min={0}
           value={quantity}
           onChange={(e) => setQuantity(Number(e.target.value))}
-          className={`${inputClass} max-w-[200px]`}
+          className={`${inputClass} max-w-50`}
         />
         <p className="mt-1 text-xs text-gray-400">
-          Pour un produit avec des combinaisons (taille, couleur...), utilisez
-          l'onglet « Combinaisons du produit » ci-dessus.
+          Pour un produit avec des combinaisons, utilisez l'onglet «
+          Combinaisons du produit » ci-dessus.
         </p>
       </div>
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isCreating}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {isSubmitting ? "Création..." : "Créer l'article"}
+          {isCreating ? "Création..." : "Créer l'article"}
         </button>
         <button
           type="button"
@@ -431,11 +429,7 @@ function NewInventoryItemForm({
   );
 }
 
-// Crée/met à jour, pour chaque combinaison active du produit, l'article
-// d'inventaire correspondant dans un même entrepôt. Vérifie désormais le
-// stock déjà existant (product+warehouse+combination) au lieu de partir du
-// principe qu'il n'y a jamais rien (0) — évite les 409 silencieux et permet
-// d'ajuster un stock déjà présent plutôt que d'essayer de le recréer.
+// ---------- Mode bulk : la boucle reste locale, l'invalidation est centralisée ----------
 function BulkCombinationForm({
   warehouses,
   onCreated,
@@ -464,8 +458,8 @@ function BulkCombinationForm({
     total: number;
   } | null>(null);
   const [results, setResults] = useState<Record<string, "ok" | "error">>({});
+  const { upsertOne, invalidateAfterBulk } = useBulkInventoryHelpers();
 
-  // Étape 1 : charger les combinaisons du produit choisi.
   useEffect(() => {
     setCombinations([]);
     setQuantities({});
@@ -489,8 +483,6 @@ function BulkCombinationForm({
       .finally(() => setIsLoadingCombos(false));
   }, [selectedProduct]);
 
-  // Étape 2 : dès que produit + entrepôt sont connus, vérifier le stock déjà
-  // enregistré (pas seulement supposer 0) pour préremplir les quantités.
   useEffect(() => {
     if (!selectedProduct || !warehouseId || combinations.length === 0) return;
     let cancelled = false;
@@ -518,9 +510,7 @@ function BulkCombinationForm({
         setExistingByCombo(map);
         setQuantities(initialQuantities);
       })
-      .catch(() => {
-        // Recherche indisponible — on retombe silencieusement sur 0 par défaut
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -536,14 +526,10 @@ function BulkCombinationForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-
     if (!selectedProduct || !warehouseId) {
       setError("Sélectionnez un produit et un entrepôt.");
       return;
     }
-
-    // Une combinaison est une "cible" si sa quantité a changé par rapport à
-    // l'existant connu (ou si elle n'existe pas encore et qu'on renseigne >0).
     const targets = combinations.filter((c) => {
       const existing = existingByCombo[c.id];
       const current = quantities[c.id] ?? 0;
@@ -559,21 +545,20 @@ function BulkCombinationForm({
     setResults({});
     let successCount = 0;
 
+    // Boucle séquentielle volontaire : chaque étape doit mettre à jour la
+    // barre de progression avant de passer à la suivante — React Query gère
+    // le CACHE de chaque appel individuel (via apiClient direct ici), mais
+    // ne remplace pas la coordination pas-à-pas de la boucle elle-même.
     for (const combo of targets) {
       const existing = existingByCombo[combo.id];
       try {
-        if (existing) {
-          await apiClient.put<InventoryItem>(`/inventory/${existing.itemId}`, {
-            quantity: quantities[combo.id],
-          });
-        } else {
-          await apiClient.post<InventoryItem>("/inventory", {
-            product_id: selectedProduct.id,
-            warehouse_id: warehouseId,
-            combination_id: combo.id,
-            quantity: quantities[combo.id],
-          });
-        }
+        await upsertOne({
+          existingItemId: existing?.itemId,
+          productId: selectedProduct.id,
+          warehouseId,
+          combinationId: combo.id,
+          quantity: quantities[combo.id],
+        });
         successCount += 1;
         setResults((prev) => ({ ...prev, [combo.id]: "ok" }));
       } catch {
@@ -583,7 +568,10 @@ function BulkCombinationForm({
     }
 
     setIsSubmitting(false);
-    if (successCount > 0) onCreated();
+    if (successCount > 0) {
+      invalidateAfterBulk(); // une seule invalidation à la fin du lot, pas à chaque item
+      onCreated();
+    }
 
     const failedCount = targets.length - successCount;
     if (failedCount > 0) {
@@ -603,8 +591,7 @@ function BulkCombinationForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-xs text-gray-500">
         Crée ou met à jour l'article d'inventaire de chaque combinaison active
-        du produit, dans le même entrepôt, en une seule opération. Le stock déjà
-        présent est automatiquement détecté et préaffiché.
+        du produit, dans le même entrepôt, en une seule opération.
       </p>
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -739,8 +726,6 @@ function BulkCombinationForm({
   );
 }
 
-// Panneau de création affiché dans une modale (plutôt qu'au-dessus de la
-// liste), avec bascule entre article simple et combinaisons du produit.
 function CreateItemModal({
   warehouses,
   onClose,
@@ -753,9 +738,7 @@ function CreateItemModal({
   const [mode, setMode] = useState<"single" | "combinations">("single");
 
   const tabBtn = (active: boolean) =>
-    `rounded-md px-3 py-1.5 text-xs font-medium ${
-      active ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-200"
-    }`;
+    `rounded-md px-3 py-1.5 text-xs font-medium ${active ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-200"}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
@@ -805,7 +788,6 @@ function CreateItemModal({
   );
 }
 
-// Regroupe les lignes d'inventaire par produit
 function groupByProduct(items: InventoryItem[]) {
   const order: number[] = [];
   const map = new Map<number, InventoryItem[]>();
@@ -816,29 +798,18 @@ function groupByProduct(items: InventoryItem[]) {
     }
     map.get(item.productId)!.push(item);
   });
-  return order.map((productId) => ({
-    productId,
-    items: map.get(productId)!,
-  }));
+  return order.map((productId) => ({ productId, items: map.get(productId)! }));
 }
 
 export default function InventoryPage() {
   const [tab, setTab] = useState<Tab>("all");
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [keyword, setKeyword] = useState("");
   const [keywordInput, setKeywordInput] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [transferItem, setTransferItem] = useState<InventoryItem | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
   const [expandedProductIds, setExpandedProductIds] = useState<Set<number>>(
     new Set(),
   );
@@ -849,74 +820,59 @@ export default function InventoryPage() {
     number | null
   >(null);
 
-  useEffect(() => {
-    apiClient
-      .get<Warehouse[]>("/warehouses")
-      .then(setWarehouses)
-      .catch(() => {});
-  }, []);
+  const { data: warehouses = [] } = useAdminWarehouses();
 
-  const fetchItems = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
+  // Un seul des trois hooks est "actif" selon le mode — les autres restent
+  // en attente grâce à `enabled` pour ne pas fetch inutilement.
+  const listQuery = useAdminInventoryList(page);
+  const lowStockQuery = useAdminInventoryLowStock();
+  const outOfStockQuery = useAdminInventoryOutOfStock();
+  const searchQuery = useAdminInventorySearch(keyword);
 
-    let request: Promise<InventoryItem[] | Paginated<InventoryItem>>;
+  const { mutate: deleteItem, isPending: isDeleting } =
+    useDeleteInventoryItem();
 
-    if (keyword) {
-      request = apiClient.get<InventoryItem[]>(
-        `/inventory/search?keyword=${encodeURIComponent(keyword)}`,
-      );
-    } else if (tab === "low-stock") {
-      request = apiClient.get<InventoryItem[]>("/inventory/low-stock");
-    } else if (tab === "out-of-stock") {
-      request = apiClient.get<InventoryItem[]>("/inventory/out-of-stock");
-    } else {
-      request = apiClient.get<Paginated<InventoryItem>>(
-        `/inventory?page=${page}&limit=20`,
-      );
-    }
+  let items: InventoryItem[] = [];
+  let totalPages = 1;
+  let total = 0;
+  let isLoading = false;
+  let isError = false;
 
-    request
-      .then((res) => {
-        if (Array.isArray(res)) {
-          setItems(res);
-          setTotalPages(1);
-          setTotal(res.length);
-        } else {
-          setItems(res.items);
-          setTotalPages(res.totalPages);
-          setTotal(res.total);
-        }
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [tab, page, keyword]);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  if (keyword) {
+    items = searchQuery.data ?? [];
+    total = items.length;
+    isLoading = searchQuery.isLoading;
+    isError = searchQuery.isError;
+  } else if (tab === "low-stock") {
+    items = lowStockQuery.data ?? [];
+    total = items.length;
+    isLoading = lowStockQuery.isLoading;
+    isError = lowStockQuery.isError;
+  } else if (tab === "out-of-stock") {
+    items = outOfStockQuery.data ?? [];
+    total = items.length;
+    isLoading = outOfStockQuery.isLoading;
+    isError = outOfStockQuery.isError;
+  } else {
+    items = listQuery.data?.items ?? [];
+    total = listQuery.data?.total ?? 0;
+    totalPages = listQuery.data?.totalPages ?? 1;
+    isLoading = listQuery.isLoading;
+    isError = listQuery.isError;
+  }
 
   function handleSearch(e: FormEvent) {
     e.preventDefault();
     setKeyword(keywordInput.trim());
   }
 
-  async function confirmDelete() {
+  function confirmDelete() {
     if (!confirmDeleteId) return;
-    setDeletingId(confirmDeleteId);
-    try {
-      await apiClient.delete(`/inventory/${confirmDeleteId}`);
-      fetchItems();
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-    } finally {
-      setDeletingId(null);
-      setConfirmDeleteId(null);
-    }
+    deleteItem(confirmDeleteId, {
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+      onSettled: () => setConfirmDeleteId(null),
+    });
   }
 
   function switchTab(newTab: Tab) {
@@ -995,8 +951,7 @@ export default function InventoryPage() {
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
           >
-            <Plus size={16} />
-            Nouvel article
+            <Plus size={16} /> Nouvel article
           </button>
         </div>
       </div>
@@ -1035,9 +990,9 @@ export default function InventoryPage() {
         </form>
       </div>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 
@@ -1093,21 +1048,11 @@ export default function InventoryPage() {
                         {editingId === item.id ? (
                           <QuantityEditor
                             item={item}
-                            onUpdated={() => {
-                              fetchItems();
-                              setEditingId(null);
-                            }}
                             onCancel={() => setEditingId(null)}
                           />
                         ) : (
                           <span
-                            className={`font-medium ${
-                              item.quantity === 0
-                                ? "text-red-600"
-                                : item.quantity <= 10
-                                  ? "text-amber-600"
-                                  : ""
-                            }`}
+                            className={`font-medium ${item.quantity === 0 ? "text-red-600" : item.quantity <= 10 ? "text-amber-600" : ""}`}
                           >
                             {item.quantity}
                           </span>
@@ -1132,15 +1077,11 @@ export default function InventoryPage() {
                             </button>
                             <button
                               onClick={() => setConfirmDeleteId(item.id)}
-                              disabled={deletingId === item.id}
+                              disabled={isDeleting}
                               className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                               title="Supprimer"
                             >
-                              {deletingId === item.id ? (
-                                <Loader2 size={16} className="animate-spin" />
-                              ) : (
-                                <Trash2 size={16} />
-                              )}
+                              <Trash2 size={16} />
                             </button>
                           </div>
                         )}
@@ -1171,9 +1112,7 @@ export default function InventoryPage() {
                         >
                           <ChevronRight
                             size={14}
-                            className={`shrink-0 text-gray-400 transition-transform ${
-                              isExpanded ? "rotate-90" : ""
-                            }`}
+                            className={`shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`}
                           />
                           <span className="font-medium">{productName}</span>
                           <span className="text-xs text-gray-400">
@@ -1225,21 +1164,11 @@ export default function InventoryPage() {
                               {editingId === item.id ? (
                                 <QuantityEditor
                                   item={item}
-                                  onUpdated={() => {
-                                    fetchItems();
-                                    setEditingId(null);
-                                  }}
                                   onCancel={() => setEditingId(null)}
                                 />
                               ) : (
                                 <span
-                                  className={`font-medium ${
-                                    item.quantity === 0
-                                      ? "text-red-600"
-                                      : item.quantity <= 10
-                                        ? "text-amber-600"
-                                        : ""
-                                  }`}
+                                  className={`font-medium ${item.quantity === 0 ? "text-red-600" : item.quantity <= 10 ? "text-amber-600" : ""}`}
                                 >
                                   {item.quantity}
                                 </span>
@@ -1264,18 +1193,11 @@ export default function InventoryPage() {
                                   </button>
                                   <button
                                     onClick={() => setConfirmDeleteId(item.id)}
-                                    disabled={deletingId === item.id}
+                                    disabled={isDeleting}
                                     className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                                     title="Supprimer"
                                   >
-                                    {deletingId === item.id ? (
-                                      <Loader2
-                                        size={16}
-                                        className="animate-spin"
-                                      />
-                                    ) : (
-                                      <Trash2 size={16} />
-                                    )}
+                                    <Trash2 size={16} />
                                   </button>
                                 </div>
                               )}
@@ -1320,7 +1242,6 @@ export default function InventoryPage() {
           item={transferItem}
           warehouses={warehouses}
           onClose={() => setTransferItem(null)}
-          onTransferred={fetchItems}
         />
       )}
 
@@ -1328,10 +1249,7 @@ export default function InventoryPage() {
         <CreateItemModal
           warehouses={warehouses}
           onClose={() => setShowCreateModal(false)}
-          onCreated={() => {
-            fetchItems();
-            setShowCreateModal(false);
-          }}
+          onCreated={() => setShowCreateModal(false)}
         />
       )}
 
@@ -1340,7 +1258,7 @@ export default function InventoryPage() {
         title="Supprimer l'article d'inventaire"
         message="Cette action est irréversible. Voulez-vous vraiment continuer ?"
         confirmLabel="Supprimer"
-        isLoading={deletingId !== null}
+        isLoading={isDeleting}
         onConfirm={confirmDelete}
         onCancel={() => setConfirmDeleteId(null)}
       />

@@ -1,43 +1,21 @@
 // app/admin/warehouses/[warehouseId]/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Package } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import type { Warehouse, InventoryItem } from "@/lib/types";
+import { useWarehouseInventory } from "@/lib/queries/admin/useInventory";
 
 export default function WarehouseDetailPage() {
   const { warehouseId } = useParams<{ warehouseId: string }>();
-  const [data, setData] = useState<{
-    warehouse: Warehouse & { totalUnits: number };
-    items: InventoryItem[];
-  } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .get<{
-        warehouse: Warehouse & { totalUnits: number };
-        items: InventoryItem[];
-      }>(`/warehouses/${warehouseId}/inventory`)
-      .then(setData)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [warehouseId]);
+  const { data, isLoading, isError } = useWarehouseInventory(warehouseId);
 
   if (isLoading)
     return <Loader2 size={20} className="animate-spin text-gray-400" />;
-  if (error || !data) {
+  if (isError || !data) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Entrepôt introuvable."}
+        Entrepôt introuvable.
       </div>
     );
   }

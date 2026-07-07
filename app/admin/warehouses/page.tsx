@@ -1,7 +1,7 @@
 // app/admin/warehouses/page.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -9,36 +9,32 @@ import {
   Trash2,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import type { Warehouse, WarehouseFormInput } from "@/lib/types";
+import { ApiError } from "@/lib/api-client";
+import type { WarehouseFormInput } from "@/lib/types";
+import {
+  useAdminWarehouses,
+  useCreateWarehouse,
+  useDeleteWarehouse,
+} from "@/lib/queries/admin/useInventory";
 
-function NewWarehouseForm({
-  onCreated,
-}: {
-  onCreated: (w: Warehouse) => void;
-}) {
+function NewWarehouseForm() {
   const [form, setForm] = useState<WarehouseFormInput>({
     name: "",
     location: "",
   });
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: createWarehouse, isPending } = useCreateWarehouse();
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setIsSubmitting(true);
-    try {
-      const created = await apiClient.post<Warehouse>("/warehouses", form);
-      onCreated(created);
-      setForm({ name: "", location: "" });
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la création",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    createWarehouse(form, {
+      onSuccess: () => setForm({ name: "", location: "" }),
+      onError: (err) =>
+        setError(
+          err instanceof ApiError ? err.message : "Erreur lors de la création",
+        ),
+    });
   }
 
   const inputClass =
@@ -94,10 +90,10 @@ function NewWarehouseForm({
       </div>
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isPending}
         className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
-        {isSubmitting ? (
+        {isPending ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
           <Plus size={16} />
@@ -110,34 +106,19 @@ function NewWarehouseForm({
 }
 
 export default function WarehousesPage() {
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { data: warehouses = [], isLoading, isError } = useAdminWarehouses();
+  const {
+    mutate: deleteWarehouse,
+    isPending: isDeleting,
+    variables: deletingId,
+  } = useDeleteWarehouse();
 
-  useEffect(() => {
-    apiClient
-      .get<Warehouse[]>("/warehouses")
-      .then(setWarehouses)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  async function handleDelete(warehouseId: string) {
+  function handleDelete(warehouseId: string) {
     if (!confirm("Supprimer cet entrepôt ?")) return;
-    setDeletingId(warehouseId);
-    try {
-      await apiClient.delete(`/warehouses/${warehouseId}`);
-      setWarehouses((prev) => prev.filter((w) => w.id !== warehouseId));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-    } finally {
-      setDeletingId(null);
-    }
+    deleteWarehouse(warehouseId, {
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+    });
   }
 
   return (
@@ -147,13 +128,11 @@ export default function WarehousesPage() {
         <p className="text-sm text-gray-500">{warehouses.length} entrepôt(s)</p>
       </div>
 
-      <NewWarehouseForm
-        onCreated={(w) => setWarehouses((prev) => [...prev, w])}
-      />
+      <NewWarehouseForm />
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 
@@ -173,10 +152,10 @@ export default function WarehousesPage() {
                 </div>
                 <button
                   onClick={() => handleDelete(w.id)}
-                  disabled={deletingId === w.id}
+                  disabled={isDeleting && deletingId === w.id}
                   className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                 >
-                  {deletingId === w.id ? (
+                  {isDeleting && deletingId === w.id ? (
                     <Loader2 size={14} className="animate-spin" />
                   ) : (
                     <Trash2 size={14} />
