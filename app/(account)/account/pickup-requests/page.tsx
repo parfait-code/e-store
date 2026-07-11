@@ -1,7 +1,7 @@
 // app/(account)/account/pickup-requests/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   Loader2,
@@ -10,7 +10,7 @@ import {
   Calendar,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { apiClient } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import type { PickupRequest, PickupRequestStatus } from "@/lib/types";
 
@@ -30,42 +30,37 @@ const STATUS_LABELS: Record<PickupRequestStatus, string> = {
   EXPIRED: "Expirée",
 };
 
-export default function PickupRequestsPage() {
-  const [requests, setRequests] = useState<PickupRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// Pas de route de listing dédiée côté user dans le guide (seul GET
+// /pickup-requests/:id existe, réservé au demandeur) — on passe donc par
+// les retours de l'utilisateur pour retrouver ses pickups liés. En pratique,
+// exposer une route GET /returns/:id/pickup-request côté backend
+// simplifierait ceci ; en attendant, cette page reste volontairement
+// minimale et informe l'utilisateur de consulter le détail de son retour.
+async function fetchMyPickupRequests(): Promise<PickupRequest[]> {
+  const orders = await apiClient.get<{ items: { id: string }[] }>(
+    "/orders?limit=50",
+  );
+  const allReturns = await Promise.all(
+    (orders.items ?? []).map((o) =>
+      apiClient
+        .get<{ id: string }[]>(`/orders/${o.id}/returns`)
+        .catch(() => []),
+    ),
+  );
+  const returnIds = allReturns.flat().map((r) => r.id);
+  void returnIds;
+  return [];
+}
 
-  useEffect(() => {
-    // Pas de route de listing dédiée côté user dans le guide (seul GET
-    // /pickup-requests/:id existe, réservé au demandeur) — on passe donc
-    // par les retours de l'utilisateur pour retrouver ses pickups liés.
-    apiClient
-      .get<{ items: { id: string }[] }>("/orders?limit=50")
-      .then(async (orders) => {
-        const allReturns = await Promise.all(
-          orders.items.map((o) =>
-            apiClient
-              .get<{ id: string }[]>(`/orders/${o.id}/returns`)
-              .catch(() => []),
-          ),
-        );
-        const returnIds = allReturns.flat().map((r) => r.id);
-        // Le retour ne référence pas directement l'ID de la pickup depuis
-        // cette API — on tente de récupérer chaque pickup via son propre id
-        // n'est possible que si on le connaît déjà. En pratique, exposer une
-        // route GET /returns/:id/pickup-request côté backend simplifierait
-        // ceci ; en attendant, cette page reste volontairement minimale et
-        // informe l'utilisateur de consulter le détail de son retour.
-        void returnIds;
-        setRequests([]);
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, []);
+export default function PickupRequestsPage() {
+  const {
+    data: requests = [],
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["shop", "pickup-requests"],
+    queryFn: fetchMyPickupRequests,
+  });
 
   return (
     <div>
@@ -76,9 +71,9 @@ export default function PickupRequestsPage() {
         la commande concernée.
       </p>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 

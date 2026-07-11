@@ -1,7 +1,7 @@
 // app/admin/pickup-requests/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Loader2,
@@ -12,15 +12,19 @@ import {
   Pencil,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import { adminPickupRequestsApi } from "@/lib/api/admin/pickupRequests";
+import { ApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import type {
   PickupRequest,
   PickupRequestStatus,
   PickupCollectionMethod,
-  Warehouse,
 } from "@/lib/types";
+import {
+  useAdminPickupRequests,
+  useUpdatePickupLocation,
+  useUpdatePickupStatus,
+} from "@/lib/queries/admin/usePickupRequests";
+import { useAdminWarehouses } from "@/lib/queries/admin/useInventory";
 
 const STATUS_OPTIONS: PickupRequestStatus[] = [
   "PENDING",
@@ -59,35 +63,32 @@ const ALLOWED_TRANSITIONS: Record<PickupRequestStatus, PickupRequestStatus[]> =
 function StatusModal({
   request,
   onClose,
-  onUpdated,
 }: {
   request: PickupRequest;
   onClose: () => void;
-  onUpdated: (r: PickupRequest) => void;
 }) {
   const options = ALLOWED_TRANSITIONS[request.status];
   const [status, setStatus] = useState<PickupRequestStatus>(options[0]);
   const [notes, setNotes] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { mutate: updateStatus, isPending: isSaving } = useUpdatePickupStatus(
+    request.id,
+  );
 
-  async function handleConfirm() {
-    setIsSaving(true);
+  function handleConfirm() {
     setError(null);
-    try {
-      const updated = await adminPickupRequestsApi.updateStatus(request.id, {
-        status,
-        notes: notes || undefined,
-      });
-      onUpdated(updated);
-      onClose();
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+    updateStatus(
+      { status, notes: notes || undefined },
+      {
+        onSuccess: onClose,
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la mise à jour",
+          ),
+      },
+    );
   }
 
   return (
@@ -147,15 +148,12 @@ function StatusModal({
 
 function LocationModal({
   request,
-  warehouses,
   onClose,
-  onUpdated,
 }: {
   request: PickupRequest;
-  warehouses: Warehouse[];
   onClose: () => void;
-  onUpdated: (r: PickupRequest) => void;
 }) {
+  const { data: warehouses = [] } = useAdminWarehouses();
   const [method, setMethod] = useState<PickupCollectionMethod>(request.method);
   const [warehouseId, setWarehouseId] = useState(request.warehouseId ?? "");
   const [pickupDate, setPickupDate] = useState(
@@ -164,30 +162,31 @@ function LocationModal({
   const [deadline, setDeadline] = useState(
     request.deadline ? request.deadline.slice(0, 16) : "",
   );
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { mutate: updateLocation, isPending: isSaving } =
+    useUpdatePickupLocation(request.id);
 
-  async function handleConfirm() {
-    setIsSaving(true);
+  function handleConfirm() {
     setError(null);
-    try {
-      const updated = await adminPickupRequestsApi.updateLocation(request.id, {
+    updateLocation(
+      {
         method,
         warehouse_id: method === "WAREHOUSE_DROPOFF" ? warehouseId : undefined,
         pickup_date: pickupDate
           ? new Date(pickupDate).toISOString()
           : undefined,
         deadline: deadline ? new Date(deadline).toISOString() : undefined,
-      });
-      onUpdated(updated);
-      onClose();
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+      },
+      {
+        onSuccess: onClose,
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la mise à jour",
+          ),
+      },
+    );
   }
 
   const inputClass =
@@ -285,47 +284,20 @@ function LocationModal({
 }
 
 export default function AdminPickupRequestsPage() {
-  const [requests, setRequests] = useState<PickupRequest[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [status, setStatus] = useState<PickupRequestStatus | "">("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [statusEditRequest, setStatusEditRequest] =
     useState<PickupRequest | null>(null);
   const [locationEditRequest, setLocationEditRequest] =
     useState<PickupRequest | null>(null);
 
-  const fetchRequests = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    adminPickupRequestsApi
-      .list({ page, limit: 20, status })
-      .then((res) => {
-        setRequests(res.items ?? []);
-        setTotalPages(res.totalPages);
-        setTotal(res.total);
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [page, status]);
-
-  useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
-
-  useEffect(() => {
-    apiClient
-      .get<Warehouse[]>("/warehouses")
-      .then(setWarehouses)
-      .catch(() => {});
-  }, []);
+  const { data, isLoading, isError } = useAdminPickupRequests({
+    page,
+    status,
+  });
+  const requests = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   return (
     <div>
@@ -357,9 +329,9 @@ export default function AdminPickupRequestsPage() {
         </select>
       </div>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 
@@ -496,23 +468,12 @@ export default function AdminPickupRequestsPage() {
         <StatusModal
           request={statusEditRequest}
           onClose={() => setStatusEditRequest(null)}
-          onUpdated={(updated) =>
-            setRequests((prev) =>
-              prev.map((x) => (x.id === updated.id ? updated : x)),
-            )
-          }
         />
       )}
       {locationEditRequest && (
         <LocationModal
           request={locationEditRequest}
-          warehouses={warehouses}
           onClose={() => setLocationEditRequest(null)}
-          onUpdated={(updated) =>
-            setRequests((prev) =>
-              prev.map((x) => (x.id === updated.id ? updated : x)),
-            )
-          }
         />
       )}
     </div>

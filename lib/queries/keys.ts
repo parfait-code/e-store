@@ -67,5 +67,8 @@ export const queryKeys = {
     return: (id: string) => ["admin", "return", id] as const,
     shipments: (params: Record<string, unknown>) =>
       ["admin", "shipments", params] as const,
+    pickupRequests: (params: Record<string, unknown>) =>
+      ["admin", "pickup-requests", params] as const,
+    pickupRequest: (id: string) => ["admin", "pickup-request", id] as const,
   },
 };
