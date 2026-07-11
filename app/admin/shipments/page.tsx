@@ -49,7 +49,7 @@ export default function ShipmentsPage() {
     apiClient
       .get<Paginated<Shipment>>(`/shipments?${params.toString()}`)
       .then((res) => {
-        setShipments(res.items);
+        setShipments(res.items ?? []);
         setTotalPages(res.totalPages);
         setTotal(res.total);
       })

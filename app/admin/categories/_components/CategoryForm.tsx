@@ -47,7 +47,7 @@ export function CategoryForm({
   useEffect(() => {
     apiClient
       .get<Category[]>("/categories")
-      .then(setCategories)
+      .then((data) => setCategories(data ?? []))
       .catch(() => {});
   }, []);
 

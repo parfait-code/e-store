@@ -158,7 +158,7 @@ export default function PaymentsPage() {
     apiClient
       .get<Paginated<Payment>>(`/payments?${params.toString()}`)
       .then((res) => {
-        setPayments(res.items);
+        setPayments(res.items ?? []);
         setTotalPages(res.totalPages);
         setTotal(res.total);
       })

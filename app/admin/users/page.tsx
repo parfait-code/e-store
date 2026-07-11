@@ -166,7 +166,7 @@ export default function UsersPage() {
   useEffect(() => {
     apiClient
       .get<User[]>("/user/all")
-      .then(setUsers)
+      .then((data) => setUsers(data ?? []))
       .catch((err) =>
         setError(
           err instanceof ApiError ? err.message : "Erreur de chargement",

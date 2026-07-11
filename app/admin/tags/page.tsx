@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
-import { Plus, Pencil, Trash2, Loader2, Check, X, TagIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, TagIcon } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { Tag } from "@/lib/types";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
@@ -187,7 +187,7 @@ export default function TagsPage() {
   useEffect(() => {
     apiClient
       .get<Tag[]>("/tags")
-      .then(setTags)
+      .then((data) => setTags(data ?? []))
       .catch((err) =>
         setError(
           err instanceof ApiError ? err.message : "Erreur de chargement",

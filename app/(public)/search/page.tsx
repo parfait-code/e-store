@@ -36,7 +36,7 @@ function SearchPageContent() {
     apiClient
       .get<Paginated<Product>>(`/product?${params.toString()}`)
       .then((res) => {
-        setProducts(res.items);
+        setProducts(res.items ?? []);
         setTotalPages(res.totalPages);
         setTotal(res.total);
       })

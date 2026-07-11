@@ -49,7 +49,7 @@ export default function CategoriesPage() {
     setIsLoading(true);
     apiClient
       .get<Category[]>("/categories?includeInactive=true")
-      .then(setCategories)
+      .then((data) => setCategories(data ?? []))
       .catch((err) =>
         setError(
           err instanceof ApiError ? err.message : "Erreur de chargement",

@@ -24,7 +24,7 @@ function PromotionsSection() {
     // Ajuster le chemin ici si le backend choisit un nom de route différent.
     apiClient
       .get<PromotionPublic[]>("/promotions/active")
-      .then(setPromotions)
+      .then((data) => setPromotions(data ?? [])) // <-- garde-fou anti-null
       .catch(() => setPromotions([]))
       .finally(() => setIsLoading(false));
   }, []);
@@ -79,14 +79,16 @@ export default function HomePage() {
   useEffect(() => {
     apiClient
       .get<Paginated<Product>>("/product?limit=8")
-      .then((res) => setFeaturedProducts(res.items))
+      .then((res) => setFeaturedProducts(res.items ?? [])) // <-- garde-fou anti-null
       .catch(() => {})
       .finally(() => setIsLoadingProducts(false));
 
     apiClient
       .get<Category[]>("/categories")
       .then((all) =>
-        setCategories(all.filter((c) => c.parentId === null && c.isActive)),
+        setCategories(
+          (all ?? []).filter((c) => c.parentId === null && c.isActive), // <-- garde-fou anti-null
+        ),
       )
       .catch(() => {});
   }, []);

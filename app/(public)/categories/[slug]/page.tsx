@@ -25,7 +25,7 @@ export default function CategoryPage() {
       .get<CategoryProductsResponse>(
         `/categories/slug/${slug}/products?page=${page}&limit=24`,
       )
-      .then(setProductsData)
+      .then((data) => setProductsData({ ...data, items: data.items ?? [] }))
       .catch((err) =>
         setError(
           err instanceof ApiError ? err.message : "Catégorie introuvable",

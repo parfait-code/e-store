@@ -51,7 +51,7 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
     if (isEditing) return;
     apiClient
       .get<CategoryRef[]>("/categories")
-      .then(setCategories)
+      .then((data) => setCategories(data ?? []))
       .catch(() => {});
   }, [isEditing]);
 

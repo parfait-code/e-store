@@ -16,7 +16,7 @@ export default function CategoriesIndexPage() {
   useEffect(() => {
     apiClient
       .get<Category[]>("/categories")
-      .then(setCategories)
+      .then((data) => setCategories(data ?? []))
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);

@@ -304,7 +304,7 @@ export default function AdminPickupRequestsPage() {
     adminPickupRequestsApi
       .list({ page, limit: 20, status })
       .then((res) => {
-        setRequests(res.items);
+        setRequests(res.items ?? []);
         setTotalPages(res.totalPages);
         setTotal(res.total);
       })

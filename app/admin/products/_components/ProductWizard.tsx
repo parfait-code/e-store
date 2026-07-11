@@ -107,7 +107,7 @@ function AttributesStep({
         `/categories/${product.categoryId}/attributes`,
       )
       .then((defs) => {
-        const productDefs = defs.filter((d) => !d.isVariant);
+        const productDefs = (defs ?? []).filter((d) => !d.isVariant);
         setDefinitions(productDefs);
         const initial: Record<string, string> = {};
         product.attributeValues.forEach((av) => {

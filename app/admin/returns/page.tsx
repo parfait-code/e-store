@@ -52,7 +52,7 @@ export default function ReturnsPage() {
     apiClient
       .get<Paginated<ReturnRequest>>(`/returns?${params.toString()}`)
       .then((res) => {
-        setReturns(res.items);
+        setReturns(res.items ?? []);
         setTotalPages(res.totalPages);
         setTotal(res.total);
       })

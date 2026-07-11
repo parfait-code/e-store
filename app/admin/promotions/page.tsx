@@ -47,7 +47,7 @@ export default function PromotionsPage() {
 
     apiClient
       .get<Promotion[]>(`/promotions?${params.toString()}`)
-      .then(setPromotions)
+      .then((data) => setPromotions(data ?? []))
       .catch((err) =>
         setError(
           err instanceof ApiError ? err.message : "Erreur de chargement",
