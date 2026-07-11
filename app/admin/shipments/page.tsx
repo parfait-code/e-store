@@ -1,11 +1,11 @@
 // app/admin/shipments/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Loader2, ChevronLeft, ChevronRight, Truck, Eye } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import type { Shipment, ShipmentStatus, Paginated } from "@/lib/types";
+import type { ShipmentStatus } from "@/lib/types";
+import { useAdminShipments } from "@/lib/queries/admin/useShipments";
 
 const STATUS_OPTIONS: ShipmentStatus[] = [
   "PENDING",
@@ -29,41 +29,19 @@ const STATUS_LABELS: Record<ShipmentStatus, string> = {
 };
 
 export default function ShipmentsPage() {
-  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [status, setStatus] = useState<ShipmentStatus | "">("");
   const [orderIdInput, setOrderIdInput] = useState("");
   const [orderId, setOrderId] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchShipments = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    const params = new URLSearchParams({ page: String(page), limit: "20" });
-    if (status) params.set("status", status);
-    if (orderId) params.set("order_id", orderId);
-
-    apiClient
-      .get<Paginated<Shipment>>(`/shipments?${params.toString()}`)
-      .then((res) => {
-        setShipments(res.items ?? []);
-        setTotalPages(res.totalPages);
-        setTotal(res.total);
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [page, status, orderId]);
-
-  useEffect(() => {
-    fetchShipments();
-  }, [fetchShipments]);
+  const { data, isLoading, isError } = useAdminShipments({
+    page,
+    status,
+    orderId,
+  });
+  const shipments = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -105,9 +83,9 @@ export default function ShipmentsPage() {
         </select>
       </div>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 

@@ -65,5 +65,7 @@ export const queryKeys = {
     returns: (params: Record<string, unknown>) =>
       ["admin", "returns", params] as const,
     return: (id: string) => ["admin", "return", id] as const,
+    shipments: (params: Record<string, unknown>) =>
+      ["admin", "shipments", params] as const,
   },
 };

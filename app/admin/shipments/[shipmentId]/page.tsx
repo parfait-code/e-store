@@ -1,7 +1,7 @@
 // app/admin/shipments/[shipmentId]/page.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -15,14 +15,17 @@ import {
   X,
   RefreshCw,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
-import type {
-  Shipment,
-  ShipmentTrackingInput,
-  ShipmentStatus,
-  ShipmentStatusUpdateInput,
-} from "@/lib/types";
+import type { Shipment, ShipmentStatus } from "@/lib/types";
+import {
+  useAdminShipment,
+  useUpdateShipmentStatus,
+  useAddShipmentTracking,
+  useCancelShipment,
+  useGenerateShipmentLabel,
+} from "@/lib/queries/admin/useShipments";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
 const STATUS_STYLES: Record<ShipmentStatus, string> = {
   PENDING: "bg-gray-100 text-gray-600",
@@ -41,45 +44,33 @@ const ADVANCE_TRANSITIONS: Record<ShipmentStatus, ShipmentStatus[]> = {
   CANCELLED: [],
 };
 
-function OfficialStatusForm({
-  shipment,
-  onUpdated,
-}: {
-  shipment: Shipment;
-  onUpdated: (s: Shipment) => void;
-}) {
+function OfficialStatusForm({ shipment }: { shipment: Shipment }) {
   const options = ADVANCE_TRANSITIONS[shipment.status];
   const [status, setStatus] = useState<ShipmentStatus>(
     options[0] ?? shipment.status,
   );
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: updateStatus, isPending: isSubmitting } =
+    useUpdateShipmentStatus(shipment.id, shipment.orderId);
 
   if (options.length === 0) return null;
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setIsSubmitting(true);
-    try {
-      const payload: ShipmentStatusUpdateInput = {
-        status,
-        reason: reason || undefined,
-      };
-      const updated = await apiClient.put<Shipment>(
-        `/shipments/${shipment.id}/status`,
-        payload,
-      );
-      onUpdated(updated);
-      setReason("");
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    updateStatus(
+      { status, reason: reason || undefined },
+      {
+        onSuccess: () => setReason(""),
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la mise à jour",
+          ),
+      },
+    );
   }
 
   const inputClass =
@@ -147,41 +138,29 @@ function OfficialStatusForm({
   );
 }
 
-function AddTrackingForm({
-  shipmentId,
-  onAdded,
-}: {
-  shipmentId: string;
-  onAdded: (shipment: Shipment) => void;
-}) {
+function AddTrackingForm({ shipmentId }: { shipmentId: string }) {
   const [status, setStatus] = useState("");
   const [location, setLocation] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: addTracking, isPending: isSubmitting } =
+    useAddShipmentTracking(shipmentId);
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setIsSubmitting(true);
-    try {
-      const payload: ShipmentTrackingInput = {
-        status,
-        location: location || undefined,
-      };
-      const updated = await apiClient.post<Shipment>(
-        `/shipments/${shipmentId}/track`,
-        payload,
-      );
-      onAdded(updated);
-      setStatus("");
-      setLocation("");
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de l'ajout",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    addTracking(
+      { status, location: location || undefined },
+      {
+        onSuccess: () => {
+          setStatus("");
+          setLocation("");
+        },
+        onError: (err) =>
+          setError(
+            err instanceof ApiError ? err.message : "Erreur lors de l'ajout",
+          ),
+      },
+    );
   }
 
   const inputClass =
@@ -243,29 +222,19 @@ function AddTrackingForm({
   );
 }
 
-function GenerateLabelButton({
-  shipmentId,
-  onGenerated,
-}: {
-  shipmentId: string;
-  onGenerated: (label: { id: string; labelUrl: string }) => void;
-}) {
-  const [isLoading, setIsLoading] = useState(false);
+function GenerateLabelButton({ shipmentId }: { shipmentId: string }) {
   const [error, setError] = useState<string | null>(null);
+  const { mutate: generateLabel, isPending } =
+    useGenerateShipmentLabel(shipmentId);
 
-  async function handleClick() {
-    setIsLoading(true);
+  function handleClick() {
     setError(null);
-    try {
-      const res = await apiClient.get<{ label_id: string; label_url: string }>(
-        `/labels/${shipmentId}`,
-      );
-      onGenerated({ id: res.label_id, labelUrl: res.label_url });
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Erreur de génération");
-    } finally {
-      setIsLoading(false);
-    }
+    generateLabel(undefined, {
+      onError: (err) =>
+        setError(
+          err instanceof ApiError ? err.message : "Erreur de génération",
+        ),
+    });
   }
 
   return (
@@ -273,10 +242,10 @@ function GenerateLabelButton({
       {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
       <button
         onClick={handleClick}
-        disabled={isLoading}
+        disabled={isPending}
         className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
       >
-        {isLoading ? (
+        {isPending ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
           <FileText size={16} />
@@ -289,42 +258,31 @@ function GenerateLabelButton({
 
 export default function ShipmentDetailPage() {
   const { shipmentId } = useParams<{ shipmentId: string }>();
-  const [shipment, setShipment] = useState<Shipment | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isCancelling, setIsCancelling] = useState(false);
+  const { data: shipment, isLoading, isError } = useAdminShipment(shipmentId);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const { mutate: cancelShipment, isPending: isCancelling } = useCancelShipment(
+    shipmentId,
+    shipment?.orderId,
+  );
 
-  useEffect(() => {
-    apiClient
-      .get<Shipment>(`/shipments/${shipmentId}`)
-      .then(setShipment)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
+  function handleConfirmCancel() {
+    setCancelError(null);
+    cancelShipment(undefined, {
+      onSuccess: () => setConfirmCancel(false),
+      onError: (err) =>
+        setCancelError(
+          err instanceof ApiError ? err.message : "Annulation impossible",
         ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [shipmentId]);
-
-  async function handleCancelShipment() {
-    if (!confirm("Annuler cette expédition ?")) return;
-    setIsCancelling(true);
-    try {
-      await apiClient.post(`/shipments/${shipment!.id}/cancel`);
-      setShipment((prev) => (prev ? { ...prev, status: "CANCELLED" } : prev));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Annulation impossible");
-    } finally {
-      setIsCancelling(false);
-    }
+    });
   }
 
   if (isLoading)
     return <Loader2 size={20} className="animate-spin text-gray-400" />;
-  if (error || !shipment) {
+  if (isError || !shipment) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Expédition introuvable."}
+        Expédition introuvable.
       </div>
     );
   }
@@ -365,15 +323,10 @@ export default function ShipmentDetailPage() {
           {shipment.status !== "CANCELLED" &&
             shipment.status !== "DELIVERED" && (
               <button
-                onClick={handleCancelShipment}
-                disabled={isCancelling}
-                className="flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                onClick={() => setConfirmCancel(true)}
+                className="flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
               >
-                {isCancelling ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <X size={14} />
-                )}
+                <X size={14} />
                 Annuler l'expédition
               </button>
             )}
@@ -382,7 +335,7 @@ export default function ShipmentDetailPage() {
 
       <div className="grid grid-cols-3 gap-6">
         <div className="col-span-2 space-y-6">
-          <OfficialStatusForm shipment={shipment} onUpdated={setShipment} />
+          <OfficialStatusForm shipment={shipment} />
 
           <div className="rounded-lg border border-gray-200 bg-white p-4">
             <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
@@ -417,7 +370,7 @@ export default function ShipmentDetailPage() {
             )}
           </div>
 
-          <AddTrackingForm shipmentId={shipment.id} onAdded={setShipment} />
+          <AddTrackingForm shipmentId={shipment.id} />
         </div>
 
         <div className="space-y-6">
@@ -455,15 +408,24 @@ export default function ShipmentDetailPage() {
               <FileText size={16} /> Voir l'étiquette
             </a>
           ) : (
-            <GenerateLabelButton
-              shipmentId={shipment.id}
-              onGenerated={(label) =>
-                setShipment((prev) => (prev ? { ...prev, label } : prev))
-              }
-            />
+            <GenerateLabelButton shipmentId={shipment.id} />
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmCancel}
+        title="Annuler l'expédition"
+        message={
+          cancelError ??
+          "Cette action est irréversible. Voulez-vous vraiment annuler cette expédition ?"
+        }
+        confirmLabel="Annuler l'expédition"
+        cancelLabel="Retour"
+        isLoading={isCancelling}
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setConfirmCancel(false)}
+      />
     </div>
   );
 }

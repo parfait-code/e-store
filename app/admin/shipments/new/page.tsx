@@ -6,13 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
-import type {
-  Shipment,
-  ShipmentFormInput,
-  Order,
-  User,
-  Product,
-} from "@/lib/types";
+import type { ShipmentFormInput, Order, User, Product } from "@/lib/types";
+import { useCreateShipment } from "@/lib/queries/admin/useShipments";
 
 function NewShipmentForm() {
   const router = useRouter();
@@ -34,10 +29,14 @@ function NewShipmentForm() {
     height: 0,
   });
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPrefilling, setIsPrefilling] = useState(Boolean(orderIdFromQuery));
+  const { mutate: createShipment, isPending: isSubmitting } =
+    useCreateShipment();
 
-  // Préremplit destinataire + poids à partir de la commande liée.
+  // Préremplissage ponctuel à partir de la commande liée : ce n'est pas une
+  // donnée affichée/mise en cache (elle sert uniquement à initialiser le
+  // formulaire une fois), donc on garde un appel apiClient direct plutôt
+  // qu'un hook react-query dédié.
   useEffect(() => {
     if (!orderIdFromQuery) return;
     setIsPrefilling(true);
@@ -105,29 +104,27 @@ function NewShipmentForm() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        ...form,
-        dimensions: useDimensions ? dimensions : undefined,
-        // <input type="date"> renvoie "YYYY-MM-DD" — le backend attend un ISO
-        // datetime complet, sinon 400 "Invalid ISO datetime".
-        estimated_delivery_at: form.estimated_delivery_at
-          ? new Date(form.estimated_delivery_at).toISOString()
-          : undefined,
-      };
-      const created = await apiClient.post<Shipment>("/shipments", payload);
-      router.push(`/admin/shipments/${created.id}`);
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la création",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+
+    const payload: ShipmentFormInput = {
+      ...form,
+      dimensions: useDimensions ? dimensions : undefined,
+      // <input type="date"> renvoie "YYYY-MM-DD" — le backend attend un ISO
+      // datetime complet, sinon 400 "Invalid ISO datetime".
+      estimated_delivery_at: form.estimated_delivery_at
+        ? new Date(form.estimated_delivery_at).toISOString()
+        : undefined,
+    };
+
+    createShipment(payload, {
+      onSuccess: (created) => router.push(`/admin/shipments/${created.id}`),
+      onError: (err) =>
+        setError(
+          err instanceof ApiError ? err.message : "Erreur lors de la création",
+        ),
+    });
   }
 
   const inputClass =

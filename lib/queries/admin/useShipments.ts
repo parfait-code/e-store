@@ -2,28 +2,52 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import { adminShipmentsApi } from "@/lib/api/admin/shipments";
 import { queryKeys } from "@/lib/queries/keys";
 import type {
   Shipment,
+  ShipmentStatus,
   ShipmentStatusUpdateInput,
   ShipmentTrackingInput,
+  ShipmentFormInput,
 } from "@/lib/types";
 
-const adminShipmentsApi = {
-  byId: (id: string) => apiClient.get<Shipment>(`/shipments/${id}`),
-  updateStatus: (id: string, payload: ShipmentStatusUpdateInput) =>
-    apiClient.put<Shipment>(`/shipments/${id}/status`, payload),
-  addTracking: (id: string, payload: ShipmentTrackingInput) =>
-    apiClient.post<Shipment>(`/shipments/${id}/track`, payload),
-  cancel: (id: string) => apiClient.post(`/shipments/${id}/cancel`),
-};
+export function useAdminShipments(params: {
+  page: number;
+  status?: ShipmentStatus | "";
+  orderId?: string;
+}) {
+  return useQuery({
+    queryKey: queryKeys.admin.shipments(params),
+    queryFn: () => adminShipmentsApi.list(params),
+    placeholderData: (prev) => prev,
+  });
+}
 
 export function useAdminShipment(shipmentId: string) {
   return useQuery({
     queryKey: queryKeys.admin.shipment(shipmentId),
     queryFn: () => adminShipmentsApi.byId(shipmentId),
     enabled: Boolean(shipmentId),
+  });
+}
+
+export function useCreateShipment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ShipmentFormInput) =>
+      adminShipmentsApi.create(payload),
+    onSuccess: (created: Shipment) => {
+      qc.invalidateQueries({ queryKey: ["admin", "shipments"] });
+      if (created.orderId) {
+        qc.invalidateQueries({
+          queryKey: queryKeys.admin.order(created.orderId),
+        });
+        qc.invalidateQueries({
+          queryKey: queryKeys.admin.orderShipment(created.orderId),
+        });
+      }
+    },
   });
 }
 
@@ -58,6 +82,46 @@ export function useAddShipmentTracking(shipmentId: string) {
       adminShipmentsApi.addTracking(shipmentId, payload),
     onSuccess: (updated: Shipment) => {
       qc.setQueryData(queryKeys.admin.shipment(shipmentId), updated);
+    },
+  });
+}
+
+export function useCancelShipment(shipmentId: string, orderId?: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminShipmentsApi.cancel(shipmentId),
+    onSuccess: () => {
+      qc.setQueryData(
+        queryKeys.admin.shipment(shipmentId),
+        (prev: Shipment | undefined) =>
+          prev ? { ...prev, status: "CANCELLED" as const } : prev,
+      );
+      qc.invalidateQueries({ queryKey: ["admin", "shipments"] });
+      if (orderId) {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.order(orderId) });
+        qc.invalidateQueries({
+          queryKey: queryKeys.admin.orderShipment(orderId),
+        });
+      }
+    },
+  });
+}
+
+export function useGenerateShipmentLabel(shipmentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminShipmentsApi.generateLabel(shipmentId),
+    onSuccess: (res) => {
+      qc.setQueryData(
+        queryKeys.admin.shipment(shipmentId),
+        (prev: Shipment | undefined) =>
+          prev
+            ? {
+                ...prev,
+                label: { id: res.label_id, labelUrl: res.label_url },
+              }
+            : prev,
+      );
     },
   });
 }
