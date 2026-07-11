@@ -4,6 +4,9 @@ export const queryKeys = {
     categories: ["shop", "categories"] as const,
     categoryBySlug: (slug: string) =>
       ["shop", "categories", "slug", slug] as const,
+    // NOUVEAU — produits paginés d'une catégorie par slug
+    categoryProducts: (slug: string, page: number) =>
+      ["shop", "categories", "slug", slug, "products", page] as const,
     products: (params: Record<string, unknown>) =>
       ["shop", "products", params] as const,
     product: (id: string | number) => ["shop", "product", id] as const,
@@ -25,6 +28,7 @@ export const queryKeys = {
     loyaltyHistory: (userId: number | string) =>
       ["shop", "loyalty", userId, "history"] as const,
     myPickupRequests: ["shop", "pickup-requests"] as const,
+    activePromotions: ["shop", "promotions", "active"] as const,
   },
   admin: {
     products: (params: Record<string, unknown>) =>

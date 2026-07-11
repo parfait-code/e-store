@@ -1,49 +1,27 @@
 // app/(public)/categories/[slug]/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Pagination } from "@/components/Pagination";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import type { Category, CategoryProductsResponse } from "@/lib/types";
+import {
+  useCategoryBySlug,
+  useCategoryProducts,
+} from "@/lib/queries/shop/useCatalog";
 
 export default function CategoryPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [category, setCategory] = useState<Category | null>(null);
-  const [productsData, setProductsData] =
-    useState<CategoryProductsResponse | null>(null);
   const [page, setPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchProducts = useCallback(() => {
-    setIsLoading(true);
-    apiClient
-      .get<CategoryProductsResponse>(
-        `/categories/slug/${slug}/products?page=${page}&limit=24`,
-      )
-      .then((data) => setProductsData({ ...data, items: data.items ?? [] }))
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Catégorie introuvable",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [slug, page]);
-
-  useEffect(() => {
-    apiClient
-      .get<Category>(`/categories/slug/${slug}`)
-      .then(setCategory)
-      .catch(() => {});
-  }, [slug]);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+  const { data: category } = useCategoryBySlug(slug);
+  const {
+    data: productsData,
+    isLoading,
+    isError,
+  } = useCategoryProducts(slug, page);
 
   if (isLoading && !productsData) {
     return (
@@ -53,10 +31,10 @@ export default function CategoryPage() {
     );
   }
 
-  if (error || !productsData) {
+  if (isError || !productsData) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Catégorie introuvable."}
+        Catégorie introuvable.
       </div>
     );
   }
@@ -94,7 +72,7 @@ export default function CategoryPage() {
         </div>
       )}
 
-      <ProductGrid products={productsData.items} isLoading={isLoading} />
+      <ProductGrid products={productsData.items ?? []} isLoading={isLoading} />
       <Pagination
         page={page}
         totalPages={productsData.totalPages}

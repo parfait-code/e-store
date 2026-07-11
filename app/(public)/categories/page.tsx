@@ -1,25 +1,14 @@
 // app/(public)/categories/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Loader2, FolderTree } from "lucide-react";
-import { apiClient } from "@/lib/api-client";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import type { Category } from "@/lib/types";
+import { useCategories } from "@/lib/queries/shop/useCatalog";
 
 export default function CategoriesIndexPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    apiClient
-      .get<Category[]>("/categories")
-      .then((data) => setCategories(data ?? []))
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, []);
+  const { data: categories = [], isLoading } = useCategories();
 
   // Catégories racines uniquement — les sous-catégories apparaissent en
   // sous-titre de leur parent, et restent accessibles depuis la page

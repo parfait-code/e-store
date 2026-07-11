@@ -1,33 +1,16 @@
 // app/(public)/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
-import { apiClient } from "@/lib/api-client";
 import { ProductGrid } from "@/components/ProductGrid";
 import { formatDate } from "@/lib/format";
-import type {
-  Product,
-  Category,
-  Paginated,
-  PromotionPublic,
-} from "@/lib/types";
+import { useCategories, useProducts } from "@/lib/queries/shop/useCatalog";
+import { useActivePromotions } from "@/lib/queries/shop/usePromotions";
 
 function PromotionsSection() {
-  const [promotions, setPromotions] = useState<PromotionPublic[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // ⚠️ Route en attente de création côté backend — voir doc transmise.
-    // Ajuster le chemin ici si le backend choisit un nom de route différent.
-    apiClient
-      .get<PromotionPublic[]>("/promotions/active")
-      .then((data) => setPromotions(data ?? [])) // <-- garde-fou anti-null
-      .catch(() => setPromotions([]))
-      .finally(() => setIsLoading(false));
-  }, []);
+  const { data: promotions = [], isLoading } = useActivePromotions();
 
   if (isLoading || promotions.length === 0) return null;
 
@@ -72,26 +55,16 @@ function PromotionsSection() {
 }
 
 export default function HomePage() {
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const { data: productsData, isLoading: isLoadingProducts } = useProducts({
+    page: 1,
+    limit: 8,
+  });
+  const { data: allCategories = [] } = useCategories();
 
-  useEffect(() => {
-    apiClient
-      .get<Paginated<Product>>("/product?limit=8")
-      .then((res) => setFeaturedProducts(res.items ?? [])) // <-- garde-fou anti-null
-      .catch(() => {})
-      .finally(() => setIsLoadingProducts(false));
-
-    apiClient
-      .get<Category[]>("/categories")
-      .then((all) =>
-        setCategories(
-          (all ?? []).filter((c) => c.parentId === null && c.isActive), // <-- garde-fou anti-null
-        ),
-      )
-      .catch(() => {});
-  }, []);
+  const featuredProducts = productsData?.items ?? [];
+  const categories = allCategories.filter(
+    (c) => c.parentId === null && c.isActive,
+  );
 
   return (
     <div className="space-y-12">

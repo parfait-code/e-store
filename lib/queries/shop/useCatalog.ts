@@ -21,10 +21,21 @@ export function useCategoryBySlug(slug: string) {
   });
 }
 
+// NOUVEAU — produits paginés d'une catégorie (et ses descendantes) par slug
+export function useCategoryProducts(slug: string, page: number, limit = 24) {
+  return useQuery({
+    queryKey: queryKeys.shop.categoryProducts(slug, page),
+    queryFn: () => shopCatalogApi.productsByCategorySlug(slug, page, limit),
+    enabled: Boolean(slug),
+    placeholderData: (prev) => prev,
+  });
+}
+
 export function useProducts(params: {
   page: number;
   categoryId?: string;
   search?: string;
+  limit?: number; // NOUVEAU — nécessaire pour la home (étape 10)
 }) {
   return useQuery({
     queryKey: queryKeys.shop.products(params),
