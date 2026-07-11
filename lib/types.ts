@@ -875,16 +875,12 @@ export type PaymentMethodType =
 
 export interface OrderCreateInput {
   items?: { id: string; combinationId?: string; quantity: number }[];
-  basketId?: string; // NOUVEAU — alternative à `items`
+  basketId?: string; // alternative à `items`
   shippingAddressId?: string;
   shippingAddress: OrderAddressInput;
-  billingAddressId?: string; // NOUVEAU
-  billingAddress?: OrderAddressInput; // NOUVEAU
+  billingAddressId?: string;
+  billingAddress?: OrderAddressInput;
   shippingMethodId?: string;
-  recipientName: string;
-  phone?: string;
-  street: string;
-  addressLine2?: string;
   paymentMethodId?: string;
   notes?: string;
   couponCode?: string;
