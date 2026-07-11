@@ -20,6 +20,10 @@ export const queryKeys = {
     shippingCost: (methodId: string, weight: number, country: string) =>
       ["shop", "shipping-cost", methodId, weight, country] as const,
     paymentMethods: ["shop", "payment-methods"] as const,
+    loyaltyBalance: (userId: number | string) =>
+      ["shop", "loyalty", userId, "balance"] as const,
+    loyaltyHistory: (userId: number | string) =>
+      ["shop", "loyalty", userId, "history"] as const,
   },
   admin: {
     products: (params: Record<string, unknown>) =>
@@ -53,5 +57,9 @@ export const queryKeys = {
     user: (userId: number | string) => ["admin", "user", userId] as const,
     userOrders: (userId: number | string) =>
       ["admin", "user", userId, "orders"] as const,
+    loyaltyBalance: (userId: number | string) =>
+      ["admin", "loyalty", userId, "balance"] as const,
+    loyaltyHistory: (userId: number | string) =>
+      ["admin", "loyalty", userId, "history"] as const,
   },
 };

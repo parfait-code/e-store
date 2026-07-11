@@ -1,12 +1,14 @@
 // app/(account)/account/loyalty/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import { Loader2, Coins } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth/auth-context";
 import { formatDate } from "@/lib/format";
-import type { LoyaltyTransaction, LoyaltyTransactionType } from "@/lib/types";
+import type { LoyaltyTransactionType } from "@/lib/types";
+import {
+  useMyLoyaltyBalance,
+  useMyLoyaltyHistory,
+} from "@/lib/queries/shop/useLoyalty";
 
 const TYPE_LABELS: Record<LoyaltyTransactionType, string> = {
   EARNED: "Gagné",
@@ -24,37 +26,22 @@ const TYPE_STYLES: Record<LoyaltyTransactionType, string> = {
 
 export default function LoyaltyPage() {
   const { user } = useAuth();
-  const [balance, setBalance] = useState<number | null>(null);
-  const [history, setHistory] = useState<LoyaltyTransaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: balanceRes,
+    isLoading: isLoadingBalance,
+    isError: isBalanceError,
+  } = useMyLoyaltyBalance(user?.id ?? null);
+  const { data: history = [], isLoading: isLoadingHistory } =
+    useMyLoyaltyHistory(user?.id ?? null);
 
-  useEffect(() => {
-    if (!user) return;
-    Promise.all([
-      apiClient.get<{ userId: number; balance: number }>(
-        `/loyalty/${user.id}/balance`,
-      ),
-      apiClient.get<LoyaltyTransaction[]>(`/loyalty/${user.id}/history`),
-    ])
-      .then(([b, h]) => {
-        setBalance(b.balance);
-        setHistory(h);
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [user]);
+  const isLoading = isLoadingBalance || isLoadingHistory;
 
   if (isLoading)
     return <Loader2 size={20} className="animate-spin text-gray-400" />;
-  if (error)
+  if (isBalanceError)
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error}
+        Erreur de chargement
       </div>
     );
 
@@ -66,7 +53,9 @@ export default function LoyaltyPage() {
         <div className="rounded-md bg-amber-50 p-2">
           <Coins size={20} className="text-amber-500" />
         </div>
-        <p className="text-2xl font-semibold">{balance} points</p>
+        <p className="text-2xl font-semibold">
+          {balanceRes?.balance ?? 0} points
+        </p>
       </div>
 
       <h2 className="mb-3 text-sm font-medium">Historique</h2>

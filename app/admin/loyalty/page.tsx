@@ -3,9 +3,14 @@
 
 import { useState, FormEvent } from "react";
 import { Search, Loader2, Coins, Plus, Minus } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
-import type { LoyaltyTransaction, LoyaltyTransactionType } from "@/lib/types";
+import type { LoyaltyTransactionType } from "@/lib/types";
+import {
+  useAdminLoyaltyBalance,
+  useAdminLoyaltyHistory,
+  useAdjustLoyaltyPoints,
+} from "@/lib/queries/admin/useLoyalty";
 
 const TYPE_LABELS: Record<LoyaltyTransactionType, string> = {
   EARNED: "Gagné",
@@ -21,44 +26,35 @@ const TYPE_STYLES: Record<LoyaltyTransactionType, string> = {
   ADJUSTED: "text-blue-600",
 };
 
-function AdjustPointsForm({
-  userId,
-  onAdjusted,
-}: {
-  userId: number;
-  onAdjusted: () => void;
-}) {
+function AdjustPointsForm({ userId }: { userId: number }) {
   const [points, setPoints] = useState(0);
   const [type, setType] = useState<LoyaltyTransactionType>("ADJUSTED");
   const [orderId, setOrderId] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: adjustPoints, isPending } = useAdjustLoyaltyPoints(userId);
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (points === 0) {
       setError("Le nombre de points doit être différent de 0.");
       return;
     }
-    setIsSubmitting(true);
-    try {
-      await apiClient.post("/loyalty/adjust", {
-        userId,
-        points,
-        type,
-        orderId: orderId || undefined,
-      });
-      onAdjusted();
-      setPoints(0);
-      setOrderId("");
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de l'ajustement",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    adjustPoints(
+      { userId, points, type, orderId: orderId || undefined },
+      {
+        onSuccess: () => {
+          setPoints(0);
+          setOrderId("");
+        },
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de l'ajustement",
+          ),
+      },
+    );
   }
 
   const inputClass =
@@ -133,10 +129,10 @@ function AdjustPointsForm({
       </div>
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isPending}
         className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
-        {isSubmitting ? "Application..." : "Appliquer l'ajustement"}
+        {isPending ? "Application..." : "Appliquer l'ajustement"}
       </button>
     </form>
   );
@@ -144,44 +140,29 @@ function AdjustPointsForm({
 
 export default function LoyaltyPage() {
   const [userIdInput, setUserIdInput] = useState("");
-  const [activeUserId, setActiveUserId] = useState<number | null>(null);
-  const [balance, setBalance] = useState<number | null>(null);
-  const [history, setHistory] = useState<LoyaltyTransaction[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [activeUserId, setActiveUserId] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  async function loadUser(userId: number) {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [balanceRes, historyRes] = await Promise.all([
-        apiClient.get<{ userId: number; balance: number }>(
-          `/loyalty/${userId}/balance`,
-        ),
-        apiClient.get<LoyaltyTransaction[]>(`/loyalty/${userId}/history`),
-      ]);
-      setBalance(balanceRes.balance);
-      setHistory(historyRes);
-      setActiveUserId(userId);
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Utilisateur introuvable",
-      );
-      setActiveUserId(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const {
+    data: balanceRes,
+    isLoading: isLoadingBalance,
+    isError: isBalanceError,
+  } = useAdminLoyaltyBalance(activeUserId);
+  const { data: history = [] } = useAdminLoyaltyHistory(activeUserId);
 
   function handleSearch(e: FormEvent) {
     e.preventDefault();
+    setSearchError(null);
     const id = Number(userIdInput);
     if (!id) {
-      setError("Entrez un ID utilisateur valide.");
+      setSearchError("Entrez un ID utilisateur valide.");
       return;
     }
-    loadUser(id);
+    setActiveUserId(String(id));
   }
+
+  const error =
+    searchError ?? (isBalanceError ? "Utilisateur introuvable" : null);
 
   return (
     <div className="max-w-2xl">
@@ -208,10 +189,10 @@ export default function LoyaltyPage() {
         </div>
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoadingBalance}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
         >
-          {isLoading ? (
+          {isLoadingBalance ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (
             "Rechercher"
@@ -225,24 +206,23 @@ export default function LoyaltyPage() {
         </div>
       )}
 
-      {activeUserId !== null && balance !== null && (
+      {activeUserId !== null && balanceRes && (
         <div className="space-y-6">
           <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-4">
             <div className="rounded-md bg-amber-50 p-2">
               <Coins size={20} className="text-amber-500" />
             </div>
             <div>
-              <p className="text-2xl font-semibold">{balance} points</p>
+              <p className="text-2xl font-semibold">
+                {balanceRes.balance} points
+              </p>
               <p className="text-sm text-gray-500">
                 Utilisateur #{activeUserId}
               </p>
             </div>
           </div>
 
-          <AdjustPointsForm
-            userId={activeUserId}
-            onAdjusted={() => loadUser(activeUserId)}
-          />
+          <AdjustPointsForm userId={Number(activeUserId)} />
 
           <div>
             <h2 className="mb-3 text-sm font-medium">Historique</h2>
