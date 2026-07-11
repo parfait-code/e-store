@@ -7,7 +7,7 @@ import { Loader2, CreditCard, MapPin, Truck, Tag, Check } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import { useCart } from "@/lib/cart/cart-context";
 import { formatXAF } from "@/lib/format";
-import type { PaymentMethodType, OrderCreateInput } from "@/lib/types";
+import type { PaymentMethodType, OrderCreateInput, OrderAddressInput  } from "@/lib/types";
 import {
   useAddresses,
   useShippingMethods,
@@ -98,92 +98,91 @@ export default function CheckoutPage() {
   const inputClass =
     "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
 
+
+    // Remplace le calcul inline de shippingAddress par cette fonction,
+// déclarée au niveau du composant (avant handleSubmit) :
+
+function buildShippingAddress(): OrderAddressInput {
+  if (useNewAddress) {
+    return {
+      recipientName: newAddress.recipientName,
+      phone: newAddress.phone || undefined,
+      street: newAddress.street,
+      addressLine2: newAddress.addressLine2 || undefined,
+      city: newAddress.city,
+      state: newAddress.state || undefined,
+      country: newAddress.country,
+      postalCode: newAddress.postalCode || undefined,
+    };
+  }
+
+  const a = addresses.find((x) => x.id === selectedAddressId);
+  if (!a) {
+    throw new Error("Adresse sélectionnée introuvable.");
+  }
+
+  return {
+    recipientName: a.recipientName,
+    phone: a.phone ?? undefined,
+    street: a.street,
+    addressLine2: a.addressLine2 ?? undefined,
+    city: a.city,
+    state: a.state ?? undefined,
+    country: a.country,
+    postalCode: a.postalCode ?? undefined,
+  };
+}
+
   async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
+  e.preventDefault();
+  setError(null);
 
-    if (!useNewAddress && !selectedAddressId) {
-      setError("Sélectionnez une adresse de livraison.");
-      return;
-    }
-    if (!paymentMethod) {
-      setError("Sélectionnez un moyen de paiement.");
-      return;
-    }
+  if (!useNewAddress && !selectedAddressId) {
+    setError("Sélectionnez une adresse de livraison.");
+    return;
+  }
+  if (!paymentMethod) {
+    setError("Sélectionnez un moyen de paiement.");
+    return;
+  }
 
-    const shippingAddress = useNewAddress
-      ? {
-          recipientName: newAddress.recipientName,
-          phone: newAddress.phone || undefined,
-          street: newAddress.street,
-          addressLine2: newAddress.addressLine2 || undefined,
-          city: newAddress.city,
-          state: newAddress.state || undefined,
-          country: newAddress.country,
-          postalCode: newAddress.postalCode || undefined,
-        }
-      : (() => {
-          const a = addresses.find((x) => x.id === selectedAddressId)!;
-          return {
-            recipientName: a.recipientName,
-            phone: a.phone ?? undefined,
-            street: a.street,
-            addressLine2: a.addressLine2 ?? undefined,
-            city: a.city,
-            state: a.state ?? undefined,
-            country: a.country,
-            postalCode: a.postalCode ?? undefined,
-          };
-        })();
+  setIsSubmitting(true);
+  try {
+    const shippingAddress = buildShippingAddress();
 
-    setIsSubmitting(true);
+    const payload: OrderCreateInput = {
+      items: items.map((i) => ({
+        id: String(i.productId),
+        combinationId: i.combinationId ?? undefined,
+        quantity: i.quantity,
+      })),
+      shippingAddressId: useNewAddress ? undefined : selectedAddressId,
+      shippingAddress,
+      shippingMethodId: shippingMethodId || undefined,
+      paymentMethodId: paymentMethod || undefined,
+      couponCode: couponCode || undefined,
+    };
+    const order = await createOrder(payload);
+
     try {
-      const payload: OrderCreateInput = {
-        items: items.map((i) => ({
-          id: String(i.productId),
-          combinationId: i.combinationId ?? undefined,
-          quantity: i.quantity,
-        })),
+      await createPayment({ order_id: order.id, method: paymentMethod });
+    } catch {
+      // La commande existe déjà même si le paiement échoue
+    }
 
-        shippingAddressId: useNewAddress ? undefined : selectedAddressId,
-
-        shippingAddress: useNewAddress
-          ? {
-              recipientName: shippingAddress.recipientName,
-              phone: shippingAddress.phone ?? undefined,
-              street: shippingAddress.street,
-              addressLine2: shippingAddress.addressLine2 ?? undefined,
-              city: shippingAddress.city,
-              state: shippingAddress.state ?? undefined,
-              country: shippingAddress.country,
-              postalCode: shippingAddress.postalCode ?? undefined,
-            }
-          : undefined,
-
-        shippingMethodId: shippingMethodId || undefined,
-        paymentMethodId: paymentMethod,
-        couponCode: couponCode || undefined,
-      };
-      const order = await createOrder(payload);
-
-      try {
-        await createPayment({ order_id: order.id, method: paymentMethod });
-      } catch {
-        // La commande existe déjà même si le paiement échoue (ex: méthode 503)
-        // — on redirige quand même, cohérent avec le comportement d'origine.
-      }
-
-      clearCart();
-      router.push(`/account/orders/${order.id}`);
-    } catch (err) {
-      setError(
-        err instanceof ApiError
+    clearCart();
+    router.push(`/account/orders/${order.id}`);
+  } catch (err) {
+    setError(
+      err instanceof ApiError
+        ? err.message
+        : err instanceof Error
           ? err.message
           : "Erreur lors de la création de la commande",
-      );
-      setIsSubmitting(false);
-    }
+    );
+    setIsSubmitting(false);
   }
+}
 
   function handleValidateCoupon() {
     if (!couponCode.trim()) return;

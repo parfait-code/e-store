@@ -22,10 +22,11 @@ function invalidateAllInventoryViews(qc: ReturnType<typeof useQueryClient>) {
 export function useAdminInventoryList(page: number) {
   return useQuery({
     queryKey: queryKeys.admin.inventoryList(page),
-    queryFn: () => adminInventoryApi.list(page),
+    queryFn: () => adminInventoryApi.list({ page }), // était: adminInventoryApi.list(page)
     placeholderData: (prev) => prev,
   });
 }
+
 
 export function useAdminInventoryGrouped(params: {
   page: number;
