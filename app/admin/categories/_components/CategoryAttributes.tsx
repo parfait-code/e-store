@@ -1,14 +1,24 @@
 // app/admin/categories/_components/CategoryAttributes.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import { Plus, Trash2, Tag, Check, Pencil, X, Loader2 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import type {
   AttributeDefinition,
   AttributeDefinitionFormInput,
   AttributeOption,
 } from "@/lib/types";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import {
+  useAdminCategoryAttributes,
+  useCreateAttribute,
+  useUpdateAttribute,
+  useDeleteAttribute,
+  useCreateAttributeOption,
+  useUpdateAttributeOption,
+  useDeleteAttributeOption,
+} from "@/lib/queries/admin/useCategories";
 
 const TYPE_LABELS: Record<AttributeDefinition["type"], string> = {
   TEXT: "Texte",
@@ -20,51 +30,44 @@ const TYPE_LABELS: Record<AttributeDefinition["type"], string> = {
 
 function AttributeOptionRow({
   option,
+  categoryId,
+  definitionId,
   definitionType,
-  onUpdated,
-  onDeleted,
+  onDeleteRequested,
 }: {
   option: AttributeOption;
+  categoryId: string;
+  definitionId: string;
   definitionType: AttributeDefinition["type"];
-  onUpdated: (option: AttributeOption) => void;
-  onDeleted: () => void;
+  onDeleteRequested: (option: AttributeOption) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(option.value);
   const [colorHex, setColorHex] = useState(option.colorHex ?? "#000000");
   const [position, setPosition] = useState(option.position);
-  const [isSaving, setIsSaving] = useState(false);
+  const { mutate: updateOption, isPending: isSaving } =
+    useUpdateAttributeOption(categoryId, definitionId);
 
-  async function handleSave() {
-    setIsSaving(true);
-    try {
-      const updated = await apiClient.patch<AttributeOption>(
-        `/attributes/options/${option.id}`,
-        {
+  function handleSave() {
+    updateOption(
+      {
+        optionId: option.id,
+        payload: {
           value: value.trim(),
           colorHex: definitionType === "COLOR" ? colorHex : undefined,
           position,
         },
-      );
-      onUpdated(updated);
-      setIsEditing(false);
-    } catch (err) {
-      alert(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!confirm(`Supprimer l'option « ${option.value} » ?`)) return;
-    try {
-      await apiClient.delete(`/attributes/options/${option.id}`);
-      onDeleted();
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-    }
+      },
+      {
+        onSuccess: () => setIsEditing(false),
+        onError: (err) =>
+          alert(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la mise à jour",
+          ),
+      },
+    );
   }
 
   if (isEditing) {
@@ -135,7 +138,7 @@ function AttributeOptionRow({
         <Pencil size={11} />
       </button>
       <button
-        onClick={handleDelete}
+        onClick={() => onDeleteRequested(option)}
         className="rounded-full p-0.5 hover:bg-gray-200"
       >
         <Trash2 size={11} />
@@ -146,36 +149,38 @@ function AttributeOptionRow({
 
 function AttributeOptionsEditor({
   definition,
-  onChange,
+  categoryId,
+  onDeleteRequested,
 }: {
   definition: AttributeDefinition;
-  onChange: (updated: AttributeDefinition) => void;
+  categoryId: string;
+  onDeleteRequested: (definitionId: string, option: AttributeOption) => void;
 }) {
   const [value, setValue] = useState("");
   const [colorHex, setColorHex] = useState("#000000");
   const [position, setPosition] = useState(definition.options.length);
-  const [isAdding, setIsAdding] = useState(false);
+  const { mutate: createOption, isPending: isAdding } =
+    useCreateAttributeOption(categoryId, definition.id);
 
-  async function addOption() {
+  function addOption() {
     if (!value.trim()) return;
-    setIsAdding(true);
-    try {
-      const created = await apiClient.post<AttributeOption>(
-        `/attributes/${definition.id}/options`,
-        {
-          value: value.trim(),
-          colorHex: definition.type === "COLOR" ? colorHex : undefined,
-          position,
+    createOption(
+      {
+        value: value.trim(),
+        colorHex: definition.type === "COLOR" ? colorHex : undefined,
+        position,
+      },
+      {
+        onSuccess: () => {
+          setValue("");
+          setPosition((p) => p + 1);
         },
-      );
-      onChange({ ...definition, options: [...definition.options, created] });
-      setValue("");
-      setPosition((p) => p + 1);
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Erreur lors de l'ajout");
-    } finally {
-      setIsAdding(false);
-    }
+        onError: (err) =>
+          alert(
+            err instanceof ApiError ? err.message : "Erreur lors de l'ajout",
+          ),
+      },
+    );
   }
 
   if (definition.type !== "SELECT" && definition.type !== "COLOR") return null;
@@ -187,20 +192,11 @@ function AttributeOptionsEditor({
           <AttributeOptionRow
             key={opt.id}
             option={opt}
+            categoryId={categoryId}
+            definitionId={definition.id}
             definitionType={definition.type}
-            onUpdated={(updated) =>
-              onChange({
-                ...definition,
-                options: definition.options.map((o) =>
-                  o.id === updated.id ? updated : o,
-                ),
-              })
-            }
-            onDeleted={() =>
-              onChange({
-                ...definition,
-                options: definition.options.filter((o) => o.id !== opt.id),
-              })
+            onDeleteRequested={(option) =>
+              onDeleteRequested(definition.id, option)
             }
           />
         ))}
@@ -244,9 +240,152 @@ function AttributeOptionsEditor({
   );
 }
 
-function CategoryAttributes({ categoryId }: { categoryId: string }) {
-  const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+function AttributeDefinitionEditor({
+  categoryId,
+  definition,
+  onCancel,
+}: {
+  categoryId: string;
+  definition: AttributeDefinition;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: definition.name,
+    slug: definition.slug,
+    unit: definition.unit ?? "",
+    position: definition.position,
+    isVariant: definition.isVariant,
+    isFilterable: definition.isFilterable,
+    isRequired: definition.isRequired,
+  });
+  const [error, setError] = useState<string | null>(null);
+  const { mutate: updateAttribute, isPending: isSaving } = useUpdateAttribute(
+    categoryId,
+    definition.id,
+  );
+
+  function handleSave() {
+    setError(null);
+    updateAttribute(
+      {
+        name: form.name,
+        slug: form.slug,
+        unit: form.unit || undefined,
+        position: form.position,
+        isVariant: form.isVariant,
+        isFilterable: form.isFilterable,
+        isRequired: form.isRequired,
+      },
+      {
+        onSuccess: onCancel,
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la mise à jour",
+          ),
+      },
+    );
+  }
+
+  const inputClass =
+    "rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-gray-900";
+
+  return (
+    <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        <input
+          type="text"
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          className={inputClass}
+          placeholder="Nom"
+        />
+        <input
+          type="text"
+          value={form.slug}
+          onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+          className={inputClass}
+          placeholder="Slug"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <input
+          type="text"
+          value={form.unit}
+          onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+          className={inputClass}
+          placeholder="Unité (optionnel, ex: cm, kg)"
+        />
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Position d'affichage
+          </label>
+          <input
+            type="number"
+            value={form.position}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, position: Number(e.target.value) }))
+            }
+            className={`${inputClass} w-full`}
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-4 text-xs">
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isVariant}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isVariant: e.target.checked }))
+            }
+          />
+          Utilisé pour les variantes
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isFilterable}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isFilterable: e.target.checked }))
+            }
+          />
+          Filtrable
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={form.isRequired}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, isRequired: e.target.checked }))
+            }
+          />
+          Obligatoire
+        </label>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+        >
+          {isSaving ? "Enregistrement..." : "Enregistrer"}
+        </button>
+        <button
+          onClick={onCancel}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600"
+        >
+          Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function CategoryAttributes({ categoryId }: { categoryId: string }) {
+  const { data: attributes = [], isLoading } =
+    useAdminCategoryAttributes(categoryId);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AttributeDefinitionFormInput>({
@@ -259,54 +398,62 @@ function CategoryAttributes({ categoryId }: { categoryId: string }) {
     isRequired: false,
     position: 0,
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiClient
-      .get<AttributeDefinition[]>(`/categories/${categoryId}/attributes`)
-      .then(setAttributes)
-      .finally(() => setIsLoading(false));
-  }, [categoryId]);
+  const { mutate: createAttribute, isPending: isSubmitting } =
+    useCreateAttribute(categoryId);
+  const { mutate: deleteAttribute, isPending: isDeletingAttribute } =
+    useDeleteAttribute(categoryId);
+  const { mutate: deleteOption, isPending: isDeletingOption } =
+    useDeleteAttributeOption(categoryId, "");
+  // NB : useDeleteAttributeOption prend un definitionId figé au montage —
+  // on l'appelle donc dynamiquement via un hook local par confirmation
+  // plutôt qu'un hook global (voir ConfirmDialog ci-dessous).
 
-  async function handleCreate(e: FormEvent) {
+  const [attrToDelete, setAttrToDelete] = useState<AttributeDefinition | null>(
+    null,
+  );
+  const [optionToDelete, setOptionToDelete] = useState<{
+    definitionId: string;
+    option: AttributeOption;
+  } | null>(null);
+
+  function handleCreate(e: FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
-    try {
-      const created = await apiClient.post<AttributeDefinition>(
-        `/categories/${categoryId}/attributes`,
-        { ...form, unit: form.unit || undefined },
-      );
-      setAttributes((prev) => [...prev, created]);
-      setForm({
-        name: "",
-        slug: "",
-        type: "TEXT",
-        unit: "",
-        isVariant: false,
-        isFilterable: false,
-        isRequired: false,
-        position: attributes.length + 1,
-      });
-      setShowForm(false);
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la création",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    createAttribute(
+      { ...form, unit: form.unit || undefined },
+      {
+        onSuccess: () => {
+          setForm({
+            name: "",
+            slug: "",
+            type: "TEXT",
+            unit: "",
+            isVariant: false,
+            isFilterable: false,
+            isRequired: false,
+            position: attributes.length + 1,
+          });
+          setShowForm(false);
+        },
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la création",
+          ),
+      },
+    );
   }
 
-  async function handleDelete(definitionId: string) {
-    if (!confirm("Supprimer cet attribut ?")) return;
-    try {
-      await apiClient.delete(`/attributes/${definitionId}`);
-      setAttributes((prev) => prev.filter((a) => a.id !== definitionId));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-    }
+  function confirmDeleteAttribute() {
+    if (!attrToDelete) return;
+    deleteAttribute(attrToDelete.id, {
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+      onSettled: () => setAttrToDelete(null),
+    });
   }
 
   const inputClass =
@@ -440,13 +587,8 @@ function CategoryAttributes({ categoryId }: { categoryId: string }) {
             editingId === attr.id ? (
               <AttributeDefinitionEditor
                 key={attr.id}
+                categoryId={categoryId}
                 definition={attr}
-                onUpdated={(updated) => {
-                  setAttributes((prev) =>
-                    prev.map((a) => (a.id === updated.id ? updated : a)),
-                  );
-                  setEditingId(null);
-                }}
                 onCancel={() => setEditingId(null)}
               />
             ) : (
@@ -488,7 +630,7 @@ function CategoryAttributes({ categoryId }: { categoryId: string }) {
                       <Pencil size={14} />
                     </button>
                     <button
-                      onClick={() => handleDelete(attr.id)}
+                      onClick={() => setAttrToDelete(attr)}
                       className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
                     >
                       <Trash2 size={14} />
@@ -497,10 +639,9 @@ function CategoryAttributes({ categoryId }: { categoryId: string }) {
                 </div>
                 <AttributeOptionsEditor
                   definition={attr}
-                  onChange={(updated) =>
-                    setAttributes((prev) =>
-                      prev.map((a) => (a.id === updated.id ? updated : a)),
-                    )
+                  categoryId={categoryId}
+                  onDeleteRequested={(definitionId, option) =>
+                    setOptionToDelete({ definitionId, option })
                   }
                 />
               </div>
@@ -508,152 +649,65 @@ function CategoryAttributes({ categoryId }: { categoryId: string }) {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={attrToDelete !== null}
+        title="Supprimer l'attribut"
+        message={`Voulez-vous vraiment supprimer l'attribut « ${attrToDelete?.name} » ? Cette action est irréversible.`}
+        confirmLabel="Supprimer"
+        isLoading={isDeletingAttribute}
+        onConfirm={confirmDeleteAttribute}
+        onCancel={() => setAttrToDelete(null)}
+      />
+
+      {optionToDelete && (
+        <DeleteOptionConfirm
+          categoryId={categoryId}
+          definitionId={optionToDelete.definitionId}
+          option={optionToDelete.option}
+          onClose={() => setOptionToDelete(null)}
+        />
+      )}
     </div>
   );
 }
 
-function AttributeDefinitionEditor({
-  definition,
-  onUpdated,
-  onCancel,
+// Composant dédié : useDeleteAttributeOption a besoin d'un definitionId fixé
+// au moment du montage — on l'instancie donc seulement quand une suppression
+// est réellement demandée, avec le bon definitionId.
+function DeleteOptionConfirm({
+  categoryId,
+  definitionId,
+  option,
+  onClose,
 }: {
-  definition: AttributeDefinition;
-  onUpdated: (updated: AttributeDefinition) => void;
-  onCancel: () => void;
+  categoryId: string;
+  definitionId: string;
+  option: AttributeOption;
+  onClose: () => void;
 }) {
-  const [form, setForm] = useState({
-    name: definition.name,
-    slug: definition.slug,
-    unit: definition.unit ?? "",
-    position: definition.position,
-    isVariant: definition.isVariant,
-    isFilterable: definition.isFilterable,
-    isRequired: definition.isRequired,
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const { mutate: deleteOption, isPending } = useDeleteAttributeOption(
+    categoryId,
+    definitionId,
+  );
 
-  async function handleSave() {
-    setIsSaving(true);
-    setError(null);
-    try {
-      const updated = await apiClient.patch<AttributeDefinition>(
-        `/attributes/${definition.id}`,
-        {
-          name: form.name,
-          slug: form.slug,
-          unit: form.unit || undefined,
-          position: form.position,
-          isVariant: form.isVariant,
-          isFilterable: form.isFilterable,
-          isRequired: form.isRequired,
-        },
-      );
-      // La route PATCH ne renvoie pas forcément `options` à jour, on les
-      // préserve depuis la définition connue côté client.
-      onUpdated({ ...updated, options: definition.options });
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+  function confirmDelete() {
+    deleteOption(option.id, {
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+      onSettled: onClose,
+    });
   }
 
-  const inputClass =
-    "rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-gray-900";
-
   return (
-    <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <div className="grid grid-cols-2 gap-3">
-        <input
-          type="text"
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          className={inputClass}
-          placeholder="Nom"
-        />
-        <input
-          type="text"
-          value={form.slug}
-          onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-          className={inputClass}
-          placeholder="Slug"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <input
-          type="text"
-          value={form.unit}
-          onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-          className={inputClass}
-          placeholder="Unité (optionnel, ex: cm, kg)"
-        />
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">
-            Position d'affichage
-          </label>
-          <input
-            type="number"
-            value={form.position}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, position: Number(e.target.value) }))
-            }
-            className={`${inputClass} w-full`}
-          />
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-4 text-xs">
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={form.isVariant}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, isVariant: e.target.checked }))
-            }
-          />
-          Utilisé pour les variantes
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={form.isFilterable}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, isFilterable: e.target.checked }))
-            }
-          />
-          Filtrable
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={form.isRequired}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, isRequired: e.target.checked }))
-            }
-          />
-          Obligatoire
-        </label>
-      </div>
-      <div className="flex gap-2">
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-        >
-          {isSaving ? "Enregistrement..." : "Enregistrer"}
-        </button>
-        <button
-          onClick={onCancel}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600"
-        >
-          Annuler
-        </button>
-      </div>
-    </div>
+    <ConfirmDialog
+      open
+      title="Supprimer l'option"
+      message={`Voulez-vous vraiment supprimer l'option « ${option.value} » ?`}
+      confirmLabel="Supprimer"
+      isLoading={isPending}
+      onConfirm={confirmDelete}
+      onCancel={onClose}
+    />
   );
 }
-
-export { CategoryAttributes };

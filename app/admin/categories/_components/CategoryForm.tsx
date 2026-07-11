@@ -1,10 +1,15 @@
 // app/admin/categories/_components/CategoryForm.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import { Loader2, Save } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import type { Category, CategoryFormInput } from "@/lib/types";
+import {
+  useAdminCategoriesList,
+  useCreateCategory,
+  useUpdateCategory,
+} from "@/lib/queries/admin/useCategories";
 
 interface CategoryFormProps {
   initialCategory?: Category;
@@ -25,10 +30,8 @@ export function CategoryForm({
   onSuccess,
 }: CategoryFormProps) {
   const isEditing = Boolean(initialCategory);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { data: categories = [] } = useAdminCategoriesList();
   const [slugTouched, setSlugTouched] = useState(isEditing);
-  // imageUrl/iconUrl retirés du formulaire — gérés par upload de fichier
-  // via CategoryAssetsUploader, une fois la catégorie créée.
   const [form, setForm] = useState<
     Omit<CategoryFormInput, "imageUrl" | "iconUrl">
   >({
@@ -42,14 +45,13 @@ export function CategoryForm({
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    apiClient
-      .get<Category[]>("/categories")
-      .then((data) => setCategories(data ?? []))
-      .catch(() => {});
-  }, []);
+  const { mutate: createCategory, isPending: isCreating } =
+    useCreateCategory();
+  const { mutate: updateCategory, isPending: isUpdating } = useUpdateCategory(
+    initialCategory?.id ?? "",
+  );
+  const isSubmitting = isCreating || isUpdating;
 
   function update<K extends keyof typeof form>(
     key: K,
@@ -63,22 +65,13 @@ export function CategoryForm({
     if (!slugTouched) update("slug", slugify(value));
   }
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setFieldErrors({});
-    setIsSubmitting(true);
 
-    try {
-      const payload = { ...form, parentId: form.parentId || undefined };
-      const result = isEditing
-        ? await apiClient.put<Category>(
-            `/categories/${initialCategory!.id}`,
-            payload,
-          )
-        : await apiClient.post<Category>("/categories", payload);
-      onSuccess(result);
-    } catch (err) {
+    const payload = { ...form, parentId: form.parentId || undefined };
+    const onError = (err: unknown) => {
       if (err instanceof ApiError) {
         setError(err.message);
         const details = err.details as
@@ -88,8 +81,12 @@ export function CategoryForm({
       } else {
         setError("Une erreur est survenue.");
       }
-    } finally {
-      setIsSubmitting(false);
+    };
+
+    if (isEditing) {
+      updateCategory(payload, { onSuccess, onError });
+    } else {
+      createCategory(payload, { onSuccess, onError });
     }
   }
 

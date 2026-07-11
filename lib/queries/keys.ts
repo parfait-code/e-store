@@ -31,6 +31,9 @@ export const queryKeys = {
       ["admin", "products", params] as const,
     product: (id: string | number) => ["admin", "product", id] as const,
     categories: ["admin", "categories"] as const,
+    category: (id: string) => ["admin", "category", id] as const,
+    categoryAttributes: (categoryId: string) =>
+      ["admin", "category", categoryId, "attributes"] as const,
     dashboardStats: ["admin", "dashboard", "stats"] as const,
     salesChart: (year: number) =>
       ["admin", "dashboard", "sales-chart", year] as const,

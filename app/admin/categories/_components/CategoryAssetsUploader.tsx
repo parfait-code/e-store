@@ -1,54 +1,26 @@
 // app/admin/categories/_components/CategoryAssetsUploader.tsx
 "use client";
 
-import { apiClient } from "@/lib/api-client";
 import type { Category } from "@/lib/types";
 import { StagedImagesManager } from "@/components/admin/StagedImagesManager";
+import {
+  useUploadCategoryImage,
+  useDeleteCategoryImage,
+  useUploadCategoryIcon,
+  useDeleteCategoryIcon,
+} from "@/lib/queries/admin/useCategories";
 
 interface CategoryAssetsUploaderProps {
   category: Category;
-  onUpdated: (category: Category) => void;
 }
 
 export function CategoryAssetsUploader({
   category,
-  onUpdated,
 }: CategoryAssetsUploaderProps) {
-  async function uploadImage(file: File) {
-    const formData = new FormData();
-    formData.append("image", file);
-    const updated = await apiClient.post<Category>(
-      `/categories/${category.id}/assets`,
-      formData,
-      { isFormData: true },
-    );
-    onUpdated(updated);
-  }
-
-  async function deleteImage() {
-    const updated = await apiClient.delete<Category>(
-      `/categories/${category.id}/image`,
-    );
-    onUpdated(updated);
-  }
-
-  async function uploadIcon(file: File) {
-    const formData = new FormData();
-    formData.append("icon", file);
-    const updated = await apiClient.post<Category>(
-      `/categories/${category.id}/assets`,
-      formData,
-      { isFormData: true },
-    );
-    onUpdated(updated);
-  }
-
-  async function deleteIcon() {
-    const updated = await apiClient.delete<Category>(
-      `/categories/${category.id}/icon`,
-    );
-    onUpdated(updated);
-  }
+  const { mutateAsync: uploadImage } = useUploadCategoryImage(category.id);
+  const { mutateAsync: deleteImage } = useDeleteCategoryImage(category.id);
+  const { mutateAsync: uploadIcon } = useUploadCategoryIcon(category.id);
+  const { mutateAsync: deleteIcon } = useDeleteCategoryIcon(category.id);
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -58,8 +30,12 @@ export function CategoryAssetsUploader({
           existingImages={
             category.imageUrl ? [{ key: "image", url: category.imageUrl }] : []
           }
-          deleteOne={deleteImage}
-          uploadOne={uploadImage}
+          deleteOne={async () => {
+            await deleteImage();
+          }}
+          uploadOne={async (file) => {
+            await uploadImage(file);
+          }}
           maxTotal={1}
           addLabel="Ajouter"
         />
@@ -71,8 +47,12 @@ export function CategoryAssetsUploader({
           existingImages={
             category.iconUrl ? [{ key: "icon", url: category.iconUrl }] : []
           }
-          deleteOne={deleteIcon}
-          uploadOne={uploadIcon}
+          deleteOne={async () => {
+            await deleteIcon();
+          }}
+          uploadOne={async (file) => {
+            await uploadIcon(file);
+          }}
           maxTotal={1}
           addLabel="Ajouter"
         />

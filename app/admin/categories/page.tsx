@@ -1,7 +1,7 @@
 // app/admin/categories/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -11,9 +11,13 @@ import {
   FolderTree,
   CornerDownRight,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import type { Category } from "@/lib/types";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import {
+  useAdminCategoriesList,
+  useDeleteCategory,
+} from "@/lib/queries/admin/useCategories";
 
 // Construit un ordre "arbre affiché à plat" : racines puis leurs enfants juste après
 function flattenTree(
@@ -39,42 +43,23 @@ function flattenTree(
 }
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const {
+    data: categories = [],
+    isLoading,
+    isError,
+  } = useAdminCategoriesList(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const { mutate: deleteCategory, isPending: isDeleting } = useDeleteCategory();
 
-  const fetchCategories = useCallback(() => {
-    setIsLoading(true);
-    apiClient
-      .get<Category[]>("/categories?includeInactive=true")
-      .then((data) => setCategories(data ?? []))
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
-
-  async function confirmDelete() {
+  function confirmDelete() {
     if (!confirmDeleteId) return;
-    setDeletingId(confirmDeleteId);
-    try {
-      await apiClient.delete(`/categories/${confirmDeleteId}`);
-      setCategories((prev) => prev.filter((c) => c.id !== confirmDeleteId));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-    } finally {
-      setDeletingId(null);
-      setConfirmDeleteId(null);
-    }
+    deleteCategory(confirmDeleteId, {
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+      onSettled: () => setConfirmDeleteId(null),
+    });
   }
+
   const rows = flattenTree(categories);
 
   return (
@@ -95,9 +80,9 @@ export default function CategoriesPage() {
         </Link>
       </div>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 
@@ -175,10 +160,7 @@ export default function CategoriesPage() {
                       </Link>
                       <button
                         onClick={() => setConfirmDeleteId(category.id)}
-                        disabled={
-                          deletingId === category.id ||
-                          category._count.products > 0
-                        }
+                        disabled={isDeleting || category._count.products > 0}
                         className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                         title={
                           category._count.products > 0
@@ -186,7 +168,7 @@ export default function CategoriesPage() {
                             : undefined
                         }
                       >
-                        {deletingId === category.id ? (
+                        {isDeleting && confirmDeleteId === category.id ? (
                           <Loader2 size={16} className="animate-spin" />
                         ) : (
                           <Trash2 size={16} />
@@ -205,7 +187,7 @@ export default function CategoriesPage() {
         title="Supprimer la catégorie"
         message="Cette action est irréversible. Voulez-vous vraiment continuer ?"
         confirmLabel="Supprimer"
-        isLoading={deletingId !== null}
+        isLoading={isDeleting}
         onConfirm={confirmDelete}
         onCancel={() => setConfirmDeleteId(null)}
       />

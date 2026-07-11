@@ -1,15 +1,18 @@
 // app/admin/categories/_components/CategoryWizard.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
-import { apiClient } from "@/lib/api-client";
-import type { Category, AttributeDefinition } from "@/lib/types";
+import type { Category } from "@/lib/types";
 import { Stepper, type StepDefinition } from "@/components/admin/Stepper";
 import { CategoryForm } from "./CategoryForm";
 import { CategoryAssetsUploader } from "./CategoryAssetsUploader";
 import { CategoryAttributes } from "./CategoryAttributes";
+import {
+  useAdminCategory,
+  useAdminCategoryAttributes,
+} from "@/lib/queries/admin/useCategories";
 
 const STEPS: StepDefinition[] = [
   { id: "info", label: "Informations" },
@@ -24,48 +27,34 @@ export function CategoryWizard({
 }) {
   const router = useRouter();
   const isEditingInitially = Boolean(initialCategory);
-  const [category, setCategory] = useState<Category | null>(
-    initialCategory ?? null,
+  const [categoryId, setCategoryId] = useState<string | null>(
+    initialCategory?.id ?? null,
   );
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(
     new Set(isEditingInitially ? ["info"] : []),
   );
 
-  const categoryExists = Boolean(category);
+  // Toujours relire la catégorie depuis le cache react-query (à jour après
+  // upload d'assets, etc.) plutôt que de garder une copie locale figée.
+  const { data: category } = useAdminCategory(categoryId ?? "");
+  const { data: attributes = [] } = useAdminCategoryAttributes(
+    categoryId ?? "",
+  );
+
+  const categoryExists = Boolean(categoryId);
 
   const disabledIndexes = new Set<number>(
     !categoryExists ? STEPS.map((_, i) => i).filter((i) => i > 0) : [],
   );
 
-  // Calcule les étapes réellement complétées à partir des données existantes.
-  useEffect(() => {
-    if (!category) return;
-    let cancelled = false;
-
-    async function computeCompleted() {
-      const next = new Set<string>(["info"]);
-      if (category!.imageUrl || category!.iconUrl) next.add("assets");
-
-      try {
-        const defs = await apiClient.get<AttributeDefinition[]>(
-          `/categories/${category!.id}/attributes`,
-        );
-        if (defs.length > 0) next.add("attributes");
-      } catch {
-        // ignore
-      }
-
-      if (!cancelled) {
-        setCompletedSteps((prev) => new Set([...prev, ...next]));
-      }
-    }
-
-    computeCompleted();
-    return () => {
-      cancelled = true;
-    };
-  }, [category]);
+  // Complète les étapes à partir des données réelles en cache.
+  const derivedCompleted = new Set(completedSteps);
+  if (category) {
+    derivedCompleted.add("info");
+    if (category.imageUrl || category.iconUrl) derivedCompleted.add("assets");
+  }
+  if (attributes.length > 0) derivedCompleted.add("attributes");
 
   function goTo(index: number) {
     if (disabledIndexes.has(index)) return;
@@ -73,8 +62,8 @@ export function CategoryWizard({
   }
 
   function handleInfoSaved(saved: Category) {
-    const wasNew = !category;
-    setCategory(saved);
+    const wasNew = !categoryId;
+    setCategoryId(saved.id);
     setCompletedSteps((prev) => new Set(prev).add("info"));
     if (wasNew) {
       setCurrentStep(1);
@@ -88,7 +77,7 @@ export function CategoryWizard({
       <Stepper
         steps={STEPS}
         currentIndex={currentStep}
-        completed={completedSteps}
+        completed={derivedCompleted}
         onStepClick={goTo}
         disabledIndexes={disabledIndexes}
       />
@@ -96,15 +85,15 @@ export function CategoryWizard({
       <div className="rounded-lg border border-gray-200 bg-white p-6">
         {stepId === "info" && (
           <CategoryForm
-            initialCategory={category ?? undefined}
+            initialCategory={category ?? initialCategory}
             onSuccess={handleInfoSaved}
           />
         )}
         {stepId === "assets" && category && (
-          <CategoryAssetsUploader category={category} onUpdated={setCategory} />
+          <CategoryAssetsUploader category={category} />
         )}
-        {stepId === "attributes" && category && (
-          <CategoryAttributes categoryId={category.id} />
+        {stepId === "attributes" && categoryId && (
+          <CategoryAttributes categoryId={categoryId} />
         )}
       </div>
 
