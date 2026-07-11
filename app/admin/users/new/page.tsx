@@ -5,8 +5,9 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import type { User, UserFormInput, Role } from "@/lib/types";
+import { useCreateUser } from "@/lib/queries/admin/useUsers";
 
 const ROLE_OPTIONS: Role[] = ["USER", "ADMIN", "MANAGER", "SUPPORT"];
 
@@ -24,7 +25,7 @@ export default function NewUserPage() {
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: createUser, isPending: isSubmitting } = useCreateUser();
 
   function update<K extends keyof UserFormInput>(
     key: K,
@@ -33,35 +34,34 @@ export default function NewUserPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setFieldErrors({});
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        ...form,
-        // <input type="date"> renvoie "YYYY-MM-DD" — le backend attend un
-        // ISO datetime complet.
-        dateOfBirth: form.dateOfBirth
-          ? new Date(form.dateOfBirth).toISOString()
-          : undefined,
-      };
-      const created = await apiClient.post<User>("/user", payload);
-      router.push(`/admin/users/${created.id}`);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-        const details = err.details as
-          | { fieldErrors?: Record<string, string[]> }
-          | undefined;
-        if (details?.fieldErrors) setFieldErrors(details.fieldErrors);
-      } else {
-        setError("Une erreur est survenue.");
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
+
+    const payload = {
+      ...form,
+      // <input type="date"> renvoie "YYYY-MM-DD" — le backend attend un
+      // ISO datetime complet.
+      dateOfBirth: form.dateOfBirth
+        ? new Date(form.dateOfBirth).toISOString()
+        : undefined,
+    };
+
+    createUser(payload, {
+      onSuccess: (created: User) => router.push(`/admin/users/${created.id}`),
+      onError: (err) => {
+        if (err instanceof ApiError) {
+          setError(err.message);
+          const details = err.details as
+            | { fieldErrors?: Record<string, string[]> }
+            | undefined;
+          if (details?.fieldErrors) setFieldErrors(details.fieldErrors);
+        } else {
+          setError("Une erreur est survenue.");
+        }
+      },
+    });
   }
 
   const inputClass =

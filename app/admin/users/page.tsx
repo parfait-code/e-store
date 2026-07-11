@@ -1,14 +1,20 @@
 // app/admin/users/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Loader2, Trash2, UserPlus, Search } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import type { User, Role } from "@/lib/types";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import {
+  useAdminUsers,
+  useChangeUserRole,
+  useSetUserStatus,
+  useDeleteUser,
+} from "@/lib/queries/admin/useUsers";
 
 const ROLE_OPTIONS: Role[] = ["USER", "ADMIN", "MANAGER", "SUPPORT"];
 
@@ -22,36 +28,32 @@ const ROLE_STYLES: Record<Role, string> = {
 function ChangeRoleModal({
   user,
   onClose,
-  onChanged,
 }: {
   user: User;
   onClose: () => void;
-  onChanged: (u: User) => void;
 }) {
   const [role, setRole] = useState<Role>(user.role);
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { mutate: changeRole, isPending } = useChangeUserRole();
 
-  async function handleConfirm() {
+  function handleConfirm() {
     if (role === user.role) {
       onClose();
       return;
     }
-    setIsSaving(true);
     setError(null);
-    try {
-      await apiClient.patch(`/user/change-role/${user.id}`, { role });
-      onChanged({ ...user, role });
-      onClose();
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Erreur lors du changement de rôle",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+    changeRole(
+      { userId: user.id, role },
+      {
+        onSuccess: onClose,
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors du changement de rôle",
+          ),
+      },
+    );
   }
 
   return (
@@ -80,7 +82,7 @@ function ChangeRoleModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={isSaving}
+            disabled={isPending}
             className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           >
             Annuler
@@ -88,10 +90,10 @@ function ChangeRoleModal({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={isSaving}
+            disabled={isPending}
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
           >
-            {isSaving ? "..." : "Confirmer"}
+            {isPending ? "..." : "Confirmer"}
           </button>
         </div>
       </div>
@@ -99,40 +101,30 @@ function ChangeRoleModal({
   );
 }
 
-function StatusToggle({
-  user,
-  onChanged,
-}: {
-  user: User;
-  onChanged: (u: User) => void;
-}) {
-  const [isSaving, setIsSaving] = useState(false);
+function StatusToggle({ user }: { user: User }) {
+  const { mutate: setStatus, isPending } = useSetUserStatus();
 
-  async function toggle() {
+  function toggle() {
     const action = user.isActive ? "suspendre" : "réactiver";
     if (!confirm(`Voulez-vous ${action} le compte de ${user.username} ?`))
       return;
-    setIsSaving(true);
-    try {
-      const updated = await apiClient.patch<User>(`/user/${user.id}/status`, {
-        isActive: !user.isActive,
-      });
-      onChanged(updated);
-    } catch (err) {
-      alert(
-        err instanceof ApiError
-          ? err.message
-          : "Erreur lors du changement de statut",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+    setStatus(
+      { userId: user.id, isActive: !user.isActive },
+      {
+        onError: (err) =>
+          alert(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors du changement de statut",
+          ),
+      },
+    );
   }
 
   return (
     <button
       onClick={toggle}
-      disabled={isSaving}
+      disabled={isPending}
       className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium disabled:opacity-50 ${
         user.isActive
           ? "bg-green-100 text-green-700 hover:bg-green-200"
@@ -142,7 +134,7 @@ function StatusToggle({
         user.isActive ? "Cliquer pour suspendre" : "Cliquer pour réactiver"
       }
     >
-      {isSaving ? (
+      {isPending ? (
         <Loader2 size={12} className="animate-spin" />
       ) : user.isActive ? (
         "Actif"
@@ -155,38 +147,19 @@ function StatusToggle({
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
+  const { data: users = [], isLoading, isError } = useAdminUsers();
   const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDeleteUser, setConfirmDeleteUser] = useState<User | null>(null);
   const [roleEditUser, setRoleEditUser] = useState<User | null>(null);
+  const { mutate: deleteUser, isPending: isDeleting } = useDeleteUser();
 
-  useEffect(() => {
-    apiClient
-      .get<User[]>("/user/all")
-      .then((data) => setUsers(data ?? []))
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  async function confirmDelete() {
+  function confirmDelete() {
     if (!confirmDeleteUser) return;
-    setDeletingId(confirmDeleteUser.id);
-    try {
-      await apiClient.delete(`/user/${confirmDeleteUser.id}`);
-      setUsers((prev) => prev.filter((u) => u.id !== confirmDeleteUser.id));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-    } finally {
-      setDeletingId(null);
-      setConfirmDeleteUser(null);
-    }
+    deleteUser(confirmDeleteUser.id, {
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+      onSettled: () => setConfirmDeleteUser(null),
+    });
   }
 
   const filtered = search
@@ -232,9 +205,9 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 
@@ -296,14 +269,7 @@ export default function UsersPage() {
                     </button>
                   </td>
                   <td className="px-4 py-3">
-                    <StatusToggle
-                      user={user}
-                      onChanged={(updated) =>
-                        setUsers((prev) =>
-                          prev.map((u) => (u.id === updated.id ? updated : u)),
-                        )
-                      }
-                    />
+                    <StatusToggle user={user} />
                   </td>
                   <td className="px-4 py-3 text-gray-500">
                     {formatDate(user.createdAt)}
@@ -311,9 +277,7 @@ export default function UsersPage() {
                   <td className="px-4 py-3">
                     <button
                       onClick={() => setConfirmDeleteUser(user)}
-                      disabled={
-                        deletingId === user.id || user.id === currentUser?.id
-                      }
+                      disabled={isDeleting || user.id === currentUser?.id}
                       title={
                         user.id === currentUser?.id
                           ? "Vous ne pouvez pas supprimer votre propre compte"
@@ -321,7 +285,7 @@ export default function UsersPage() {
                       }
                       className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                     >
-                      {deletingId === user.id ? (
+                      {isDeleting && confirmDeleteUser?.id === user.id ? (
                         <Loader2 size={16} className="animate-spin" />
                       ) : (
                         <Trash2 size={16} />
@@ -339,11 +303,6 @@ export default function UsersPage() {
         <ChangeRoleModal
           user={roleEditUser}
           onClose={() => setRoleEditUser(null)}
-          onChanged={(updated) =>
-            setUsers((prev) =>
-              prev.map((u) => (u.id === updated.id ? updated : u)),
-            )
-          }
         />
       )}
 
@@ -352,7 +311,7 @@ export default function UsersPage() {
         title="Supprimer l'utilisateur"
         message={`Voulez-vous vraiment supprimer « ${confirmDeleteUser?.username} » ?`}
         confirmLabel="Supprimer"
-        isLoading={deletingId !== null}
+        isLoading={isDeleting}
         onConfirm={confirmDelete}
         onCancel={() => setConfirmDeleteUser(null)}
       />

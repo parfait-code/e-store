@@ -1,7 +1,6 @@
 // app/admin/users/[userId]/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,9 +11,9 @@ import {
   Calendar,
   ShoppingBag,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
-import type { User, Order, Paginated } from "@/lib/types";
+import type { Order } from "@/lib/types";
+import { useAdminUser, useAdminUserOrders } from "@/lib/queries/admin/useUsers";
 
 const STATUS_STYLES: Record<Order["status"], string> = {
   PENDING: "bg-gray-100 text-gray-600",
@@ -28,37 +27,16 @@ const STATUS_STYLES: Record<Order["status"], string> = {
 
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
-  const [user, setUser] = useState<User | null>(null);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const [userRes, ordersRes] = await Promise.all([
-          apiClient.get<User>(`/user/${userId}`),
-          apiClient.get<Paginated<Order>>(`/user/${userId}/orders?limit=10`),
-        ]);
-        setUser(userRes);
-        setOrders(ordersRes.items);
-      } catch (err) {
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    load();
-  }, [userId]);
+  const { data: user, isLoading, isError } = useAdminUser(userId);
+  const { data: ordersData } = useAdminUserOrders(userId);
+  const orders = ordersData?.items ?? [];
 
   if (isLoading)
     return <Loader2 size={20} className="animate-spin text-gray-400" />;
-  if (error || !user) {
+  if (isError || !user) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Utilisateur introuvable."}
+        Utilisateur introuvable.
       </div>
     );
   }

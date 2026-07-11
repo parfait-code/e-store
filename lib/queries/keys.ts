@@ -49,5 +49,9 @@ export const queryKeys = {
     productCombinations: (productId: number) =>
       ["admin", "product", productId, "combinations"] as const,
     tags: ["admin", "tags"] as const,
+    users: ["admin", "users"] as const,
+    user: (userId: number | string) => ["admin", "user", userId] as const,
+    userOrders: (userId: number | string) =>
+      ["admin", "user", userId, "orders"] as const,
   },
 };
