@@ -1,11 +1,17 @@
 // app/admin/tags/page.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
-import { Plus, Pencil, Trash2, Loader2, TagIcon } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { useState, FormEvent } from "react";
+import { Plus, Pencil, Trash2, Loader2, Check, X, TagIcon } from "lucide-react";
+import { ApiError } from "@/lib/api-client";
 import type { Tag } from "@/lib/types";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import {
+  useAdminTags,
+  useCreateTag,
+  useUpdateTag,
+  useDeleteTag,
+} from "@/lib/queries/admin/useTags";
 
 function slugify(text: string) {
   return text
@@ -16,29 +22,26 @@ function slugify(text: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-function NewTagForm({ onCreated }: { onCreated: (tag: Tag) => void }) {
+function NewTagForm() {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: createTag, isPending } = useCreateTag();
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setIsSubmitting(true);
-    try {
-      const created = await apiClient.post<Tag>("/tags", {
-        name,
-        slug: slugify(name),
-      });
-      onCreated(created);
-      setName("");
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la création",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    createTag(
+      { name, slug: slugify(name) },
+      {
+        onSuccess: () => setName(""),
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la création",
+          ),
+      },
+    );
   }
 
   return (
@@ -58,10 +61,10 @@ function NewTagForm({ onCreated }: { onCreated: (tag: Tag) => void }) {
       </div>
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isPending}
         className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
-        {isSubmitting ? (
+        {isPending ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
           <Plus size={16} />
@@ -73,36 +76,25 @@ function NewTagForm({ onCreated }: { onCreated: (tag: Tag) => void }) {
   );
 }
 
-function EditTagModal({
-  tag,
-  onClose,
-  onUpdated,
-}: {
-  tag: Tag;
-  onClose: () => void;
-  onUpdated: (tag: Tag) => void;
-}) {
+function EditTagModal({ tag, onClose }: { tag: Tag; onClose: () => void }) {
   const [name, setName] = useState(tag.name);
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { mutate: updateTag, isPending } = useUpdateTag(tag.id);
 
-  async function handleSave() {
-    setIsSaving(true);
+  function handleSave() {
     setError(null);
-    try {
-      const updated = await apiClient.patch<Tag>(`/tags/${tag.id}`, {
-        name,
-        slug: slugify(name),
-      });
-      onUpdated(updated);
-      onClose();
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+    updateTag(
+      { name, slug: slugify(name) },
+      {
+        onSuccess: onClose,
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la mise à jour",
+          ),
+      },
+    );
   }
 
   return (
@@ -124,7 +116,7 @@ function EditTagModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={isSaving}
+            disabled={isPending}
             className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           >
             Annuler
@@ -132,10 +124,10 @@ function EditTagModal({
           <button
             type="button"
             onClick={handleSave}
-            disabled={isSaving || !name.trim()}
+            disabled={isPending || !name.trim()}
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
           >
-            {isSaving ? "..." : "Enregistrer"}
+            {isPending ? "..." : "Enregistrer"}
           </button>
         </div>
       </div>
@@ -177,37 +169,18 @@ function TagCard({
 }
 
 export default function TagsPage() {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: tags = [], isLoading, isError } = useAdminTags();
   const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
   const [tagToEdit, setTagToEdit] = useState<Tag | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const { mutate: deleteTag, isPending: isDeleting } = useDeleteTag();
 
-  useEffect(() => {
-    apiClient
-      .get<Tag[]>("/tags")
-      .then((data) => setTags(data ?? []))
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  async function confirmDelete() {
+  function confirmDelete() {
     if (!tagToDelete) return;
-    setIsDeleting(true);
-    try {
-      await apiClient.delete(`/tags/${tagToDelete.id}`);
-      setTags((prev) => prev.filter((t) => t.id !== tagToDelete.id));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-    } finally {
-      setIsDeleting(false);
-      setTagToDelete(null);
-    }
+    deleteTag(tagToDelete.id, {
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+      onSettled: () => setTagToDelete(null),
+    });
   }
 
   return (
@@ -217,11 +190,11 @@ export default function TagsPage() {
         <p className="text-sm text-gray-500">{tags.length} tag(s)</p>
       </div>
 
-      <NewTagForm onCreated={(tag) => setTags((prev) => [...prev, tag])} />
+      <NewTagForm />
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 
@@ -243,15 +216,7 @@ export default function TagsPage() {
       )}
 
       {tagToEdit && (
-        <EditTagModal
-          tag={tagToEdit}
-          onClose={() => setTagToEdit(null)}
-          onUpdated={(updated) =>
-            setTags((prev) =>
-              prev.map((t) => (t.id === updated.id ? updated : t)),
-            )
-          }
-        />
+        <EditTagModal tag={tagToEdit} onClose={() => setTagToEdit(null)} />
       )}
 
       <ConfirmDialog

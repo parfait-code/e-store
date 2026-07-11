@@ -48,5 +48,6 @@ export const queryKeys = {
       ["admin", "inventory", "search", keyword] as const,
     productCombinations: (productId: number) =>
       ["admin", "product", productId, "combinations"] as const,
+    tags: ["admin", "tags"] as const,
   },
 };
