@@ -1,7 +1,7 @@
 // app/admin/returns/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Loader2,
@@ -10,8 +10,8 @@ import {
   RotateCcw,
   Eye,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import type { ReturnRequest, ReturnStatus, Paginated } from "@/lib/types";
+import type { ReturnStatus } from "@/lib/types";
+import { useAdminReturns } from "@/lib/queries/admin/useReturns";
 
 const STATUS_OPTIONS: ReturnStatus[] = [
   "PENDING",
@@ -35,38 +35,13 @@ const STATUS_LABELS: Record<ReturnStatus, string> = {
 };
 
 export default function ReturnsPage() {
-  const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [status, setStatus] = useState<ReturnStatus | "">("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchReturns = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    const params = new URLSearchParams({ page: String(page), limit: "20" });
-    if (status) params.set("status", status);
-
-    apiClient
-      .get<Paginated<ReturnRequest>>(`/returns?${params.toString()}`)
-      .then((res) => {
-        setReturns(res.items ?? []);
-        setTotalPages(res.totalPages);
-        setTotal(res.total);
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [page, status]);
-
-  useEffect(() => {
-    fetchReturns();
-  }, [fetchReturns]);
+  const { data, isLoading, isError } = useAdminReturns({ page, status });
+  const returns = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   return (
     <div>
@@ -93,9 +68,9 @@ export default function ReturnsPage() {
         </select>
       </div>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 

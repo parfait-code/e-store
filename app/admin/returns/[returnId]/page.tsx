@@ -1,16 +1,16 @@
 // app/admin/returns/[returnId]/page.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save, PackageOpen } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import type {
-  ReturnRequest,
-  ReturnStatus,
-  ReturnStatusUpdateInput,
-} from "@/lib/types";
+import { ApiError } from "@/lib/api-client";
+import type { ReturnRequest, ReturnStatus } from "@/lib/types";
+import {
+  useAdminReturn,
+  useUpdateReturnStatus,
+} from "@/lib/queries/admin/useReturns";
 
 const STATUS_OPTIONS: ReturnStatus[] = [
   "PENDING",
@@ -26,39 +26,27 @@ const STATUS_STYLES: Record<ReturnStatus, string> = {
   COMPLETED: "bg-blue-100 text-blue-700",
 };
 
-function StatusUpdateForm({
-  returnRequest,
-  onUpdated,
-}: {
-  returnRequest: ReturnRequest;
-  onUpdated: (r: ReturnRequest) => void;
-}) {
+function StatusUpdateForm({ returnRequest }: { returnRequest: ReturnRequest }) {
   const [status, setStatus] = useState<ReturnStatus>(returnRequest.status);
   const [notes, setNotes] = useState(returnRequest.notes ?? "");
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: updateStatus, isPending: isSubmitting } =
+    useUpdateReturnStatus(returnRequest.id);
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setIsSubmitting(true);
-    try {
-      const payload: ReturnStatusUpdateInput = {
-        status,
-        notes: notes || undefined,
-      };
-      const updated = await apiClient.put<ReturnRequest>(
-        `/returns/${returnRequest.id}/status`,
-        payload,
-      );
-      onUpdated(updated);
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    updateStatus(
+      { status, notes: notes || undefined },
+      {
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la mise à jour",
+          ),
+      },
+    );
   }
 
   const inputClass =
@@ -120,30 +108,14 @@ function StatusUpdateForm({
 
 export default function ReturnDetailPage() {
   const { returnId } = useParams<{ returnId: string }>();
-  const [returnRequest, setReturnRequest] = useState<ReturnRequest | null>(
-    null,
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .get<ReturnRequest>(`/returns/${returnId}`)
-      .then(setReturnRequest)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [returnId]);
+  const { data: returnRequest, isLoading, isError } = useAdminReturn(returnId);
 
   if (isLoading)
     return <Loader2 size={20} className="animate-spin text-gray-400" />;
-  if (error || !returnRequest) {
+  if (isError || !returnRequest) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Demande introuvable."}
+        Demande introuvable.
       </div>
     );
   }
@@ -203,10 +175,7 @@ export default function ReturnDetailPage() {
         </div>
       </div>
 
-      <StatusUpdateForm
-        returnRequest={returnRequest}
-        onUpdated={setReturnRequest}
-      />
+      <StatusUpdateForm returnRequest={returnRequest} />
     </div>
   );
 }
