@@ -37,7 +37,10 @@ function AddressForm({
   isSubmitting: boolean;
 }) {
   const [form, setForm] = useState<AddressFormInput>({
+    recipientName: initial?.recipientName ?? "",
+    phone: initial?.phone ?? "",
     street: initial?.street ?? "",
+    addressLine2: initial?.addressLine2 ?? "",
     city: initial?.city ?? "",
     state: initial?.state ?? "",
     country: initial?.country ?? "",
@@ -55,20 +58,21 @@ function AddressForm({
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-
-    // La validation reste purement informative — elle ne doit jamais
-    // bloquer la soumission, même si le service renvoie `valid: false`.
     setValidation(null);
+
     validateAddress(
       {
+        recipientName: form.recipientName,
+        phone: form.phone || undefined,
         street: form.street,
+        addressLine2: form.addressLine2 || undefined,
         city: form.city,
         state: form.state || undefined,
         country: form.country,
-        postal_code: form.postalCode,
+        postalCode: form.postalCode || undefined,
       },
       {
-        onSuccess: (res: AddressValidateResponse) => {
+        onSuccess: (res) => {
           setValidation({
             valid: res.valid,
             message: res.valid
@@ -76,7 +80,7 @@ function AddressForm({
               : "Adresse non reconnue par le service de validation — vous pouvez tout de même l'enregistrer.",
           });
         },
-        onError: () => setValidation(null), // route indisponible : pas de confirmation visuelle, on ne bloque pas
+        onError: () => setValidation(null),
       },
     );
 
@@ -103,6 +107,36 @@ function AddressForm({
           {validation.message}
         </p>
       )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Nom du destinataire
+          </label>
+          <input
+            type="text"
+            required
+            minLength={2}
+            value={form.recipientName}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, recipientName: e.target.value }))
+            }
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Téléphone (optionnel)
+          </label>
+          <input
+            type="text"
+            value={form.phone}
+            onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+            className={inputClass}
+          />
+        </div>
+      </div>
+
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">
           Rue
@@ -115,6 +149,21 @@ function AddressForm({
           className={inputClass}
         />
       </div>
+
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-600">
+          Complément d'adresse (optionnel)
+        </label>
+        <input
+          type="text"
+          value={form.addressLine2}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, addressLine2: e.target.value }))
+          }
+          className={inputClass}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -140,6 +189,7 @@ function AddressForm({
           />
         </div>
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -148,6 +198,7 @@ function AddressForm({
           <input
             type="text"
             required
+            placeholder="CM, FR, US, GB, SN, CI, NG, GH"
             value={form.country}
             onChange={(e) =>
               setForm((f) => ({ ...f, country: e.target.value }))
@@ -157,12 +208,11 @@ function AddressForm({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">
-            Code postal
+            Code postal (optionnel)
           </label>
           <input
             type="text"
-            required
-            value={form.postalCode}
+            value={form.postalCode ? form.postalCode : ""}
             onChange={(e) =>
               setForm((f) => ({ ...f, postalCode: e.target.value }))
             }
@@ -170,6 +220,7 @@ function AddressForm({
           />
         </div>
       </div>
+
       <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
         <input
           type="checkbox"
@@ -180,6 +231,7 @@ function AddressForm({
         />
         Adresse par défaut
       </label>
+
       <div className="flex gap-2">
         <button
           type="submit"
@@ -288,7 +340,9 @@ export default function AddressesPage() {
                   <MapPin size={16} className="mt-0.5 text-gray-400" />
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{addr.street}</span>
+                      <span className="text-sm font-medium">
+                        {addr.recipientName}
+                      </span>
                       {addr.isDefault && (
                         <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-600">
                           <Star
@@ -300,8 +354,14 @@ export default function AddressesPage() {
                       )}
                     </div>
                     <p className="text-sm text-gray-500">
-                      {addr.postalCode} {addr.city}
+                      {addr.street}
+                      {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {addr.postalCode ? `${addr.postalCode} ` : ""}
+                      {addr.city}
                       {addr.state ? `, ${addr.state}` : ""} · {addr.country}
+                      {addr.phone ? ` · ${addr.phone}` : ""}
                     </p>
                   </div>
                 </div>

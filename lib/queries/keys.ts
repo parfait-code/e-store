@@ -17,8 +17,8 @@ export const queryKeys = {
     addresses: ["shop", "addresses"] as const,
     address: (id: string) => ["shop", "address", id] as const,
     shippingMethods: ["shop", "shipping-methods"] as const,
-    shippingCost: (methodId: string, weight: number) =>
-      ["shop", "shipping-cost", methodId, weight] as const,
+    shippingCost: (methodId: string, weight: number, country: string) =>
+      ["shop", "shipping-cost", methodId, weight, country] as const,
     paymentMethods: ["shop", "payment-methods"] as const,
   },
   admin: {
@@ -40,8 +40,10 @@ export const queryKeys = {
       ["admin", "warehouses", warehouseId, "inventory"] as const,
     inventoryList: (page: number) =>
       ["admin", "inventory", "list", page] as const,
-    inventoryLowStock: ["admin", "inventory", "low-stock"] as const,
-    inventoryOutOfStock: ["admin", "inventory", "out-of-stock"] as const,
+    inventoryGrouped: (params: Record<string, unknown>) =>
+      ["admin", "inventory", "grouped", params] as const,
+    inventoryGroupedDetail: (productId: number, page: number) =>
+      ["admin", "inventory", "grouped", productId, page] as const,
     inventorySearch: (keyword: string) =>
       ["admin", "inventory", "search", keyword] as const,
     productCombinations: (productId: number) =>

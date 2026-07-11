@@ -7,17 +7,57 @@ import type {
   InventoryFormInput,
   InventoryTransferInput,
   ProductCombination,
+  InventoryGroupedProduct,
 } from "@/lib/types";
 
 export const adminInventoryApi = {
-  list: (page: number, limit = 20) =>
+  list: (
+    params: {
+      page?: number;
+      limit?: number;
+      category?: string;
+      location?: string;
+      warehouseId?: string;
+    } = {},
+  ) => {
+    const qs = new URLSearchParams();
+    qs.set("page", String(params.page ?? 1));
+    qs.set("limit", String(params.limit ?? 20));
+    if (params.category) qs.set("category", params.category);
+    if (params.location) qs.set("location", params.location);
+    if (params.warehouseId) qs.set("warehouse_id", params.warehouseId);
+    return apiClient.get<Paginated<InventoryItem>>(
+      `/inventory?${qs.toString()}`,
+    );
+  },
+
+  // Remplace lowStock()/outOfStock() — vue groupée par produit
+  grouped: (
+    params: {
+      page?: number;
+      limit?: number;
+      lowStock?: boolean;
+      outOfStock?: boolean;
+    } = {},
+  ) => {
+    const qs = new URLSearchParams();
+    qs.set("page", String(params.page ?? 1));
+    qs.set("limit", String(params.limit ?? 20));
+    if (params.lowStock) qs.set("low_stock", "true");
+    if (params.outOfStock) qs.set("out_of_stock", "true");
+    return apiClient.get<Paginated<InventoryGroupedProduct>>(
+      `/inventory/grouped?${qs.toString()}`,
+    );
+  },
+
+  // Détail par combinaison × entrepôt pour un produit, paginé
+  groupedDetail: (productId: number, page = 1, limit = 50) =>
     apiClient.get<Paginated<InventoryItem>>(
-      `/inventory?page=${page}&limit=${limit}`,
+      `/inventory/grouped/${productId}?page=${page}&limit=${limit}`,
     ),
 
-  lowStock: () => apiClient.get<InventoryItem[]>("/inventory/low-stock"),
-
-  outOfStock: () => apiClient.get<InventoryItem[]>("/inventory/out-of-stock"),
+  byId: (itemId: string) =>
+    apiClient.get<InventoryItem>(`/inventory/${itemId}`),
 
   search: (keyword: string) =>
     apiClient.get<InventoryItem[]>(
@@ -43,16 +83,13 @@ export const adminInventoryApi = {
 
 export const adminWarehousesApi = {
   list: () => apiClient.get<Warehouse[]>("/warehouses"),
-
   inventory: (warehouseId: string) =>
     apiClient.get<{
       warehouse: Warehouse & { totalUnits: number };
       items: InventoryItem[];
     }>(`/warehouses/${warehouseId}/inventory`),
-
   create: (payload: { name: string; location: string; capacity?: number }) =>
     apiClient.post<Warehouse>("/warehouses", payload),
-
   remove: (warehouseId: string) =>
     apiClient.delete(`/warehouses/${warehouseId}`),
 };

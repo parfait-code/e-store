@@ -3,6 +3,7 @@ import { apiClient } from "@/lib/api-client";
 import type {
   Address,
   AddressFormInput,
+  AddressValidateInput,
   AddressValidateResponse,
   ShippingMethod,
   ShippingCostResponse,
@@ -25,29 +26,30 @@ export const shopCheckoutApi = {
   deleteAddress: (addressId: string) =>
     apiClient.delete(`/addresses/${addressId}`),
 
-  validateAddress: (payload: {
-    street: string;
-    city: string;
-    state?: string;
-    country: string;
-    postal_code: string;
-  }) => apiClient.post<AddressValidateResponse>("/address/validate", payload),
+  // Body désormais en camelCase, recipientName requis, postalCode optionnel
+  validateAddress: (payload: AddressValidateInput) =>
+    apiClient.post<AddressValidateResponse>("/address/validate", payload, {
+      auth: false, // route publique
+    }),
 
   listShippingMethods: () =>
     apiClient.get<ShippingMethod[]>("/shipping-methods?active=true"),
 
-  calculateShippingCost: (shippingMethodId: string, weight: number) =>
-    apiClient.post<ShippingCostResponse>("/shipping-methods/calculate", {
-      shippingMethodId,
-      weight,
-    }),
+  // Le calcul exige désormais `country` en plus de shippingMethodId/weight
+  calculateShippingCost: (
+    shippingMethodId: string,
+    weight: number,
+    country: string,
+  ) =>
+    apiClient.post<ShippingCostResponse>(
+      "/shipping-methods/calculate",
+      { shippingMethodId, weight, country },
+      { auth: false },
+    ),
 
   listPaymentMethods: () =>
     apiClient.get<PaymentMethodOption[]>("/payment-methods"),
 
-  // POST /coupons/validate exige un basketId — get-or-create via /user/basket
-  // (workaround documenté : les routes /basket réelles ne sont plus utilisées
-  // pour l'achat, seulement pour satisfaire ce endpoint).
   validateCoupon: async (code: string) => {
     const basket = await apiClient.get<Basket>("/user/basket");
     return apiClient.post<CouponValidateResponse>("/coupons/validate", {

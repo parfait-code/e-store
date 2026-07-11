@@ -31,7 +31,10 @@ export default function CheckoutPage() {
 
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [newAddress, setNewAddress] = useState({
+    recipientName: "",
+    phone: "",
     street: "",
+    addressLine2: "",
     city: "",
     state: "",
     country: "",
@@ -60,8 +63,12 @@ export default function CheckoutPage() {
     (sum, i) => sum + (i.weight ?? 0) * i.quantity,
     0,
   );
+  const shippingCountry = useNewAddress
+    ? newAddress.country
+    : (addresses.find((a) => a.id === selectedAddressId)?.country ?? "");
+
   const { costsByMethodId: shippingCosts, isLoading: isLoadingCosts } =
-    useShippingCosts(shippingMethods, totalWeight);
+    useShippingCosts(shippingMethods, totalWeight, shippingCountry);
 
   const selectedShippingCost = shippingMethodId
     ? (shippingCosts[shippingMethodId] ?? 0)
@@ -105,15 +112,27 @@ export default function CheckoutPage() {
     }
 
     const shippingAddress = useNewAddress
-      ? newAddress
+      ? {
+          recipientName: newAddress.recipientName,
+          phone: newAddress.phone || undefined,
+          street: newAddress.street,
+          addressLine2: newAddress.addressLine2 || undefined,
+          city: newAddress.city,
+          state: newAddress.state || undefined,
+          country: newAddress.country,
+          postalCode: newAddress.postalCode || undefined,
+        }
       : (() => {
           const a = addresses.find((x) => x.id === selectedAddressId)!;
           return {
+            recipientName: a.recipientName,
+            phone: a.phone ?? undefined,
             street: a.street,
+            addressLine2: a.addressLine2 ?? undefined,
             city: a.city,
             state: a.state ?? undefined,
             country: a.country,
-            postalCode: a.postalCode,
+            postalCode: a.postalCode ?? undefined,
           };
         })();
 
@@ -125,10 +144,24 @@ export default function CheckoutPage() {
           combinationId: i.combinationId ?? undefined,
           quantity: i.quantity,
         })),
+
         shippingAddressId: useNewAddress ? undefined : selectedAddressId,
-        shippingAddress,
+
+        shippingAddress: useNewAddress
+          ? {
+              recipientName: shippingAddress.recipientName,
+              phone: shippingAddress.phone ?? undefined,
+              street: shippingAddress.street,
+              addressLine2: shippingAddress.addressLine2 ?? undefined,
+              city: shippingAddress.city,
+              state: shippingAddress.state ?? undefined,
+              country: shippingAddress.country,
+              postalCode: shippingAddress.postalCode ?? undefined,
+            }
+          : undefined,
+
         shippingMethodId: shippingMethodId || undefined,
-        paymentMethodId: paymentMethod || undefined,
+        paymentMethodId: paymentMethod,
         couponCode: couponCode || undefined,
       };
       const order = await createOrder(payload);

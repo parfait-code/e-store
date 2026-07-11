@@ -68,13 +68,18 @@ export function useShippingMethods() {
 // Une requête par méthode de livraison, en parallèle, chacune avec son
 // propre cache — équivalent typé du Promise.allSettled manuel d'origine,
 // mais avec dédoublonnage/cache automatique par (methodId, weight).
-export function useShippingCosts(methods: ShippingMethod[], weight: number) {
+export function useShippingCosts(
+  methods: ShippingMethod[],
+  weight: number,
+  country: string, // NOUVEAU paramètre requis
+) {
   const results = useQueries({
     queries: methods.map((m) => ({
-      queryKey: queryKeys.shop.shippingCost(m.id, weight),
-      queryFn: () => shopCheckoutApi.calculateShippingCost(m.id, weight),
-      enabled: methods.length > 0,
-      retry: 0, // un échec = "livraison gratuite" côté UI, pas la peine de réessayer
+      queryKey: queryKeys.shop.shippingCost(m.id, weight, country),
+      queryFn: () =>
+        shopCheckoutApi.calculateShippingCost(m.id, weight, country),
+      enabled: methods.length > 0 && Boolean(country),
+      retry: 0,
     })),
   });
 
@@ -85,10 +90,7 @@ export function useShippingCosts(methods: ShippingMethod[], weight: number) {
       r.isSuccess && typeof r.data?.cost === "number" ? r.data.cost : null;
   });
 
-  return {
-    costsByMethodId,
-    isLoading: results.some((r) => r.isLoading),
-  };
+  return { costsByMethodId, isLoading: results.some((r) => r.isLoading) };
 }
 
 export function usePaymentMethods() {

@@ -207,14 +207,28 @@ export interface ProductCombinationsResponse {
   combinations: ProductCombination[];
 }
 
-export type PickupRequestStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
+export type PickupRequestStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "EXPIRED";
 
 export interface PickupRequest {
   id: string;
   userId: number;
-  pickupDate: string;
-  pickupAddress: string;
+  returnId: string; // toute pickup naît d'un retour APPROVED
+  method: PickupCollectionMethod;
+  addressId: string | null;
+  warehouseId: string | null;
+  address: { id: string; street: string; city: string; country: string } | null;
+  warehouse: { id: string; name: string; location: string } | null;
+  pickupDate: string | null;
+  deadline: string | null;
   status: PickupRequestStatus;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AttributeOptionUpdateInput {
@@ -266,17 +280,77 @@ export type OrderStatus =
   | "CANCELLED"
   | "REFUNDED";
 
+// --- Adresses : recipientName devient requis, postalCode optionnel, ajout phone/addressLine2 ---
+
 export interface Address {
   id: string;
   userId: number;
+  recipientName: string;
+  phone: string | null;
   street: string;
+  addressLine2: string | null;
   city: string;
   state: string | null;
   country: string;
-  postalCode: string;
+  postalCode: string | null; // était `string` (requis) — maintenant optionnel
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AddressFormInput {
+  recipientName: string; // NOUVEAU — requis, min 2 caractères
+  phone?: string; // NOUVEAU
+  street: string;
+  addressLine2?: string; // NOUVEAU
+  city: string;
+  state?: string;
+  country: string;
+  postalCode: string | null; // était requis — maintenant optionnel
+  isDefault?: boolean;
+}
+
+// --- Commande : shippingAddress suit le même schéma que Address, + billing, + basketId ---
+
+export interface OrderAddressInput {
+  recipientName: string;
+  phone?: string;
+  street: string;
+  addressLine2?: string;
+  city: string;
+  state?: string;
+  country: string;
+  postalCode: string | null;
+}
+
+export interface InventoryGroupedProduct {
+  productId: number;
+  productName: string;
+  productSku: string;
+  totalQuantity: number;
+  lineCount: number;
+  isLowStock: boolean;
+  isOutOfStock: boolean;
+}
+
+// --- Pickup requests : refonte complète du modèle ---
+
+export type PickupCollectionMethod =
+  | "ORIGINAL_ADDRESS"
+  | "WAREHOUSE_DROPOFF"
+  | "CUSTOM_ADDRESS";
+
+export interface PickupRequestLocationUpdateInput {
+  method: PickupCollectionMethod;
+  address_id?: string;
+  warehouse_id?: string;
+  pickup_date?: string;
+  deadline?: string;
+}
+
+export interface PickupRequestStatusUpdateInput {
+  status: PickupRequestStatus;
+  notes?: string;
 }
 
 // --- OrderItem avec support des combinaisons ---
@@ -743,7 +817,7 @@ export interface AddressFormInput {
   city: string;
   state?: string;
   country: string;
-  postalCode: string;
+  postalCode: string | null;
   isDefault?: boolean;
 }
 
@@ -800,24 +874,20 @@ export type PaymentMethodType =
 // --- OrderCreateInput avec combinationId ---
 
 export interface OrderCreateInput {
-  items: { id: string; combinationId?: string; quantity: number }[];
+  items?: { id: string; combinationId?: string; quantity: number }[];
+  basketId?: string; // NOUVEAU — alternative à `items`
   shippingAddressId?: string;
-  shippingAddress: {
-    street: string;
-    city: string;
-    state?: string;
-    country: string;
-    postalCode: string;
-  };
+  shippingAddress: OrderAddressInput;
+  billingAddressId?: string; // NOUVEAU
+  billingAddress?: OrderAddressInput; // NOUVEAU
   shippingMethodId?: string;
+  recipientName: string;
+  phone?: string;
+  street: string;
+  addressLine2?: string;
   paymentMethodId?: string;
   notes?: string;
   couponCode?: string;
-}
-
-export interface PickupRequestFormInput {
-  pickup_date: string;
-  pickup_address: string;
 }
 
 export interface ShippingCalculateInput {
@@ -852,21 +922,27 @@ export interface CouponValidateResponse {
 }
 
 export interface AddressValidateInput {
+  recipientName: string;
+  phone?: string;
   street: string;
+  addressLine2?: string;
   city: string;
   state?: string;
   country: string;
-  postal_code: string;
+  postalCode?: string; // était `postal_code` (snake_case) — le body /address/validate est en camelCase maintenant
 }
 
 export interface AddressValidateResponse {
   valid: boolean;
   normalized_address?: {
+    recipientName: string;
+    phone?: string;
     street: string;
+    addressLine2?: string;
     city: string;
     state?: string;
     country: string;
-    postal_code: string; // corrigé (était postalCode)
+    postalCode?: string;
   };
 }
 

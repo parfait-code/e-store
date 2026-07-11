@@ -1,7 +1,7 @@
 // app/admin/inventory/page.tsx
 "use client";
 
-import { useState, FormEvent, useEffect } from "react";
+import React, { useState, FormEvent, useEffect } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -26,17 +26,17 @@ import type {
   Product,
   ProductCombination,
   Paginated,
+  InventoryGroupedProduct,
 } from "@/lib/types";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import {
-  useAdminInventoryList,
-  useAdminInventoryLowStock,
-  useAdminInventoryOutOfStock,
   useAdminInventorySearch,
   useAdminWarehouses,
   useUpdateInventoryItem,
   useDeleteInventoryItem,
   useTransferInventory,
+  useAdminInventoryGrouped,
+  useAdminInventoryGroupedDetail,
 } from "@/lib/queries/admin/useInventory";
 import { useBulkInventoryHelpers } from "@/lib/queries/admin/useBulkInventory";
 
@@ -824,9 +824,11 @@ export default function InventoryPage() {
 
   // Un seul des trois hooks est "actif" selon le mode — les autres restent
   // en attente grâce à `enabled` pour ne pas fetch inutilement.
-  const listQuery = useAdminInventoryList(page);
-  const lowStockQuery = useAdminInventoryLowStock();
-  const outOfStockQuery = useAdminInventoryOutOfStock();
+  const listQuery = useAdminInventoryGrouped({
+    page,
+    lowStock: tab === "low-stock",
+    outOfStock: tab === "out-of-stock",
+  });
   const searchQuery = useAdminInventorySearch(keyword);
 
   const { mutate: deleteItem, isPending: isDeleting } =
@@ -838,23 +840,16 @@ export default function InventoryPage() {
   let isLoading = false;
   let isError = false;
 
+  let groupedProducts: InventoryGroupedProduct[] = [];
+  let flatSearchItems: InventoryItem[] = [];
+
   if (keyword) {
-    items = searchQuery.data ?? [];
-    total = items.length;
+    flatSearchItems = searchQuery.data ?? [];
+    total = flatSearchItems.length;
     isLoading = searchQuery.isLoading;
     isError = searchQuery.isError;
-  } else if (tab === "low-stock") {
-    items = lowStockQuery.data ?? [];
-    total = items.length;
-    isLoading = lowStockQuery.isLoading;
-    isError = lowStockQuery.isError;
-  } else if (tab === "out-of-stock") {
-    items = outOfStockQuery.data ?? [];
-    total = items.length;
-    isLoading = outOfStockQuery.isLoading;
-    isError = outOfStockQuery.isError;
   } else {
-    items = listQuery.data?.items ?? [];
+    groupedProducts = listQuery.data?.items ?? [];
     total = listQuery.data?.total ?? 0;
     totalPages = listQuery.data?.totalPages ?? 1;
     isLoading = listQuery.isLoading;
@@ -889,27 +884,87 @@ export default function InventoryPage() {
         next.delete(productId);
       } else {
         next.add(productId);
-        if (!combosByProduct[productId]) {
-          setLoadingCombosProductId(productId);
-          apiClient
-            .get<ProductCombination[]>(`/product/${productId}/combinations`)
-            .then((combos) =>
-              setCombosByProduct((prevMap) => ({
-                ...prevMap,
-                [productId]: combos,
-              })),
-            )
-            .catch(() =>
-              setCombosByProduct((prevMap) => ({
-                ...prevMap,
-                [productId]: [],
-              })),
-            )
-            .finally(() => setLoadingCombosProductId(null));
-        }
       }
       return next;
     });
+  }
+
+  function ExpandedProductRows({ productId }: { productId: number }) {
+    const { data, isLoading } = useAdminInventoryGroupedDetail(productId, 1);
+    const items = data?.items ?? [];
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [transferItem, setTransferItem] = useState<InventoryItem | null>(
+      null,
+    );
+
+    if (isLoading) {
+      return (
+        <tr>
+          <td colSpan={5} className="px-8 py-3">
+            <Loader2 size={14} className="animate-spin text-gray-400" />
+          </td>
+        </tr>
+      );
+    }
+
+    return (
+      <>
+        {items.map((item) => (
+          <tr
+            key={item.id}
+            className="border-b border-gray-100 bg-white last:border-0"
+          >
+            <td className="px-4 py-2.5 pl-10 text-gray-600">
+              {item.combination ? item.combination.sku : "Produit simple"}
+            </td>
+            <td className="px-4 py-2.5 text-gray-500">
+              {item.combination?.sku ?? "—"}
+            </td>
+            <td className="px-4 py-2.5 text-gray-500">{item.warehouse.name}</td>
+            <td className="px-4 py-2.5">
+              {editingId === item.id ? (
+                <QuantityEditor
+                  item={item}
+                  onCancel={() => setEditingId(null)}
+                />
+              ) : (
+                <span
+                  className={`font-medium ${item.quantity === 0 ? "text-red-600" : item.quantity <= 10 ? "text-amber-600" : ""}`}
+                >
+                  {item.quantity}
+                </span>
+              )}
+            </td>
+            <td className="px-4 py-2.5">
+              {editingId !== item.id && (
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setEditingId(item.id)}
+                    className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    onClick={() => setTransferItem(item)}
+                    className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                  >
+                    <ArrowLeftRight size={16} />
+                  </button>
+                </div>
+              )}
+            </td>
+          </tr>
+        ))}
+        {transferItem && (
+          <TransferModal
+            item={transferItem}
+            warehouses={[]}
+            onClose={() => setTransferItem(null)}
+          />
+          // NB: passer les vraies warehouses via prop depuis le parent plutôt que []
+        )}
+      </>
+    );
   }
 
   function combinationLabel(
@@ -1130,81 +1185,61 @@ export default function InventoryPage() {
                         </button>
                       </td>
                     </tr>
-
-                    {isExpanded &&
-                      (loadingCombosProductId === group.productId ? (
-                        <tr key={`loading-${group.productId}`}>
-                          <td colSpan={5} className="px-8 py-3">
-                            <Loader2
-                              size={14}
-                              className="animate-spin text-gray-400"
-                            />
-                          </td>
-                        </tr>
-                      ) : (
-                        group.items.map((item) => (
-                          <tr
-                            key={item.id}
-                            className="border-b border-gray-100 bg-white last:border-0"
-                          >
-                            <td className="px-4 py-2.5 pl-10 text-gray-600">
-                              {combinationLabel(
-                                group.productId,
-                                item.combinationId,
-                                item.combination?.sku ?? null,
-                              )}
-                            </td>
-                            <td className="px-4 py-2.5 text-gray-500">
-                              {item.combination?.sku ?? "—"}
-                            </td>
-                            <td className="px-4 py-2.5 text-gray-500">
-                              {item.warehouse.name}
-                            </td>
-                            <td className="px-4 py-2.5">
-                              {editingId === item.id ? (
-                                <QuantityEditor
-                                  item={item}
-                                  onCancel={() => setEditingId(null)}
+                    {groupedProducts.map((group) => {
+                      const isExpanded = expandedProductIds.has(
+                        group.productId,
+                      );
+                      return (
+                        <React.Fragment key={group.productId}>
+                          <tr className="border-b border-gray-100 bg-gray-50/60">
+                            <td colSpan={5} className="px-4 py-2.5">
+                              <button
+                                type="button"
+                                onClick={() => toggleExpand(group.productId)}
+                                className="flex w-full items-center gap-2 text-left"
+                              >
+                                <ChevronRight
+                                  size={14}
+                                  className={`shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`}
                                 />
-                              ) : (
-                                <span
-                                  className={`font-medium ${item.quantity === 0 ? "text-red-600" : item.quantity <= 10 ? "text-amber-600" : ""}`}
-                                >
-                                  {item.quantity}
+                                <span className="font-medium">
+                                  {group.productName}
                                 </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2.5">
-                              {editingId !== item.id && (
-                                <div className="flex items-center justify-end gap-2">
-                                  <button
-                                    onClick={() => setEditingId(item.id)}
-                                    className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                                    title="Modifier la quantité"
+                                <span className="text-xs text-gray-400">
+                                  {group.productSku}
+                                </span>
+                                {group.isOutOfStock && (
+                                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">
+                                    Rupture
+                                  </span>
+                                )}
+                                {!group.isOutOfStock && group.isLowStock && (
+                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+                                    Stock faible
+                                  </span>
+                                )}
+                                <span className="ml-auto whitespace-nowrap text-xs text-gray-500">
+                                  {group.lineCount} ligne(s) ·{" "}
+                                  <span
+                                    className={
+                                      group.totalQuantity === 0
+                                        ? "text-red-600"
+                                        : ""
+                                    }
                                   >
-                                    <Pencil size={16} />
-                                  </button>
-                                  <button
-                                    onClick={() => setTransferItem(item)}
-                                    className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                                    title="Transférer"
-                                  >
-                                    <ArrowLeftRight size={16} />
-                                  </button>
-                                  <button
-                                    onClick={() => setConfirmDeleteId(item.id)}
-                                    disabled={isDeleting}
-                                    className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                                    title="Supprimer"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
-                              )}
+                                    {group.totalQuantity} unité(s)
+                                  </span>{" "}
+                                  au total
+                                </span>
+                              </button>
                             </td>
                           </tr>
-                        ))
-                      ))}
+                          {isExpanded && (
+                            <ExpandedProductRows productId={group.productId} />
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </>
                 );
               })

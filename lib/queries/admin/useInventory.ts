@@ -27,17 +27,26 @@ export function useAdminInventoryList(page: number) {
   });
 }
 
-export function useAdminInventoryLowStock() {
+export function useAdminInventoryGrouped(params: {
+  page: number;
+  lowStock?: boolean;
+  outOfStock?: boolean;
+}) {
   return useQuery({
-    queryKey: queryKeys.admin.inventoryLowStock,
-    queryFn: adminInventoryApi.lowStock,
+    queryKey: queryKeys.admin.inventoryGrouped(params),
+    queryFn: () => adminInventoryApi.grouped(params),
+    placeholderData: (prev) => prev,
   });
 }
 
-export function useAdminInventoryOutOfStock() {
+export function useAdminInventoryGroupedDetail(
+  productId: number | null,
+  page: number,
+) {
   return useQuery({
-    queryKey: queryKeys.admin.inventoryOutOfStock,
-    queryFn: adminInventoryApi.outOfStock,
+    queryKey: queryKeys.admin.inventoryGroupedDetail(productId ?? 0, page),
+    queryFn: () => adminInventoryApi.groupedDetail(productId!, page),
+    enabled: productId !== null,
   });
 }
 
