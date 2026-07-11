@@ -1,13 +1,18 @@
 // app/admin/shipping-methods/page.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Trash2, Loader2, Check, X, Route } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { Plus, Pencil, Trash2, Loader2, Check, Route } from "lucide-react";
+import { ApiError } from "@/lib/api-client";
 import { formatXAF } from "@/lib/format";
 import type { ShippingMethod, ShippingMethodFormInput } from "@/lib/types";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import {
+  useAdminShippingMethods,
+  useUpdateShippingMethod,
+  useDeleteShippingMethod,
+} from "@/lib/queries/admin/useShippingMethods";
 
 function ShippingMethodForm({
   initial,
@@ -196,47 +201,41 @@ function ShippingMethodForm({
   );
 }
 
+function EditableMethodRow({
+  method,
+  onCancel,
+}: {
+  method: ShippingMethod;
+  onCancel: () => void;
+}) {
+  const { mutateAsync: updateMethod } = useUpdateShippingMethod(method.id);
+
+  return (
+    <ShippingMethodForm
+      initial={method}
+      onSubmit={async (input) => {
+        await updateMethod(input);
+        onCancel();
+      }}
+      onCancel={onCancel}
+    />
+  );
+}
+
 export default function ShippingMethodsPage() {
-  const [methods, setMethods] = useState<ShippingMethod[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: methods = [], isLoading, isError } = useAdminShippingMethods();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const { mutate: deleteMethod, isPending: isDeleting } =
+    useDeleteShippingMethod();
 
-  useEffect(() => {
-    apiClient
-      .get<ShippingMethod[]>("/shipping-methods")
-      .then(setMethods)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  async function handleUpdate(id: string, input: ShippingMethodFormInput) {
-    const updated = await apiClient.patch<ShippingMethod>(
-      `/shipping-methods/${id}`,
-      input,
-    );
-    setMethods((prev) => prev.map((m) => (m.id === id ? updated : m)));
-    setEditingId(null);
-  }
-
-  async function confirmDelete() {
+  function confirmDelete() {
     if (!confirmDeleteId) return;
-    setDeletingId(confirmDeleteId);
-    try {
-      await apiClient.delete(`/shipping-methods/${confirmDeleteId}`);
-      setMethods((prev) => prev.filter((m) => m.id !== confirmDeleteId));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-    } finally {
-      setDeletingId(null);
-      setConfirmDeleteId(null);
-    }
+    deleteMethod(confirmDeleteId, {
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+      onSettled: () => setConfirmDeleteId(null),
+    });
   }
 
   return (
@@ -255,9 +254,9 @@ export default function ShippingMethodsPage() {
         </Link>
       </div>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 
@@ -269,10 +268,9 @@ export default function ShippingMethodsPage() {
         <div className="space-y-3">
           {methods.map((method) =>
             editingId === method.id ? (
-              <ShippingMethodForm
+              <EditableMethodRow
                 key={method.id}
-                initial={method}
-                onSubmit={(input) => handleUpdate(method.id, input)}
+                method={method}
                 onCancel={() => setEditingId(null)}
               />
             ) : (
@@ -314,10 +312,10 @@ export default function ShippingMethodsPage() {
                   </button>
                   <button
                     onClick={() => setConfirmDeleteId(method.id)}
-                    disabled={deletingId === method.id}
+                    disabled={isDeleting}
                     className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                   >
-                    {deletingId === method.id ? (
+                    {isDeleting && confirmDeleteId === method.id ? (
                       <Loader2 size={16} className="animate-spin" />
                     ) : (
                       <Trash2 size={16} />
@@ -335,7 +333,7 @@ export default function ShippingMethodsPage() {
         title="Supprimer la méthode de livraison"
         message="Cette action est irréversible. Voulez-vous vraiment continuer ?"
         confirmLabel="Supprimer"
-        isLoading={deletingId !== null}
+        isLoading={isDeleting}
         onConfirm={confirmDelete}
         onCancel={() => setConfirmDeleteId(null)}
       />

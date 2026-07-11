@@ -5,8 +5,9 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import type { ShippingMethod, ShippingMethodFormInput } from "@/lib/types";
+import { ApiError } from "@/lib/api-client";
+import type { ShippingMethodFormInput } from "@/lib/types";
+import { useCreateShippingMethod } from "@/lib/queries/admin/useShippingMethods";
 
 export default function NewShippingMethodPage() {
   const router = useRouter();
@@ -21,7 +22,8 @@ export default function NewShippingMethodPage() {
   });
   const [zonesInput, setZonesInput] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: createMethod, isPending: isSubmitting } =
+    useCreateShippingMethod();
 
   function update<K extends keyof ShippingMethodFormInput>(
     key: K,
@@ -30,7 +32,7 @@ export default function NewShippingMethodPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
@@ -43,23 +45,18 @@ export default function NewShippingMethodPage() {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const created = await apiClient.post<ShippingMethod>(
-        "/shipping-methods",
-        { ...form, zones },
-      );
-      router.push(`/admin/shipping-methods`);
-      // note: pas de route détail dédiée pour les méthodes de livraison,
-      // la liste suffit (édition inline déjà supportée sur /admin/shipping-methods)
-      void created;
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la création",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    createMethod(
+      { ...form, zones },
+      {
+        onSuccess: () => router.push("/admin/shipping-methods"),
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la création",
+          ),
+      },
+    );
   }
 
   const inputClass =

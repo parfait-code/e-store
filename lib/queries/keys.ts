@@ -61,5 +61,6 @@ export const queryKeys = {
       ["admin", "loyalty", userId, "balance"] as const,
     loyaltyHistory: (userId: number | string) =>
       ["admin", "loyalty", userId, "history"] as const,
+    shippingMethods: ["admin", "shipping-methods"] as const,
   },
 };
