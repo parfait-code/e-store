@@ -24,6 +24,7 @@ export const queryKeys = {
       ["shop", "loyalty", userId, "balance"] as const,
     loyaltyHistory: (userId: number | string) =>
       ["shop", "loyalty", userId, "history"] as const,
+    myPickupRequests: ["shop", "pickup-requests"] as const,
   },
   admin: {
     products: (params: Record<string, unknown>) =>

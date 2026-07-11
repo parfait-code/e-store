@@ -1,7 +1,6 @@
 // app/(account)/account/pickup-requests/page.tsx
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   Loader2,
@@ -10,9 +9,9 @@ import {
   Calendar,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
-import { apiClient } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
-import type { PickupRequest, PickupRequestStatus } from "@/lib/types";
+import type { PickupRequestStatus } from "@/lib/types";
+import { useMyPickupRequests } from "@/lib/queries/shop/usePickupRequests";
 
 const STATUS_STYLES: Record<PickupRequestStatus, string> = {
   PENDING: "bg-gray-100 text-gray-600",
@@ -30,37 +29,8 @@ const STATUS_LABELS: Record<PickupRequestStatus, string> = {
   EXPIRED: "Expirée",
 };
 
-// Pas de route de listing dédiée côté user dans le guide (seul GET
-// /pickup-requests/:id existe, réservé au demandeur) — on passe donc par
-// les retours de l'utilisateur pour retrouver ses pickups liés. En pratique,
-// exposer une route GET /returns/:id/pickup-request côté backend
-// simplifierait ceci ; en attendant, cette page reste volontairement
-// minimale et informe l'utilisateur de consulter le détail de son retour.
-async function fetchMyPickupRequests(): Promise<PickupRequest[]> {
-  const orders = await apiClient.get<{ items: { id: string }[] }>(
-    "/orders?limit=50",
-  );
-  const allReturns = await Promise.all(
-    (orders.items ?? []).map((o) =>
-      apiClient
-        .get<{ id: string }[]>(`/orders/${o.id}/returns`)
-        .catch(() => []),
-    ),
-  );
-  const returnIds = allReturns.flat().map((r) => r.id);
-  void returnIds;
-  return [];
-}
-
 export default function PickupRequestsPage() {
-  const {
-    data: requests = [],
-    isLoading,
-    isError,
-  } = useQuery({
-    queryKey: ["shop", "pickup-requests"],
-    queryFn: fetchMyPickupRequests,
-  });
+  const { data: requests = [], isLoading, isError } = useMyPickupRequests();
 
   return (
     <div>

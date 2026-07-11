@@ -21,48 +21,40 @@ export function useAdminPickupRequests(params: {
   });
 }
 
-export function useAdminPickupRequest(requestId: string) {
+export function useAdminPickupRequest(id: string) {
   return useQuery({
-    queryKey: queryKeys.admin.pickupRequest(requestId),
-    queryFn: () => adminPickupRequestsApi.byId(requestId),
-    enabled: Boolean(requestId),
+    queryKey: queryKeys.admin.pickupRequest(id),
+    queryFn: () => adminPickupRequestsApi.byId(id),
+    enabled: Boolean(id),
   });
 }
 
-export function useUpdatePickupLocation(requestId: string) {
+export function useUpdatePickupLocation(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: PickupRequestLocationUpdateInput) =>
-      adminPickupRequestsApi.updateLocation(requestId, payload),
+      adminPickupRequestsApi.updateLocation(id, payload),
     onSuccess: (updated) => {
-      qc.setQueryData(queryKeys.admin.pickupRequest(requestId), updated);
+      qc.setQueryData(queryKeys.admin.pickupRequest(id), updated);
       qc.invalidateQueries({ queryKey: ["admin", "pickup-requests"] });
     },
   });
 }
 
-export function useUpdatePickupStatus(requestId: string) {
+export function useUpdatePickupStatus(id: string, returnId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: PickupRequestStatusUpdateInput) =>
-      adminPickupRequestsApi.updateStatus(requestId, payload),
+      adminPickupRequestsApi.updateStatus(id, payload),
     onSuccess: (updated) => {
-      qc.setQueryData(queryKeys.admin.pickupRequest(requestId), updated);
+      qc.setQueryData(queryKeys.admin.pickupRequest(id), updated);
       qc.invalidateQueries({ queryKey: ["admin", "pickup-requests"] });
       // Annuler la pickup annule en cascade le retour lié (§6.15 du guide) —
-      // on invalide donc aussi le retour associé pour refléter ce cas.
-      qc.invalidateQueries({
-        queryKey: queryKeys.admin.return(updated.returnId),
-      });
+      // on invalide donc aussi le retour associé et sa liste.
+      if (returnId) {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.return(returnId) });
+        qc.invalidateQueries({ queryKey: ["admin", "returns"] });
+      }
     },
-  });
-}
-
-export function useExpireOverduePickups() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => adminPickupRequestsApi.expireOverdue(),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["admin", "pickup-requests"] }),
   });
 }

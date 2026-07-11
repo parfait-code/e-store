@@ -73,6 +73,7 @@ function StatusModal({
   const [error, setError] = useState<string | null>(null);
   const { mutate: updateStatus, isPending: isSaving } = useUpdatePickupStatus(
     request.id,
+    request.returnId,
   );
 
   function handleConfirm() {
