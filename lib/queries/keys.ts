@@ -77,6 +77,8 @@ export const queryKeys = {
     loyaltyHistory: (userId: number | string) =>
       ["admin", "loyalty", userId, "history"] as const,
     shippingMethods: ["admin", "shipping-methods"] as const,
+    settings: (category?: string) =>
+      ["admin", "settings", category ?? "all"] as const,
     returns: (params: Record<string, unknown>) =>
       ["admin", "returns", params] as const,
     return: (id: string) => ["admin", "return", id] as const,
