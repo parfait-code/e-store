@@ -3,12 +3,15 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useState, useEffect, useCallback } from "react";
 import {
   ArrowRight,
   Truck,
   ShieldCheck,
   RotateCcw,
   HeadphonesIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { ProductGrid } from "@/components/ProductGrid";
 import { formatDate } from "@/lib/format";
@@ -54,6 +57,204 @@ function colorForName(name: string) {
   return AVATAR_COLORS[sum % AVATAR_COLORS.length];
 }
 
+// Composant Carrousel pour les promotions
+function PromotionsCarousel({ promotions }: { promotions: any[] }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  const totalSlides = promotions.length;
+  const slidesToShow = 2; // Nombre de promotions visibles en même temps
+
+  // Calcul du nombre de slides visibles selon la taille d'écran
+  const getSlidesToShow = useCallback(() => {
+    if (typeof window === "undefined") return slidesToShow;
+    if (window.innerWidth < 640) return 1;
+    if (window.innerWidth < 1024) return 2;
+    return 2;
+  }, []);
+
+  const [currentSlidesToShow, setCurrentSlidesToShow] = useState(slidesToShow);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setCurrentSlidesToShow(getSlidesToShow());
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [getSlidesToShow]);
+
+  // Navigation automatique
+  useEffect(() => {
+    if (isPaused || totalSlides <= currentSlidesToShow) return;
+
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) =>
+        prev + currentSlidesToShow >= totalSlides ? 0 : prev + 1
+      );
+    }, 4000);
+
+    return () => clearInterval(timer);
+  }, [currentSlidesToShow, isPaused, totalSlides]);
+
+  const goToPrevious = () => {
+    setCurrentIndex((prev) =>
+      prev - 1 < 0 ? Math.max(0, totalSlides - currentSlidesToShow) : prev - 1
+    );
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) =>
+      prev + currentSlidesToShow >= totalSlides ? 0 : prev + 1
+    );
+  };
+
+  const goToSlide = (index: number) => {
+    setCurrentIndex(Math.min(index, totalSlides - currentSlidesToShow));
+  };
+
+  // Si pas assez de promotions pour un carrousel, afficher en grille
+  if (totalSlides <= currentSlidesToShow) {
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {promotions.map((promo) => (
+          <PromotionCard key={promo.id} promo={promo} />
+        ))}
+      </div>
+    );
+  }
+
+  const visiblePromotions = promotions.slice(
+    currentIndex,
+    currentIndex + currentSlidesToShow
+  );
+
+  // Si on est à la fin, compléter avec les premiers éléments pour un défilement infini
+  const displayPromotions =
+    visiblePromotions.length < currentSlidesToShow
+      ? [...visiblePromotions, ...promotions.slice(0, currentSlidesToShow - visiblePromotions.length)]
+      : visiblePromotions;
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      <div className="overflow-hidden">
+        <div
+          className="flex transition-transform duration-500 ease-in-out"
+          style={{
+            transform: `translateX(-${currentIndex * (100 / currentSlidesToShow)}%)`,
+          }}
+        >
+          {promotions.map((promo, index) => (
+            <div
+              key={`${promo.id}-${index}`}
+              className="flex-shrink-0 px-2"
+              style={{ width: `${100 / currentSlidesToShow}%` }}
+            >
+              <PromotionCard promo={promo} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Boutons de navigation */}
+      {totalSlides > currentSlidesToShow && (
+        <>
+          <button
+            onClick={goToPrevious}
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white sm:-translate-x-3"
+            aria-label="Promotion précédente"
+          >
+            <ChevronLeft className="h-5 w-5 text-gray-700" />
+          </button>
+          <button
+            onClick={goToNext}
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white sm:translate-x-3"
+            aria-label="Promotion suivante"
+          >
+            <ChevronRight className="h-5 w-5 text-gray-700" />
+          </button>
+        </>
+      )}
+
+      {/* Indicateurs de pagination */}
+      {totalSlides > currentSlidesToShow && (
+        <div className="mt-4 flex justify-center gap-2">
+          {Array.from({
+            length: Math.ceil(totalSlides / currentSlidesToShow),
+          }).map((_, idx) => {
+            const dotIndex = idx * currentSlidesToShow;
+            const isActive =
+              currentIndex >= dotIndex &&
+              currentIndex < dotIndex + currentSlidesToShow;
+            return (
+              <button
+                key={idx}
+                onClick={() => goToSlide(dotIndex)}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  isActive ? "w-8 bg-gray-900" : "w-2 bg-gray-300"
+                }`}
+                aria-label={`Aller à la page ${idx + 1}`}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Composant carte de promotion
+function PromotionCard({ promo }: { promo: any }) {
+  const images = Array.isArray(promo.images) ? promo.images : [];
+
+  return (
+    <Link
+      href={`/promotions/${promo.slug}`}
+      className="group block overflow-hidden rounded-lg border border-gray-200 bg-white transition hover:shadow-md"
+    >
+      <div className="relative aspect-3/1 w-full overflow-hidden bg-gray-100">
+        {images[0] ? (
+          <Image
+            src={images[0]}
+            alt={promo.name}
+            fill
+            className="object-cover transition group-hover:scale-105"
+            sizes="(max-width: 768px) 100vw, 50vw"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-gray-900">
+            <span className="text-lg font-semibold text-white">
+              {promo.name}
+            </span>
+          </div>
+        )}
+        {/* Badge de promotion */}
+        {promo.discountPercentage && (
+          <div className="absolute left-3 top-3 rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white shadow-lg">
+            -{promo.discountPercentage}%
+          </div>
+        )}
+      </div>
+      <div className="p-4">
+        <h3 className="font-medium text-gray-900 line-clamp-1">{promo.name}</h3>
+        <p className="mt-1 text-xs text-gray-400">
+          Jusqu'au {formatDate(promo.endDate)}
+        </p>
+        {promo.description && (
+          <p className="mt-2 text-sm text-gray-600 line-clamp-2">
+            {promo.description}
+          </p>
+        )}
+      </div>
+    </Link>
+  );
+}
+
 function PromotionsSection() {
   const { data: promotions = [], isLoading } = useActivePromotions();
   const safePromotions = Array.isArray(promotions) ? promotions : [];
@@ -62,43 +263,18 @@ function PromotionsSection() {
 
   return (
     <section>
-      <h2 className="mb-4 text-xl font-semibold">Promotions en cours</h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {safePromotions.map((promo) => {
-          const images = Array.isArray(promo.images) ? promo.images : [];
-          return (
-            <Link
-              key={promo.id}
-              href={`/promotions/${promo.slug}`}
-              className="group overflow-hidden rounded-lg border border-gray-200 bg-white transition hover:shadow-md"
-            >
-              <div className="relative aspect-3/1 w-full overflow-hidden bg-gray-100">
-                {images[0] ? (
-                  <Image
-                    src={images[0]}
-                    alt={promo.name}
-                    fill
-                    className="object-cover transition group-hover:scale-105"
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center bg-gray-900">
-                    <span className="text-lg font-semibold text-white">
-                      {promo.name}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="p-4">
-                <h3 className="font-medium text-gray-900">{promo.name}</h3>
-                <p className="mt-1 text-xs text-gray-400">
-                  Jusqu'au {formatDate(promo.endDate)}
-                </p>
-              </div>
-            </Link>
-          );
-        })}
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Promotions en cours</h2>
+        {safePromotions.length > 2 && (
+          <Link
+            href="/promotions"
+            className="text-sm font-medium text-gray-900 hover:underline"
+          >
+            Voir tout →
+          </Link>
+        )}
       </div>
+      <PromotionsCarousel promotions={safePromotions} />
     </section>
   );
 }
@@ -157,7 +333,7 @@ export default function HomePage() {
         ))}
       </section>
 
-      {/* Promotions */}
+      {/* Promotions avec carrousel */}
       <PromotionsSection />
 
       {/* Catégories */}
