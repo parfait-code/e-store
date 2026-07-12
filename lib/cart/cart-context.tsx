@@ -24,7 +24,7 @@ const STORAGE_KEY = "cart_items";
 
 function sameLine(
   a: CartLocalItem,
-  productId: number,
+  productId: string,
   combinationId: string | null,
 ) {
   return a.productId === productId && a.combinationId === combinationId;
@@ -78,7 +78,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeItem = useCallback(
-    (productId: number, combinationId: string | null) => {
+    (productId: string, combinationId: string | null) => {
       setItems((prev) =>
         prev.filter((i) => !sameLine(i, productId, combinationId)),
       );
@@ -87,7 +87,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 
   const updateQuantity = useCallback(
-    (productId: number, combinationId: string | null, quantity: number) => {
+    (productId: string, combinationId: string | null, quantity: number) => {
       if (quantity <= 0) {
         removeItem(productId, combinationId);
         return;

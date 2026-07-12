@@ -14,7 +14,7 @@ export default function WishlistPage() {
   const [wishlist, setWishlist] = useState<Wishlist | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const { addItem } = useCart();
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function WishlistPage() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  async function handleRemove(productId: number, combinationId: string | null) {
+  async function handleRemove(productId: string, combinationId: string | null) {
     setRemovingId(productId);
     try {
       const updated = await apiClient.delete<Wishlist>("/wishlist/items", {

@@ -61,7 +61,7 @@ export function useUpdateProduct(productId: string) {
 export function useDeleteProduct() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (productId: number) => adminCatalogApi.deleteProduct(productId),
+    mutationFn: (productId: string) => adminCatalogApi.deleteProduct(productId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "products"] });
     },

@@ -3,7 +3,7 @@
 export type Role = "USER" | "ADMIN" | "MANAGER" | "SUPPORT";
 
 export interface User {
-  id: number;
+  id: string;
   username: string;
   email: string;
   firstName: string;
@@ -153,9 +153,9 @@ export interface CombinationInventoryLine {
 
 export interface ProductCombination {
   id: string;
-  productId: number;
+  productId: string;
   optionsKey: string;
-  sku: string | null; // corrigé — peut être absent
+  sku: string | null;
   price: number | null;
   isActive: boolean;
   values: CombinationValue[];
@@ -179,7 +179,7 @@ export interface CombinationFormInput {
 // --- Product sans combinaisons (chargées séparément) ---
 
 export interface Product {
-  id: number;
+  id: string;
   sku: string;
   name: string;
   description: string | null;
@@ -203,7 +203,7 @@ export interface ProductWithCombinations extends Product {
 // --- Endpoint séparé pour les combinaisons ---
 
 export interface ProductCombinationsResponse {
-  productId: number;
+  productId: string;
   combinations: ProductCombination[];
 }
 
@@ -216,7 +216,7 @@ export type PickupRequestStatus =
 
 export interface PickupRequest {
   id: string;
-  userId: number;
+  userId: string;
   returnId: string; // toute pickup naît d'un retour APPROVED
   method: PickupCollectionMethod;
   addressId: string | null;
@@ -284,7 +284,7 @@ export type OrderStatus =
 
 export interface Address {
   id: string;
-  userId: number;
+  userId: string;
   recipientName: string;
   phone: string | null;
   street: string;
@@ -324,7 +324,7 @@ export interface OrderAddressInput {
 }
 
 export interface InventoryGroupedProduct {
-  productId: number;
+  productId: string;
   productName: string;
   productSku: string;
   totalQuantity: number;
@@ -364,7 +364,7 @@ export interface OrderItemCombinationRef {
 
 export interface OrderItem {
   id: string;
-  productId: number;
+  productId: string;
   combinationId: string | null;
   combinationSnapshot: Record<string, string> | null;
   quantity: number;
@@ -386,7 +386,7 @@ export type PaymentStatus =
 export interface Payment {
   id: string;
   orderId: string;
-  userId: number;
+  userId: string;
   method: string;
   status: PaymentStatus; // était `string`
   amount: number;
@@ -417,7 +417,7 @@ export interface OrderStatusHistoryEntry {
 
 export interface Order {
   id: string;
-  userId: number;
+  userId: string;
   status: OrderStatus;
   totalAmount: number;
   discountedAmount: number | null;
@@ -509,7 +509,7 @@ export interface DiscountFormInput {
   type: DiscountType;
   value: number;
   categoryId?: string;
-  productIds?: number[];
+  productIds?: string[];
 }
 
 export interface CouponFormInput {
@@ -549,7 +549,7 @@ export interface WarehouseFormInput {
 
 export interface InventoryItem {
   id: string;
-  productId: number;
+  productId: string;
   combinationId: string | null;
   warehouseId: string;
   quantity: number;
@@ -559,7 +559,7 @@ export interface InventoryItem {
 }
 
 export interface InventoryFormInput {
-  product_id: number;
+  product_id: string;
   warehouse_id: string;
   combination_id?: string;
   quantity?: number;
@@ -612,7 +612,7 @@ export type ReturnStatus = "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED";
 export interface ReturnRequest {
   id: string;
   orderId: string;
-  userId: number;
+  userId: string;
   status: ReturnStatus;
   reason: string;
   notes: string | null;
@@ -623,12 +623,12 @@ export interface ReturnRequest {
     condition: string | null;
     orderItem: {
       id: string;
-      productId: number;
+      productId: string;
       quantity: number;
       price: number;
     };
   }[];
-  order: { id: string; userId: number; status: OrderStatus };
+  order: { id: string; userId: string; status: OrderStatus };
 }
 
 export interface ReturnStatusUpdateInput {
@@ -651,7 +651,7 @@ export interface LoyaltyTransaction {
 }
 
 export interface LoyaltyAdjustInput {
-  userId: number;
+  userId: string;
   points: number;
   type: LoyaltyTransactionType;
   orderId?: string;
@@ -706,10 +706,10 @@ export interface ShipmentFormInput {
 
 export interface Basket {
   id: string;
-  userId: number;
+  userId: string;
   items: {
     id: string;
-    productId: number;
+    productId: string;
     combinationId: string | null;
     quantity: number;
     product: Product;
@@ -727,7 +727,7 @@ export interface ProductReview {
 }
 
 export interface ProductReviewsResponse {
-  product_id: number;
+  product_id: string;
   average_rating: number;
   total_reviews: number;
   reviews: ProductReview[];
@@ -784,7 +784,7 @@ export interface SignupFormInput {
 // --- Cart local avec combinationId ---
 
 export interface CartLocalItem {
-  productId: number;
+  productId: string;
   combinationId: string | null;
   quantity: number;
   name: string;
@@ -802,9 +802,9 @@ export interface CartContextValue {
   totalItems: number;
   totalAmount: number;
   addItem: (item: CartLocalItem) => void;
-  removeItem: (productId: number, combinationId: string | null) => void;
+  removeItem: (productId: string, combinationId: string | null) => void;
   updateQuantity: (
-    productId: number,
+    productId: string,
     combinationId: string | null,
     quantity: number,
   ) => void;
@@ -826,7 +826,7 @@ export interface AddressFormInput {
 
 export interface WishlistItem {
   id: string;
-  productId: number;
+  productId: string;
   combinationId: string | null;
   product: {
     id: number;
@@ -840,13 +840,13 @@ export interface WishlistItem {
 
 export interface Wishlist {
   id: string;
-  userId: number;
+  userId: string;
   items: WishlistItem[];
 }
 
 export interface ReviewCreateInput {
   order_item_id: string;
-  product_id: number;
+  product_id: string;
   rating: number;
   comment?: string;
 }

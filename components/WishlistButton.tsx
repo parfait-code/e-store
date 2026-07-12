@@ -8,7 +8,7 @@ import { apiClient, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth/auth-context";
 
 interface WishlistButtonProps {
-  productId: number;
+  productId: string;
   combinationId?: string | null;
 }
 

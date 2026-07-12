@@ -8,7 +8,7 @@ import { RatingStars } from "./RatingStars";
 import { formatDate } from "@/lib/format";
 import type { ProductReviewsResponse } from "@/lib/types";
 
-export function ReviewsSection({ productId }: { productId: number }) {
+export function ReviewsSection({ productId }: { productId: string }) {
   const [data, setData] = useState<ProductReviewsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
