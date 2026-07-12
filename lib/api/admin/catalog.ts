@@ -36,10 +36,16 @@ export const adminCatalogApi = {
   createProduct: (payload: Record<string, unknown>) =>
     apiClient.post<Product>("/product", payload),
 
+  // FIX : le backend applique le même filtre de visibilité (DRAFT/ARCHIVED
+  // masqués) sur la résolution du produit pour PATCH que pour GET. Sans
+  // `includeInactive=true`, modifier un produit DRAFT (ex: le passer en
+  // ACTIVE) renvoyait 404 "produit introuvable" alors qu'il existe bien.
   updateProduct: (id: string | number, payload: Record<string, unknown>) =>
-    apiClient.patch<Product>(`/product/${id}`, payload),
+    apiClient.patch<Product>(`/product/${id}?includeInactive=true`, payload),
 
-  deleteProduct: (id: string | number) => apiClient.delete(`/product/${id}`),
+  // Même cause potentielle sur DELETE — corrigé par précaution.
+  deleteProduct: (id: string | number) =>
+    apiClient.delete(`/product/${id}?includeInactive=true`),
 
   listCategories: () => apiClient.get<CategoryRef[]>("/categories"),
 
@@ -47,21 +53,27 @@ export const adminCatalogApi = {
   uploadImage: (productId: string | number, file: File) => {
     const fd = new FormData();
     fd.append("images", file);
-    return apiClient.post<Product>(`/product/${productId}/images`, fd, {
-      isFormData: true,
-    });
+    return apiClient.post<Product>(
+      `/product/${productId}/images?includeInactive=true`,
+      fd,
+      { isFormData: true },
+    );
   },
   deleteImage: (productId: string | number, imageId: string) =>
-    apiClient.delete<Product>(`/product/${productId}/images`, { imageId }),
+    apiClient.delete<Product>(
+      `/product/${productId}/images?includeInactive=true`,
+      { imageId },
+    ),
 
   // --- Attributs non-variante (§7.4 du guide) ---
   saveAttributes: (
     productId: string | number,
     attributes: { attributeDefinitionId: string; value: string }[],
   ) =>
-    apiClient.put<Product>(`/product/${productId}/attributes`, {
-      attributes,
-    }),
+    apiClient.put<Product>(
+      `/product/${productId}/attributes?includeInactive=true`,
+      { attributes },
+    ),
 
   // --- Tags ---
   productTags: (productId: string | number) =>
