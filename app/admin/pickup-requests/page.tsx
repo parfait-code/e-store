@@ -305,7 +305,6 @@ export default function AdminPickupRequestsPage() {
         alert(
           err instanceof ApiError ? err.message : "Erreur lors de l'opération",
         ),
-      onSettled: fetchRequests,
     });
   }
 
