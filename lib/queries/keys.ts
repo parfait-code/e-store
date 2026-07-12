@@ -4,7 +4,6 @@ export const queryKeys = {
     categories: ["shop", "categories"] as const,
     categoryBySlug: (slug: string) =>
       ["shop", "categories", "slug", slug] as const,
-    // NOUVEAU — produits paginés d'une catégorie par slug
     categoryProducts: (slug: string, page: number) =>
       ["shop", "categories", "slug", slug, "products", page] as const,
     products: (params: Record<string, unknown>) =>
@@ -29,6 +28,10 @@ export const queryKeys = {
       ["shop", "loyalty", userId, "history"] as const,
     myPickupRequests: ["shop", "pickup-requests"] as const,
     activePromotions: ["shop", "promotions", "active"] as const,
+    promotionBySlug: (slug: string) =>
+      ["shop", "promotions", "slug", slug] as const,
+    promotionProductsBySlug: (slug: string) =>
+      ["shop", "promotions", "slug", slug, "products"] as const,
   },
   admin: {
     products: (params: Record<string, unknown>) =>
@@ -78,7 +81,5 @@ export const queryKeys = {
     pickupRequests: (params: Record<string, unknown>) =>
       ["admin", "pickup-requests", params] as const,
     pickupRequest: (id: string) => ["admin", "pickup-request", id] as const,
-    settings: (category?: string) =>
-      ["admin", "settings", category ?? "all"] as const,
   },
 };

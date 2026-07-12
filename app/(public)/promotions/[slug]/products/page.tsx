@@ -1,31 +1,15 @@
 // app/(public)/promotions/[slug]/products/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
 import { ProductGrid } from "@/components/ProductGrid";
-import type { PromotionProductsResponse } from "@/lib/types";
+import { usePromotionProductsBySlug } from "@/lib/queries/shop/usePromotions";
 
 export default function PromotionProductsPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [data, setData] = useState<PromotionProductsResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .get<PromotionProductsResponse>(`/promotions/slug/${slug}/products`)
-      .then(setData)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [slug]);
+  const { data, isLoading, isError } = usePromotionProductsBySlug(slug);
 
   if (isLoading) {
     return (
@@ -35,10 +19,10 @@ export default function PromotionProductsPage() {
     );
   }
 
-  if (error || !data) {
+  if (isError || !data) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Promotion introuvable."}
+        Promotion introuvable.
       </div>
     );
   }
@@ -60,7 +44,7 @@ export default function PromotionProductsPage() {
       </div>
 
       <ProductGrid
-        products={data.products}
+        products={data.products ?? []}
         emptyMessage="Aucun produit n'est actuellement rattaché à cette promotion."
       />
     </div>

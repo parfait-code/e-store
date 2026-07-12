@@ -1,7 +1,7 @@
 // app/(public)/promotions/[slug]/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -12,38 +12,19 @@ import {
   DollarSign,
   ShoppingBag,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
-import type { PromotionPublic, PromotionProductsResponse } from "@/lib/types";
+import {
+  usePromotionBySlug,
+  usePromotionProductsBySlug,
+} from "@/lib/queries/shop/usePromotions";
 
 export default function PromotionPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
-  const [promotion, setPromotion] = useState<PromotionPublic | null>(null);
-  const [productsInfo, setProductsInfo] =
-    useState<PromotionProductsResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiClient
-      .get<PromotionPublic>(`/promotions/slug/${slug}`)
-      .then(setPromotion)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Promotion introuvable",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-
-    // Non bloquant — si cet appel échoue, on masque simplement le bouton
-    // "Voir les produits" plutôt que de faire échouer la page entière.
-    apiClient
-      .get<PromotionProductsResponse>(`/promotions/slug/${slug}/products`)
-      .then(setProductsInfo)
-      .catch(() => setProductsInfo(null));
-  }, [slug]);
+  const { data: promotion, isLoading, isError } = usePromotionBySlug(slug);
+  const { data: productsInfo } = usePromotionProductsBySlug(slug);
 
   function copyCode(code: string) {
     navigator.clipboard.writeText(code);
@@ -71,10 +52,10 @@ export default function PromotionPage() {
     );
   }
 
-  if (error || !promotion) {
+  if (isError || !promotion) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Promotion introuvable."}
+        Promotion introuvable.
       </div>
     );
   }

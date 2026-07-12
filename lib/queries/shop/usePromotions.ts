@@ -11,3 +11,24 @@ export function useActivePromotions() {
     queryFn: shopPromotionsApi.active,
   });
 }
+
+export function usePromotionBySlug(slug: string) {
+  return useQuery({
+    queryKey: queryKeys.shop.promotionBySlug(slug),
+    queryFn: () => shopPromotionsApi.bySlug(slug),
+    enabled: Boolean(slug),
+  });
+}
+
+// Non bloquant côté page : si cet appel échoue, on masque simplement le
+// bouton "Voir les produits" plutôt que de faire échouer la page entière —
+// d'où l'absence de gestion d'erreur ici, gérée au niveau du composant via
+// `productsInfo ?? null`.
+export function usePromotionProductsBySlug(slug: string) {
+  return useQuery({
+    queryKey: queryKeys.shop.promotionProductsBySlug(slug),
+    queryFn: () => shopPromotionsApi.productsBySlug(slug),
+    enabled: Boolean(slug),
+    retry: false,
+  });
+}
