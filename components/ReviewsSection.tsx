@@ -28,7 +28,9 @@ export function ReviewsSection({ productId }: { productId: string }) {
     );
   }
 
-  if (!data || data.total_reviews === 0) {
+  const reviews = Array.isArray(data?.reviews) ? data!.reviews : [];
+
+  if (!data || reviews.length === 0) {
     return (
       <p className="text-sm text-gray-400">
         Aucun avis pour ce produit pour le moment.
@@ -40,23 +42,25 @@ export function ReviewsSection({ productId }: { productId: string }) {
     <div>
       <div className="mb-6 flex items-center gap-3">
         <span className="text-3xl font-semibold">
-          {data.average_rating.toFixed(1)}
+          {(data.average_rating ?? 0).toFixed(1)}
         </span>
         <div>
-          <RatingStars rating={data.average_rating} size={16} />
-          <p className="text-xs text-gray-500">{data.total_reviews} avis</p>
+          <RatingStars rating={data.average_rating ?? 0} size={16} />
+          <p className="text-xs text-gray-500">
+            {data.total_reviews ?? reviews.length} avis
+          </p>
         </div>
       </div>
 
       <div className="space-y-4">
-        {data.reviews.map((review) => (
+        {reviews.map((review) => (
           <div
             key={review.id}
             className="border-b border-gray-100 pb-4 last:border-0"
           >
             <div className="mb-1 flex items-center justify-between">
               <span className="text-sm font-medium">
-                {review.user.firstName} {review.user.lastName.charAt(0)}.
+                {review.user?.firstName} {review.user?.lastName?.charAt(0)}.
               </span>
               <span className="text-xs text-gray-400">
                 {formatDate(review.createdAt)}

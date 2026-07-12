@@ -22,10 +22,13 @@ export function AddToCartButton({
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
 
-  // Stock total = somme sur tous les entrepôts pour cette combinaison
-  // (nouvelle logique multi-entrepôt : plus de blocage par entrepôt isolé).
+  // `inventory` peut être absent si le backend omet le champ pour cette
+  // combinaison — on ne suppose jamais sa présence.
   const stock = selectedCombination
-    ? selectedCombination.inventory.reduce((sum, inv) => sum + inv.quantity, 0)
+    ? (Array.isArray(selectedCombination.inventory)
+        ? selectedCombination.inventory
+        : []
+      ).reduce((sum, inv) => sum + inv.quantity, 0)
     : undefined;
 
   const isOutOfStock = selectedCombination !== null && stock === 0;
@@ -34,8 +37,8 @@ export function AddToCartButton({
   function handleAdd() {
     if (missingSelection || isOutOfStock) return;
 
-    const primaryImage =
-      product.images.find((i) => i.isPrimary) ?? product.images[0];
+    const images = Array.isArray(product.images) ? product.images : [];
+    const primaryImage = images.find((i) => i.isPrimary) ?? images[0];
 
     addItem({
       productId: product.id,

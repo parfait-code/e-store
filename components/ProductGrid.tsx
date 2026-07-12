@@ -14,6 +14,10 @@ export function ProductGrid({
   isLoading,
   emptyMessage = "Aucun produit trouvé.",
 }: ProductGridProps) {
+  // Défense en profondeur : composant partagé par plusieurs pages, on ne
+  // suppose jamais que `products` est bien un tableau.
+  const safeProducts = Array.isArray(products) ? products : [];
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-20">
@@ -22,7 +26,7 @@ export function ProductGrid({
     );
   }
 
-  if (products.length === 0) {
+  if (safeProducts.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-20 text-gray-400">
         <PackageX size={32} />
@@ -33,7 +37,7 @@ export function ProductGrid({
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-      {products.map((product) => (
+      {safeProducts.map((product) => (
         <ProductCard key={product.id} product={product} />
       ))}
     </div>

@@ -20,7 +20,7 @@ function buildAttributeGroups(
   const groups = new Map<string, AttributeGroup>();
 
   combinations.forEach((combo) => {
-    combo.values.forEach((v) => {
+    (Array.isArray(combo.values) ? combo.values : []).forEach((v) => {
       const defId = v.attributeDefinition.id;
       if (!groups.has(defId)) {
         groups.set(defId, { definition: v.attributeDefinition, values: [] });
@@ -40,7 +40,10 @@ export function VariantSelector({
   selectedCombination,
   onSelect,
 }: CombinationSelectorProps) {
-  const activeCombinations = combinations.filter((c) => c.isActive);
+  // Garde-fou : un backend qui renverrait autre chose qu'un tableau (objet
+  // d'erreur, null...) ne doit pas faire planter la page produit.
+  const safeCombinations = Array.isArray(combinations) ? combinations : [];
+  const activeCombinations = safeCombinations.filter((c) => c.isActive);
   const groups = buildAttributeGroups(activeCombinations);
 
   if (groups.length === 0) return null;
@@ -49,13 +52,12 @@ export function VariantSelector({
     combo: ProductCombination | null,
     attributeDefinitionId: string,
   ): string | undefined {
-    return combo?.values.find(
+    return (Array.isArray(combo?.values) ? combo!.values : []).find(
       (v) => v.attributeDefinition.id === attributeDefinitionId,
     )?.attributeOption.id;
   }
 
   function handlePick(attributeDefinitionId: string, optionId: string) {
-    // Construit la combinaison de valeurs souhaitée (celle déjà sélectionnée + ce nouveau choix)
     const desired: Record<string, string> = {};
     groups.forEach((g) => {
       const current = getOptionIdForAttribute(
@@ -69,8 +71,9 @@ export function VariantSelector({
     const match = activeCombinations.find((c) =>
       Object.entries(desired).every(
         ([defId, optId]) =>
-          c.values.find((v) => v.attributeDefinition.id === defId)
-            ?.attributeOption.id === optId,
+          (Array.isArray(c.values) ? c.values : []).find(
+            (v) => v.attributeDefinition.id === defId,
+          )?.attributeOption.id === optId,
       ),
     );
 

@@ -7,10 +7,11 @@ import { ImageOff } from "lucide-react";
 import type { ProductImage } from "@/lib/types";
 
 export function ProductGallery({ images }: { images: ProductImage[] }) {
-  const sorted = [...images].sort((a, b) => a.position - b.position);
+  // `images` peut être absent si le produit backend omet le champ.
+  const safeImages = Array.isArray(images) ? images : [];
+  const sorted = [...safeImages].sort((a, b) => a.position - b.position);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Si la liste d'images change (ex: changement de variante), on revient à la première
   useEffect(() => {
     setActiveIndex(0);
   }, [images]);

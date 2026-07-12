@@ -6,7 +6,7 @@ import { PriceDisplay } from "./PriceDisplay";
 import type { Product } from "@/lib/types";
 
 export function ProductCard({ product }: { product: Product }) {
-  const images = product.images ?? [];
+  const images = Array.isArray(product.images) ? product.images : [];
   const primaryImage = images.find((img) => img.isPrimary) ?? images[0];
 
   return (

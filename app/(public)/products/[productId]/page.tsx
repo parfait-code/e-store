@@ -29,6 +29,7 @@ export default function ProductDetailPage() {
       apiClient.get<Product>(`/product/${productId}`),
       apiClient
         .get<ProductCombination[]>(`/product/${productId}/combinations`)
+        .then((res) => (Array.isArray(res) ? res : []))
         .catch(() => []), // pas grave si absent (produit sans variantes)
     ])
       .then(([p, combos]) => {
@@ -64,15 +65,24 @@ export default function ProductDetailPage() {
   const activeCombinations = combinations.filter((c) => c.isActive);
   const requiresCombination = activeCombinations.length > 0;
   const displayPrice = selectedCombination?.price ?? product.price;
+  // Le backend peut, en théorie, omettre `attributeValues` — on ne suppose
+  // jamais sa présence avant d'appeler .length / .map dessus.
+  const attributeValues = Array.isArray(product.attributeValues)
+    ? product.attributeValues
+    : [];
 
   return (
     <div>
       <Breadcrumb
         items={[
-          {
-            label: product.category.name,
-            href: `/categories/${product.category.slug}`,
-          },
+          ...(product.category
+            ? [
+                {
+                  label: product.category.name,
+                  href: `/categories/${product.category.slug}`,
+                },
+              ]
+            : []),
           { label: product.name },
         ]}
       />
@@ -82,9 +92,6 @@ export default function ProductDetailPage() {
         <ProductGallery images={product.images} />
 
         <div>
-          {product.brand && (
-            <p className="mb-1 text-sm text-gray-400">{product.brand}</p>
-          )}
           <h1 className="text-2xl font-semibold text-gray-900">
             {product.name}
           </h1>
@@ -130,11 +137,11 @@ export default function ProductDetailPage() {
             />
           </div>
 
-          {product.attributeValues.length > 0 && (
+          {attributeValues.length > 0 && (
             <div className="mt-8 border-t border-gray-100 pt-6">
               <h2 className="mb-3 text-sm font-medium">Caractéristiques</h2>
               <dl className="space-y-1.5 text-sm">
-                {product.attributeValues.map((av) => (
+                {attributeValues.map((av) => (
                   <div key={av.id} className="flex justify-between">
                     <dt className="text-gray-500">
                       {av.attributeDefinition.name}
