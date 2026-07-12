@@ -604,6 +604,7 @@ export interface Shipment {
 export interface ShipmentTrackingInput {
   status: string;
   location?: string;
+  shipment_status?: ShipmentStatus;
 }
 
 export type ReturnStatus = "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED";
@@ -947,4 +948,19 @@ export interface PromotionProductsResponse {
   promotionName: string;
   count: number;
   products: Product[];
+}
+
+export type SettingType = "STRING" | "NUMBER" | "BOOLEAN" | "JSON";
+
+export interface Setting {
+  id: string;
+  key: string;
+  value: string; // toujours une string en base, y compris pour JSON (à parser)
+  type: SettingType;
+  category: string;
+  description: string | null;
+  isPublic: boolean;
+  updatedBy: number | null;
+  createdAt: string;
+  updatedAt: string;
 }

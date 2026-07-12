@@ -19,6 +19,7 @@ import {
   Route,
   PackageCheck,
   CreditCard,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 
@@ -46,6 +47,7 @@ const NAV_ITEMS = [
   },
   { href: "/admin/returns", label: "Retours", icon: RotateCcw },
   { href: "/admin/loyalty", label: "Fidélité", icon: Coins },
+  { href: "/admin/settings", label: "Paramètres", icon: SlidersHorizontal },
 ];
 
 export default function AdminLayout({

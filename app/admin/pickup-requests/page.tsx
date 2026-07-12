@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Pencil,
   Warehouse as WarehouseIcon,
+  RefreshCw,
 } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
@@ -21,6 +22,7 @@ import type {
 } from "@/lib/types";
 import {
   useAdminPickupRequests,
+  useExpireOverduePickupRequests,
   useUpdatePickupLocation,
   useUpdatePickupStatus,
 } from "@/lib/queries/admin/usePickupRequests";
@@ -292,6 +294,21 @@ export default function AdminPickupRequestsPage() {
   const [locationEditRequest, setLocationEditRequest] =
     useState<PickupRequest | null>(null);
 
+  const { mutate: expireOverdue, isPending: isExpiring } =
+    useExpireOverduePickupRequests();
+
+  function handleExpireOverdue() {
+    if (!confirm("Forcer l'expiration des demandes d'enlèvement en retard ?"))
+      return;
+    expireOverdue(undefined, {
+      onError: (err) =>
+        alert(
+          err instanceof ApiError ? err.message : "Erreur lors de l'opération",
+        ),
+      onSettled: fetchRequests,
+    });
+  }
+
   const { data, isLoading, isError } = useAdminPickupRequests({
     page,
     status,
@@ -310,6 +327,18 @@ export default function AdminPickupRequestsPage() {
             retour
           </p>
         </div>
+        <button
+          onClick={handleExpireOverdue}
+          disabled={isExpiring}
+          className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {isExpiring ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <RefreshCw size={16} />
+          )}
+          Expirer les demandes en retard
+        </button>
       </div>
 
       <div className="mb-4">

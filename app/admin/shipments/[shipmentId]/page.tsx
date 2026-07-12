@@ -141,6 +141,7 @@ function OfficialStatusForm({ shipment }: { shipment: Shipment }) {
 function AddTrackingForm({ shipmentId }: { shipmentId: string }) {
   const [status, setStatus] = useState("");
   const [location, setLocation] = useState("");
+  const [shipmentStatus, setShipmentStatus] = useState<ShipmentStatus | "">("");
   const [error, setError] = useState<string | null>(null);
   const { mutate: addTracking, isPending: isSubmitting } =
     useAddShipmentTracking(shipmentId);
@@ -149,11 +150,16 @@ function AddTrackingForm({ shipmentId }: { shipmentId: string }) {
     e.preventDefault();
     setError(null);
     addTracking(
-      { status, location: location || undefined },
+      {
+        status,
+        location: location || undefined,
+        shipment_status: shipmentStatus || undefined,
+      },
       {
         onSuccess: () => {
           setStatus("");
           setLocation("");
+          setShipmentStatus("");
         },
         onError: (err) =>
           setError(
@@ -175,7 +181,8 @@ function AddTrackingForm({ shipmentId }: { shipmentId: string }) {
         <Plus size={16} /> Ajouter un événement de suivi
       </h2>
       <p className="text-xs text-gray-400">
-        Journal libre (ne change pas le statut officiel de l'expédition).
+        Journal libre. Optionnellement, synchronise aussi le statut officiel de
+        l'expédition en un seul appel.
       </p>
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -205,6 +212,24 @@ function AddTrackingForm({ shipmentId }: { shipmentId: string }) {
           onChange={(e) => setLocation(e.target.value)}
           className={`${inputClass} w-full`}
         />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-600">
+          Mettre aussi à jour le statut officiel (optionnel)
+        </label>
+        <select
+          value={shipmentStatus}
+          onChange={(e) =>
+            setShipmentStatus(e.target.value as ShipmentStatus | "")
+          }
+          className={`${inputClass} w-full`}
+        >
+          <option value="">Aucun changement</option>
+          <option value="PENDING">PENDING</option>
+          <option value="IN_TRANSIT">IN_TRANSIT</option>
+          <option value="DELIVERED">DELIVERED</option>
+          <option value="CANCELLED">CANCELLED</option>
+        </select>
       </div>
       <button
         type="submit"

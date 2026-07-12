@@ -58,3 +58,12 @@ export function useUpdatePickupStatus(id: string, returnId?: string) {
     },
   });
 }
+export function useExpireOverduePickupRequests() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminPickupRequestsApi.expireOverdue(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "pickup-requests"] });
+    },
+  });
+}

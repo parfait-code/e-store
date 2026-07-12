@@ -26,6 +26,16 @@ export function useAdminOrder(orderId: string) {
   });
 }
 
+export function useExpireStaleOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminOrdersApi.expireStale(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "orders"] });
+    },
+  });
+}
+
 // Le point d'attention métier (STATUS_MANAGEMENT.md §2) : le statut de
 // l'expédition liée n'est PAS automatiquement synchronisé avec la commande
 // dans l'autre sens — mais niveau frontend, changer le statut d'une commande

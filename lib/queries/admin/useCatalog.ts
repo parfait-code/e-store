@@ -4,12 +4,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminCatalogApi } from "@/lib/api/admin/catalog";
 import { queryKeys } from "@/lib/queries/keys";
-import type { Product } from "@/lib/types";
+import type { Product, ProductStatus } from "@/lib/types";
 
 export function useAdminProducts(params: {
   page: number;
   categoryId?: string;
   search?: string;
+  status?: ProductStatus | "";
 }) {
   return useQuery({
     queryKey: queryKeys.admin.products(params),

@@ -3,7 +3,8 @@ import { apiClient } from "@/lib/api-client";
 import type { ShippingMethod, ShippingMethodFormInput } from "@/lib/types";
 
 export const adminShippingMethodsApi = {
-  list: () => apiClient.get<ShippingMethod[]>("/shipping-methods"),
+  list: () =>
+    apiClient.get<ShippingMethod[]>("/shipping-methods?includeInactive=true"),
 
   create: (payload: ShippingMethodFormInput) =>
     apiClient.post<ShippingMethod>("/shipping-methods", payload),

@@ -3,10 +3,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, ChevronLeft, ChevronRight, Loader2, Eye } from "lucide-react";
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Eye,
+  RefreshCw,
+} from "lucide-react";
 import { formatXAF, formatDate } from "@/lib/format";
 import type { OrderStatus } from "@/lib/types";
-import { useAdminOrders } from "@/lib/queries/admin/useOrders";
+import {
+  useAdminOrders,
+  useExpireStaleOrders,
+} from "@/lib/queries/admin/useOrders";
+import { ApiError } from "@/lib/api-client";
 
 const STATUS_OPTIONS: OrderStatus[] = [
   "PENDING",
@@ -44,6 +55,8 @@ export default function OrdersPage() {
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerInput, setCustomerInput] = useState("");
 
+  const { mutate: expireStale, isPending: isExpiring } = useExpireStaleOrders();
+
   const { data, isLoading, isError } = useAdminOrders({
     page,
     status,
@@ -59,11 +72,46 @@ export default function OrdersPage() {
     setCustomerEmail(customerInput.trim());
   }
 
+  function handleExpireStale() {
+    if (
+      !confirm(
+        "Forcer l'annulation des commandes PENDING non payées dépassant le délai configuré ?",
+      )
+    )
+      return;
+    expireStale(undefined, {
+      onSuccess: (res) =>
+        alert(
+          res.cancelledCount !== undefined
+            ? `${res.cancelledCount} commande(s) annulée(s).`
+            : "Vérification terminée.",
+        ),
+      onError: (err) =>
+        alert(
+          err instanceof ApiError ? err.message : "Erreur lors de l'opération",
+        ),
+    });
+  }
+
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold">Commandes</h1>
-        <p className="text-sm text-gray-500">{total} commande(s) au total</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Commandes</h1>
+          <p className="text-sm text-gray-500">{total} commande(s) au total</p>
+        </div>
+        <button
+          onClick={handleExpireStale}
+          disabled={isExpiring}
+          className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {isExpiring ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <RefreshCw size={16} />
+          )}
+          Expirer les commandes en attente
+        </button>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-3">

@@ -34,4 +34,6 @@ export const adminOrdersApi = {
     apiClient
       .get<Shipment | null>(`/orders/${orderId}/shipment`)
       .catch(() => null),
+  expireStale: () =>
+    apiClient.post<{ cancelledCount?: number }>("/orders/expire-stale"),
 };

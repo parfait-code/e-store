@@ -1,6 +1,6 @@
 // lib/api/admin/catalog.ts
 import { apiClient } from "@/lib/api-client";
-import type { Product, Paginated, CategoryRef } from "@/lib/types";
+import type { Product, Paginated, CategoryRef, ProductStatus } from "@/lib/types";
 
 export const adminCatalogApi = {
   listProducts: (
@@ -9,6 +9,7 @@ export const adminCatalogApi = {
       limit?: number;
       categoryId?: string;
       search?: string;
+      status?: ProductStatus | "";
     } = {},
   ) => {
     const qs = new URLSearchParams();
@@ -16,6 +17,8 @@ export const adminCatalogApi = {
     if (params.limit) qs.set("limit", String(params.limit));
     if (params.categoryId) qs.set("categoryId", params.categoryId);
     if (params.search) qs.set("search", params.search);
+    if (params.status) qs.set("status", params.status);
+    qs.set("includeInactive", "true");
     return apiClient.get<Paginated<Product>>(`/product?${qs.toString()}`);
   },
 
