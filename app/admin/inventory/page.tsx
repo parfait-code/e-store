@@ -445,7 +445,7 @@ function BulkCombinationForm({
   const [isLoadingCombos, setIsLoadingCombos] = useState(false);
   const [warehouseId, setWarehouseId] = useState("");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [existingByCombo, setExistingByCombo] = useState<
+  const [existingByCombo, setExistingByCombo] = useState
     Record<string, { itemId: string; quantity: number }>
   >({});
   const [error, setError] = useState<string | null>(null);
@@ -781,6 +781,17 @@ function CreateItemModal({
   );
 }
 
+// Construit un libellé lisible pour une ligne d'inventaire détaillée : nom du
+// produit toujours affiché, complété par la description de la variante
+// (attribut: valeur) quand une combinaison existe. Avant ce correctif, cette
+// colonne n'affichait que le SKU de la combinaison (dupliqué avec la colonne
+// SKU juste à côté) ou "Produit simple" — impossible de savoir quelle
+// variante (couleur/taille) correspondait à la ligne.
+function inventoryItemLabel(item: InventoryItem): string {
+  if (!item.combination) return item.product.name;
+  return `${item.product.name} — ${item.combination.sku ?? "variante"}`;
+}
+
 // Détail par entrepôt/combinaison d'un produit du tableau groupé. Reçoit les
 // entrepôts depuis le parent (plus de tableau vide en dur passé au transfert).
 function ExpandedProductRows({
@@ -812,11 +823,13 @@ function ExpandedProductRows({
           key={item.id}
           className="border-b border-gray-100 bg-white last:border-0"
         >
+          {/* FIX : affiche le nom du produit + la variante, au lieu du SKU
+              de la combinaison dupliqué avec la colonne suivante. */}
           <td className="px-4 py-2.5 pl-10 text-gray-600">
-            {item.combination ? item.combination.sku : "Produit simple"}
+            {inventoryItemLabel(item)}
           </td>
           <td className="px-4 py-2.5 text-gray-500">
-            {item.combination?.sku ?? "—"}
+            {item.combination?.sku ?? item.product.sku}
           </td>
           <td className="px-4 py-2.5 text-gray-500">{item.warehouse.name}</td>
           <td className="px-4 py-2.5">
@@ -851,15 +864,11 @@ function ExpandedProductRows({
         </tr>
       ))}
       {transferItem && (
-        <tr>
-          <td colSpan={5} className="p-0">
-            <TransferModal
-              item={transferItem}
-              warehouses={warehouses}
-              onClose={() => setTransferItem(null)}
-            />
-          </td>
-        </tr>
+        <TransferModal
+          item={transferItem}
+          warehouses={warehouses}
+          onClose={() => setTransferItem(null)}
+        />
       )}
     </>
   );
@@ -939,9 +948,14 @@ export default function InventoryPage() {
     });
   }
 
+  // FIX : les onglets ne sont pertinents que hors mode recherche — on ne les
+  // met plus en avant visuellement pendant une recherche, pour éviter de
+  // laisser croire qu'un filtre "Stock faible"/"Rupture" s'applique encore.
   const tabClass = (t: Tab) =>
     `flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium ${
-      tab === t ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
+      tab === t && !isSearchMode
+        ? "bg-gray-900 text-white"
+        : "text-gray-600 hover:bg-gray-100"
     }`;
 
   return (
@@ -1167,7 +1181,11 @@ export default function InventoryPage() {
         </table>
       </div>
 
-      {tab === "all" && !isSearchMode && totalPages > 1 && (
+      {/* FIX : la pagination doit s'afficher pour les 3 onglets (all,
+          low-stock, out-of-stock), pas seulement "all" — les onglets
+          low-stock/out-of-stock utilisent la même requête paginée et
+          pouvaient avoir plusieurs pages sans aucun moyen d'y accéder. */}
+      {!isSearchMode && totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm">
           <span className="text-gray-500">
             Page {page} sur {totalPages}

@@ -28,24 +28,23 @@ export const adminCatalogApi = {
     return apiClient.get<Paginated<Product>>(`/product?${qs.toString()}`);
   },
 
-  // Corrigé — sans includeInactive, un produit DRAFT/ARCHIVED n'était pas
-  // renvoyé pour l'admin, bloquant la vue/l'édition de sa fiche.
+  // Confirmé nécessaire : GET /product/:id est Public et applique le même
+  // filtre de visibilité que le listing (masque DRAFT/ARCHIVED) sauf avec
+  // ce flag — c'est ce qui permet à la page d'édition de charger le produit.
   productById: (id: string | number) =>
     apiClient.get<Product>(`/product/${id}?includeInactive=true`),
 
   createProduct: (payload: Record<string, unknown>) =>
     apiClient.post<Product>("/product", payload),
 
-  // FIX : le backend applique le même filtre de visibilité (DRAFT/ARCHIVED
-  // masqués) sur la résolution du produit pour PATCH que pour GET. Sans
-  // `includeInactive=true`, modifier un produit DRAFT (ex: le passer en
-  // ACTIVE) renvoyait 404 "produit introuvable" alors qu'il existe bien.
+  // Revert : PATCH est une route Admin (voir §6.2 du guide), donc en
+  // principe non soumise au filtre de visibilité catalogue qui ne concerne
+  // que les routes Public. Ajouter includeInactive ici n'a probablement
+  // aucun effet — le vrai 404 vient d'ailleurs (voir diagnostic ci-dessous).
   updateProduct: (id: string | number, payload: Record<string, unknown>) =>
-    apiClient.patch<Product>(`/product/${id}?includeInactive=true`, payload),
+    apiClient.patch<Product>(`/product/${id}`, payload),
 
-  // Même cause potentielle sur DELETE — corrigé par précaution.
-  deleteProduct: (id: string | number) =>
-    apiClient.delete(`/product/${id}?includeInactive=true`),
+  deleteProduct: (id: string | number) => apiClient.delete(`/product/${id}`),
 
   listCategories: () => apiClient.get<CategoryRef[]>("/categories"),
 
@@ -53,27 +52,21 @@ export const adminCatalogApi = {
   uploadImage: (productId: string | number, file: File) => {
     const fd = new FormData();
     fd.append("images", file);
-    return apiClient.post<Product>(
-      `/product/${productId}/images?includeInactive=true`,
-      fd,
-      { isFormData: true },
-    );
+    return apiClient.post<Product>(`/product/${productId}/images`, fd, {
+      isFormData: true,
+    });
   },
   deleteImage: (productId: string | number, imageId: string) =>
-    apiClient.delete<Product>(
-      `/product/${productId}/images?includeInactive=true`,
-      { imageId },
-    ),
+    apiClient.delete<Product>(`/product/${productId}/images`, { imageId }),
 
   // --- Attributs non-variante (§7.4 du guide) ---
   saveAttributes: (
     productId: string | number,
     attributes: { attributeDefinitionId: string; value: string }[],
   ) =>
-    apiClient.put<Product>(
-      `/product/${productId}/attributes?includeInactive=true`,
-      { attributes },
-    ),
+    apiClient.put<Product>(`/product/${productId}/attributes`, {
+      attributes,
+    }),
 
   // --- Tags ---
   productTags: (productId: string | number) =>
