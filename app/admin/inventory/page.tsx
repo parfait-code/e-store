@@ -445,7 +445,7 @@ function BulkCombinationForm({
   const [isLoadingCombos, setIsLoadingCombos] = useState(false);
   const [warehouseId, setWarehouseId] = useState("");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [existingByCombo, setExistingByCombo] = useState
+  const [existingByCombo, setExistingByCombo] = useState<
     Record<string, { itemId: string; quantity: number }>
   >({});
   const [error, setError] = useState<string | null>(null);
