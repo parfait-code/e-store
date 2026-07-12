@@ -211,7 +211,7 @@ function AttributesStep({ product }: { product: Product }) {
 }
 
 // ---------- Étape Tags ----------
-function TagsStep({ productId }: { productId: number }) {
+function TagsStep({ productId }: { productId: string }) {
   const { data: allTags = [], isLoading: isLoadingTags } = useAdminTags();
   const { data: productTags = [], isLoading: isLoadingProductTags } =
     useProductTags(String(productId));

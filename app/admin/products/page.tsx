@@ -41,7 +41,7 @@ export default function ProductsPage() {
   const [categoryId, setCategoryId] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [status, setStatus] = useState<ProductStatus | "">("");
 
   useEffect(() => {

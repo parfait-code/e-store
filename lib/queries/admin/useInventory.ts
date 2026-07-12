@@ -27,7 +27,6 @@ export function useAdminInventoryList(page: number) {
   });
 }
 
-
 export function useAdminInventoryGrouped(params: {
   page: number;
   lowStock?: boolean;
@@ -41,7 +40,7 @@ export function useAdminInventoryGrouped(params: {
 }
 
 export function useAdminInventoryGroupedDetail(
-  productId: number | null,
+  productId: string | null,
   page: number,
 ) {
   return useQuery({
@@ -59,7 +58,7 @@ export function useAdminInventorySearch(keyword: string) {
   });
 }
 
-export function useProductCombinationsForInventory(productId: number | null) {
+export function useProductCombinationsForInventory(productId: string | null) {
   return useQuery({
     queryKey: queryKeys.admin.productCombinations(productId ?? 0),
     queryFn: () => adminInventoryApi.combinationsForProduct(productId!),

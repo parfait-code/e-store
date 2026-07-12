@@ -61,7 +61,7 @@ export const queryKeys = {
       ["admin", "inventory", "list", page] as const,
     inventoryGrouped: (params: Record<string, unknown>) =>
       ["admin", "inventory", "grouped", params] as const,
-    inventoryGroupedDetail: (productId: number, page: number) =>
+    inventoryGroupedDetail: (productId: string, page: number) =>
       ["admin", "inventory", "grouped", productId, page] as const,
     inventorySearch: (keyword: string) =>
       ["admin", "inventory", "search", keyword] as const,

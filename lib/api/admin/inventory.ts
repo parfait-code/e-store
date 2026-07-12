@@ -51,7 +51,7 @@ export const adminInventoryApi = {
   },
 
   // Détail par combinaison × entrepôt pour un produit, paginé
-  groupedDetail: (productId: number, page = 1, limit = 50) =>
+  groupedDetail: (productId: string, page = 1, limit = 50) =>
     apiClient.get<Paginated<InventoryItem>>(
       `/inventory/grouped/${productId}?page=${page}&limit=${limit}`,
     ),
@@ -77,7 +77,7 @@ export const adminInventoryApi = {
   transfer: (payload: InventoryTransferInput) =>
     apiClient.post("/inventory/transfer", payload),
 
-  combinationsForProduct: (productId: number) =>
+  combinationsForProduct: (productId: string) =>
     apiClient.get<ProductCombination[]>(`/product/${productId}/combinations`),
 };
 
