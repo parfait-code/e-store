@@ -8,6 +8,7 @@ import { ApiError } from "@/lib/api-client";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Pagination } from "@/components/Pagination";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import Image from "next/image";
 import {
   useCategoryBySlug,
   useCategoryProducts,
@@ -70,6 +71,18 @@ export function CategoryPageClient({ slug }: { slug: string }) {
   return (
     <div>
       <Breadcrumb items={breadcrumbItems} />
+
+      {category?.imageUrl && (
+        <div className="relative mb-6 aspect-[4/1] w-full overflow-hidden rounded-lg bg-gray-100">
+          <Image
+            src={category.imageUrl}
+            alt={productsData.category.name}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 1200px"
+          />
+        </div>
+      )}
 
       <div className="mb-6">
         <h1 className="text-xl font-semibold">{productsData.category.name}</h1>
