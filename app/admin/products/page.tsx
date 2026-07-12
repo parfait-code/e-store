@@ -24,17 +24,17 @@ import {
 } from "@/lib/queries/admin/useCatalog";
 import { ApiError } from "@/lib/api-client";
 
-// const STATUS_STYLES: Record<ProductStatus, string> = {
-//   ACTIVE: "bg-green-100 text-green-700",
-//   DRAFT: "bg-gray-100 text-gray-600",
-//   ARCHIVED: "bg-amber-100 text-amber-700",
-// };
+const STATUS_STYLES: Record<ProductStatus, string> = {
+  ACTIVE: "bg-green-100 text-green-700",
+  DRAFT: "bg-gray-100 text-gray-600",
+  ARCHIVED: "bg-amber-100 text-amber-700",
+};
 
-// const STATUS_LABELS: Record<ProductStatus, string> = {
-//   ACTIVE: "Actif",
-//   DRAFT: "Brouillon",
-//   ARCHIVED: "Archivé",
-// };
+const STATUS_LABELS: Record<ProductStatus, string> = {
+  ACTIVE: "Actif",
+  DRAFT: "Brouillon",
+  ARCHIVED: "Archivé",
+};
 
 export default function ProductsPage() {
   const [page, setPage] = useState(1);
@@ -123,6 +123,19 @@ export default function ProductsPage() {
             </option>
           ))}
         </select>
+        <select
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value as ProductStatus | "");
+            setPage(1);
+          }}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+        >
+          <option value="">Tous les statuts</option>
+          <option value="DRAFT">Brouillon</option>
+          <option value="ACTIVE">Actif</option>
+          <option value="ARCHIVED">Archivé</option>
+        </select>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -203,19 +216,11 @@ export default function ProductsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <select
-                        value={status}
-                        onChange={(e) => {
-                          setStatus(e.target.value as ProductStatus | "");
-                          setPage(1);
-                        }}
-                        className="rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[product.status]}`}
                       >
-                        <option value="">Tous les statuts</option>
-                        <option value="DRAFT">Brouillon</option>
-                        <option value="ACTIVE">Actif</option>
-                        <option value="ARCHIVED">Archivé</option>
-                      </select>
+                        {STATUS_LABELS[product.status]}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">

@@ -37,6 +37,7 @@ import {
   useTransferInventory,
   useAdminInventoryGrouped,
   useAdminInventoryGroupedDetail,
+  useCreateInventoryItem,
 } from "@/lib/queries/admin/useInventory";
 import { useBulkInventoryHelpers } from "@/lib/queries/admin/useBulkInventory";
 
@@ -232,7 +233,7 @@ function ProductSearchPicker({
         .get<Paginated<Product>>(
           `/product?search=${encodeURIComponent(query.trim())}&limit=8`,
         )
-        .then((res) => setResults(res.items))
+        .then((res) => setResults(res.items ?? []))
         .catch(() => setResults([]))
         .finally(() => setIsSearching(false));
     }, 350);
@@ -327,11 +328,7 @@ function NewInventoryItemForm({
   const [warehouseId, setWarehouseId] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const { mutate: createItem, isPending } = useUpdateInventoryItem(); // placeholder — remplacé ci-dessous
-  const { mutate: create, isPending: isCreating } = (() => {
-    // useCreateInventoryItem attend InventoryFormInput — import direct
-    return require("@/lib/queries/admin/useInventory").useCreateInventoryItem();
-  })();
+  const { mutate: create, isPending: isCreating } = useCreateInventoryItem();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -344,7 +341,7 @@ function NewInventoryItemForm({
       { product_id: selectedProduct.id, warehouse_id: warehouseId, quantity },
       {
         onSuccess: onCreated,
-        onError: (err: unknown) =>
+        onError: (err) =>
           setError(
             err instanceof ApiError
               ? err.message
@@ -470,9 +467,9 @@ function BulkCombinationForm({
     apiClient
       .get<ProductCombination[]>(`/product/${selectedProduct.id}/combinations`)
       .then((combos) => {
-        setCombinations(combos);
+        setCombinations(combos ?? []);
         const initial: Record<string, number> = {};
-        combos.forEach((c) => {
+        (combos ?? []).forEach((c) => {
           initial[c.id] = 0;
         });
         setQuantities(initial);
@@ -497,7 +494,7 @@ function BulkCombinationForm({
         combinations.forEach((c) => {
           initialQuantities[c.id] = 0;
         });
-        items.forEach((item) => {
+        (items ?? []).forEach((item) => {
           if (item.warehouseId !== warehouseId) return;
           if (!item.combinationId) return;
           if (!combinations.some((c) => c.id === item.combinationId)) return;
@@ -545,10 +542,6 @@ function BulkCombinationForm({
     setResults({});
     let successCount = 0;
 
-    // Boucle séquentielle volontaire : chaque étape doit mettre à jour la
-    // barre de progression avant de passer à la suivante — React Query gère
-    // le CACHE de chaque appel individuel (via apiClient direct ici), mais
-    // ne remplace pas la coordination pas-à-pas de la boucle elle-même.
     for (const combo of targets) {
       const existing = existingByCombo[combo.id];
       try {
@@ -569,7 +562,7 @@ function BulkCombinationForm({
 
     setIsSubmitting(false);
     if (successCount > 0) {
-      invalidateAfterBulk(); // une seule invalidation à la fin du lot, pas à chaque item
+      invalidateAfterBulk();
       onCreated();
     }
 
@@ -788,17 +781,88 @@ function CreateItemModal({
   );
 }
 
-function groupByProduct(items: InventoryItem[]) {
-  const order: number[] = [];
-  const map = new Map<number, InventoryItem[]>();
-  items.forEach((item) => {
-    if (!map.has(item.productId)) {
-      map.set(item.productId, []);
-      order.push(item.productId);
-    }
-    map.get(item.productId)!.push(item);
-  });
-  return order.map((productId) => ({ productId, items: map.get(productId)! }));
+// Détail par entrepôt/combinaison d'un produit du tableau groupé. Reçoit les
+// entrepôts depuis le parent (plus de tableau vide en dur passé au transfert).
+function ExpandedProductRows({
+  productId,
+  warehouses,
+}: {
+  productId: number;
+  warehouses: Warehouse[];
+}) {
+  const { data, isLoading } = useAdminInventoryGroupedDetail(productId, 1);
+  const items = data?.items ?? [];
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [transferItem, setTransferItem] = useState<InventoryItem | null>(null);
+
+  if (isLoading) {
+    return (
+      <tr>
+        <td colSpan={5} className="px-8 py-3">
+          <Loader2 size={14} className="animate-spin text-gray-400" />
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <>
+      {items.map((item) => (
+        <tr
+          key={item.id}
+          className="border-b border-gray-100 bg-white last:border-0"
+        >
+          <td className="px-4 py-2.5 pl-10 text-gray-600">
+            {item.combination ? item.combination.sku : "Produit simple"}
+          </td>
+          <td className="px-4 py-2.5 text-gray-500">
+            {item.combination?.sku ?? "—"}
+          </td>
+          <td className="px-4 py-2.5 text-gray-500">{item.warehouse.name}</td>
+          <td className="px-4 py-2.5">
+            {editingId === item.id ? (
+              <QuantityEditor item={item} onCancel={() => setEditingId(null)} />
+            ) : (
+              <span
+                className={`font-medium ${item.quantity === 0 ? "text-red-600" : item.quantity <= 10 ? "text-amber-600" : ""}`}
+              >
+                {item.quantity}
+              </span>
+            )}
+          </td>
+          <td className="px-4 py-2.5">
+            {editingId !== item.id && (
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setEditingId(item.id)}
+                  className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
+                  onClick={() => setTransferItem(item)}
+                  className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                >
+                  <ArrowLeftRight size={16} />
+                </button>
+              </div>
+            )}
+          </td>
+        </tr>
+      ))}
+      {transferItem && (
+        <tr>
+          <td colSpan={5} className="p-0">
+            <TransferModal
+              item={transferItem}
+              warehouses={warehouses}
+              onClose={() => setTransferItem(null)}
+            />
+          </td>
+        </tr>
+      )}
+    </>
+  );
 }
 
 export default function InventoryPage() {
@@ -813,17 +877,9 @@ export default function InventoryPage() {
   const [expandedProductIds, setExpandedProductIds] = useState<Set<number>>(
     new Set(),
   );
-  const [combosByProduct, setCombosByProduct] = useState<
-    Record<number, ProductCombination[]>
-  >({});
-  const [loadingCombosProductId, setLoadingCombosProductId] = useState<
-    number | null
-  >(null);
 
   const { data: warehouses = [] } = useAdminWarehouses();
 
-  // Un seul des trois hooks est "actif" selon le mode — les autres restent
-  // en attente grâce à `enabled` pour ne pas fetch inutilement.
   const listQuery = useAdminInventoryGrouped({
     page,
     lowStock: tab === "low-stock",
@@ -834,27 +890,21 @@ export default function InventoryPage() {
   const { mutate: deleteItem, isPending: isDeleting } =
     useDeleteInventoryItem();
 
-  let items: InventoryItem[] = [];
-  let totalPages = 1;
-  let total = 0;
-  let isLoading = false;
-  let isError = false;
+  const isSearchMode = Boolean(keyword);
 
-  let groupedProducts: InventoryGroupedProduct[] = [];
-  let flatSearchItems: InventoryItem[] = [];
+  const flatSearchItems: InventoryItem[] = isSearchMode
+    ? (searchQuery.data ?? [])
+    : [];
+  const groupedProducts: InventoryGroupedProduct[] = isSearchMode
+    ? []
+    : (listQuery.data?.items ?? []);
 
-  if (keyword) {
-    flatSearchItems = searchQuery.data ?? [];
-    total = flatSearchItems.length;
-    isLoading = searchQuery.isLoading;
-    isError = searchQuery.isError;
-  } else {
-    groupedProducts = listQuery.data?.items ?? [];
-    total = listQuery.data?.total ?? 0;
-    totalPages = listQuery.data?.totalPages ?? 1;
-    isLoading = listQuery.isLoading;
-    isError = listQuery.isError;
-  }
+  const total = isSearchMode
+    ? flatSearchItems.length
+    : (listQuery.data?.total ?? 0);
+  const totalPages = isSearchMode ? 1 : (listQuery.data?.totalPages ?? 1);
+  const isLoading = isSearchMode ? searchQuery.isLoading : listQuery.isLoading;
+  const isError = isSearchMode ? searchQuery.isError : listQuery.isError;
 
   function handleSearch(e: FormEvent) {
     e.preventDefault();
@@ -889,104 +939,10 @@ export default function InventoryPage() {
     });
   }
 
-  function ExpandedProductRows({ productId }: { productId: number }) {
-    const { data, isLoading } = useAdminInventoryGroupedDetail(productId, 1);
-    const items = data?.items ?? [];
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [transferItem, setTransferItem] = useState<InventoryItem | null>(
-      null,
-    );
-
-    if (isLoading) {
-      return (
-        <tr>
-          <td colSpan={5} className="px-8 py-3">
-            <Loader2 size={14} className="animate-spin text-gray-400" />
-          </td>
-        </tr>
-      );
-    }
-
-    return (
-      <>
-        {items.map((item) => (
-          <tr
-            key={item.id}
-            className="border-b border-gray-100 bg-white last:border-0"
-          >
-            <td className="px-4 py-2.5 pl-10 text-gray-600">
-              {item.combination ? item.combination.sku : "Produit simple"}
-            </td>
-            <td className="px-4 py-2.5 text-gray-500">
-              {item.combination?.sku ?? "—"}
-            </td>
-            <td className="px-4 py-2.5 text-gray-500">{item.warehouse.name}</td>
-            <td className="px-4 py-2.5">
-              {editingId === item.id ? (
-                <QuantityEditor
-                  item={item}
-                  onCancel={() => setEditingId(null)}
-                />
-              ) : (
-                <span
-                  className={`font-medium ${item.quantity === 0 ? "text-red-600" : item.quantity <= 10 ? "text-amber-600" : ""}`}
-                >
-                  {item.quantity}
-                </span>
-              )}
-            </td>
-            <td className="px-4 py-2.5">
-              {editingId !== item.id && (
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    onClick={() => setEditingId(item.id)}
-                    className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    onClick={() => setTransferItem(item)}
-                    className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                  >
-                    <ArrowLeftRight size={16} />
-                  </button>
-                </div>
-              )}
-            </td>
-          </tr>
-        ))}
-        {transferItem && (
-          <TransferModal
-            item={transferItem}
-            warehouses={[]}
-            onClose={() => setTransferItem(null)}
-          />
-          // NB: passer les vraies warehouses via prop depuis le parent plutôt que []
-        )}
-      </>
-    );
-  }
-
-  function combinationLabel(
-    productId: number,
-    combinationId: string | null,
-    fallbackSku: string | null,
-  ) {
-    if (!combinationId) return "Produit simple";
-    const combos = combosByProduct[productId];
-    const combo = combos?.find((c) => c.id === combinationId);
-    if (combo && combo.values.length > 0) {
-      return combo.values.map((v) => v.attributeOption.value).join(" / ");
-    }
-    return fallbackSku ?? `Combinaison #${combinationId.slice(0, 6)}`;
-  }
-
   const tabClass = (t: Tab) =>
     `flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium ${
       tab === t ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
     }`;
-
-  const groups = groupByProduct(items);
 
   return (
     <div>
@@ -1072,7 +1028,77 @@ export default function InventoryPage() {
                   <Loader2 size={20} className="mx-auto animate-spin" />
                 </td>
               </tr>
-            ) : groups.length === 0 ? (
+            ) : isSearchMode ? (
+              flatSearchItems.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-10 text-center text-gray-500"
+                  >
+                    Aucun article trouvé.
+                  </td>
+                </tr>
+              ) : (
+                flatSearchItems.map((item) => (
+                  <tr
+                    key={item.id}
+                    className="border-b border-gray-100 last:border-0"
+                  >
+                    <td className="px-4 py-3 font-medium">
+                      {item.product.name}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {item.combination?.sku ?? item.product.sku}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {item.warehouse.name}
+                    </td>
+                    <td className="px-4 py-3">
+                      {editingId === item.id ? (
+                        <QuantityEditor
+                          item={item}
+                          onCancel={() => setEditingId(null)}
+                        />
+                      ) : (
+                        <span
+                          className={`font-medium ${item.quantity === 0 ? "text-red-600" : item.quantity <= 10 ? "text-amber-600" : ""}`}
+                        >
+                          {item.quantity}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {editingId !== item.id && (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setEditingId(item.id)}
+                            className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                            title="Modifier la quantité"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            onClick={() => setTransferItem(item)}
+                            className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                            title="Transférer"
+                          >
+                            <ArrowLeftRight size={16} />
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(item.id)}
+                            disabled={isDeleting}
+                            className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                            title="Supprimer"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )
+            ) : groupedProducts.length === 0 ? (
               <tr>
                 <td
                   colSpan={5}
@@ -1082,83 +1108,11 @@ export default function InventoryPage() {
                 </td>
               </tr>
             ) : (
-              groups.map((group) => {
-                if (group.items.length === 1) {
-                  const item = group.items[0];
-                  return (
-                    <tr
-                      key={item.id}
-                      className="border-b border-gray-100 last:border-0"
-                    >
-                      <td className="px-4 py-3 font-medium">
-                        {item.product.name}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">
-                        {item.combination?.sku ?? item.product.sku}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">
-                        {item.warehouse.name}
-                      </td>
-                      <td className="px-4 py-3">
-                        {editingId === item.id ? (
-                          <QuantityEditor
-                            item={item}
-                            onCancel={() => setEditingId(null)}
-                          />
-                        ) : (
-                          <span
-                            className={`font-medium ${item.quantity === 0 ? "text-red-600" : item.quantity <= 10 ? "text-amber-600" : ""}`}
-                          >
-                            {item.quantity}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {editingId !== item.id && (
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setEditingId(item.id)}
-                              className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                              title="Modifier la quantité"
-                            >
-                              <Pencil size={16} />
-                            </button>
-                            <button
-                              onClick={() => setTransferItem(item)}
-                              className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                              title="Transférer"
-                            >
-                              <ArrowLeftRight size={16} />
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteId(item.id)}
-                              disabled={isDeleting}
-                              className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                              title="Supprimer"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                }
-
+              groupedProducts.map((group) => {
                 const isExpanded = expandedProductIds.has(group.productId);
-                const totalQty = group.items.reduce(
-                  (sum, i) => sum + i.quantity,
-                  0,
-                );
-                const productName = group.items[0].product.name;
-                const productSku = group.items[0].product.sku;
-
                 return (
-                  <>
-                    <tr
-                      key={`group-${group.productId}`}
-                      className="border-b border-gray-100 bg-gray-50/60"
-                    >
+                  <React.Fragment key={group.productId}>
+                    <tr className="border-b border-gray-100 bg-gray-50/60">
                       <td colSpan={5} className="px-4 py-2.5">
                         <button
                           type="button"
@@ -1169,78 +1123,43 @@ export default function InventoryPage() {
                             size={14}
                             className={`shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`}
                           />
-                          <span className="font-medium">{productName}</span>
-                          <span className="text-xs text-gray-400">
-                            {productSku}
+                          <span className="font-medium">
+                            {group.productName}
                           </span>
+                          <span className="text-xs text-gray-400">
+                            {group.productSku}
+                          </span>
+                          {group.isOutOfStock && (
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">
+                              Rupture
+                            </span>
+                          )}
+                          {!group.isOutOfStock && group.isLowStock && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+                              Stock faible
+                            </span>
+                          )}
                           <span className="ml-auto whitespace-nowrap text-xs text-gray-500">
-                            {group.items.length} ligne(s) ·{" "}
+                            {group.lineCount} ligne(s) ·{" "}
                             <span
-                              className={totalQty === 0 ? "text-red-600" : ""}
+                              className={
+                                group.totalQuantity === 0 ? "text-red-600" : ""
+                              }
                             >
-                              {totalQty} unité(s)
+                              {group.totalQuantity} unité(s)
                             </span>{" "}
                             au total
                           </span>
                         </button>
                       </td>
                     </tr>
-                    {groupedProducts.map((group) => {
-                      const isExpanded = expandedProductIds.has(
-                        group.productId,
-                      );
-                      return (
-                        <React.Fragment key={group.productId}>
-                          <tr className="border-b border-gray-100 bg-gray-50/60">
-                            <td colSpan={5} className="px-4 py-2.5">
-                              <button
-                                type="button"
-                                onClick={() => toggleExpand(group.productId)}
-                                className="flex w-full items-center gap-2 text-left"
-                              >
-                                <ChevronRight
-                                  size={14}
-                                  className={`shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`}
-                                />
-                                <span className="font-medium">
-                                  {group.productName}
-                                </span>
-                                <span className="text-xs text-gray-400">
-                                  {group.productSku}
-                                </span>
-                                {group.isOutOfStock && (
-                                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">
-                                    Rupture
-                                  </span>
-                                )}
-                                {!group.isOutOfStock && group.isLowStock && (
-                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
-                                    Stock faible
-                                  </span>
-                                )}
-                                <span className="ml-auto whitespace-nowrap text-xs text-gray-500">
-                                  {group.lineCount} ligne(s) ·{" "}
-                                  <span
-                                    className={
-                                      group.totalQuantity === 0
-                                        ? "text-red-600"
-                                        : ""
-                                    }
-                                  >
-                                    {group.totalQuantity} unité(s)
-                                  </span>{" "}
-                                  au total
-                                </span>
-                              </button>
-                            </td>
-                          </tr>
-                          {isExpanded && (
-                            <ExpandedProductRows productId={group.productId} />
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </>
+                    {isExpanded && (
+                      <ExpandedProductRows
+                        productId={group.productId}
+                        warehouses={warehouses}
+                      />
+                    )}
+                  </React.Fragment>
                 );
               })
             )}
@@ -1248,7 +1167,7 @@ export default function InventoryPage() {
         </table>
       </div>
 
-      {tab === "all" && !keyword && totalPages > 1 && (
+      {tab === "all" && !isSearchMode && totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm">
           <span className="text-gray-500">
             Page {page} sur {totalPages}

@@ -1,6 +1,11 @@
 // lib/api/admin/catalog.ts
 import { apiClient } from "@/lib/api-client";
-import type { Product, Paginated, CategoryRef, ProductStatus } from "@/lib/types";
+import type {
+  Product,
+  Paginated,
+  CategoryRef,
+  ProductStatus,
+} from "@/lib/types";
 
 export const adminCatalogApi = {
   listProducts: (
@@ -23,7 +28,7 @@ export const adminCatalogApi = {
   },
 
   productById: (id: string | number) =>
-    apiClient.get<Product>(`/product/${id}`),
+    apiClient.get<Product>(`/product/${id}?includeInactive=true`),
 
   createProduct: (payload: Record<string, unknown>) =>
     apiClient.post<Product>("/product", payload),

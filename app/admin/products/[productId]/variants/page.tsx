@@ -302,7 +302,9 @@ export default function ProductCombinationsPage() {
   async function loadAll() {
     setIsLoading(true);
     try {
-      const productRes = await apiClient.get<Product>(`/product/${productId}`);
+      const productRes = await apiClient.get<Product>(
+        `/product/${productId}?includeInactive=true`,
+      );
       setProduct(productRes);
 
       const [attrsRes, selectionsRes, combosRes] = await Promise.all([
