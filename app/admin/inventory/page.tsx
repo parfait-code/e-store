@@ -214,8 +214,8 @@ function ProductSearchPicker({
   selected,
   onSelect,
 }: {
-  selected: { id: number; name: string; sku: string } | null;
-  onSelect: (product: { id: number; name: string; sku: string } | null) => void;
+  selected: { id: string; name: string; sku: string } | null;
+  onSelect: (product: { id: string; name: string; sku: string } | null) => void;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Product[]>([]);
@@ -321,7 +321,7 @@ function NewInventoryItemForm({
   onCancel: () => void;
 }) {
   const [selectedProduct, setSelectedProduct] = useState<{
-    id: number;
+    id: string;
     name: string;
     sku: string;
   } | null>(null);
@@ -437,7 +437,7 @@ function BulkCombinationForm({
   onCancel: () => void;
 }) {
   const [selectedProduct, setSelectedProduct] = useState<{
-    id: number;
+    id: string;
     name: string;
     sku: string;
   } | null>(null);
@@ -787,7 +787,7 @@ function ExpandedProductRows({
   productId,
   warehouses,
 }: {
-  productId: number;
+  productId: string;
   warehouses: Warehouse[];
 }) {
   const { data, isLoading } = useAdminInventoryGroupedDetail(productId, 1);
@@ -874,7 +874,7 @@ export default function InventoryPage() {
   const [transferItem, setTransferItem] = useState<InventoryItem | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [expandedProductIds, setExpandedProductIds] = useState<Set<number>>(
+  const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(
     new Set(),
   );
 
@@ -927,7 +927,7 @@ export default function InventoryPage() {
     setKeywordInput("");
   }
 
-  function toggleExpand(productId: number) {
+  function toggleExpand(productId: string) {
     setExpandedProductIds((prev) => {
       const next = new Set(prev);
       if (next.has(productId)) {

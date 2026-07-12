@@ -30,7 +30,6 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
     categoryId: initialProduct?.categoryId ?? "",
     status: initialProduct?.status ?? "DRAFT",
     weight: initialProduct?.weight ?? undefined,
-    brand: initialProduct?.brand ?? "",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
@@ -93,16 +92,14 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
       name: form.name,
       description: form.description,
       price: Number(form.price),
-      weight: form.weight ? Number(form.weight) : undefined,
-      brand: form.brand,
+      weight: form.weight !== undefined ? Number(form.weight) : undefined,
     };
 
     if (isEditing) {
-      // categoryId n'est pas accepté par PATCH — on ne l'envoie pas
-      payload.status = form.status;
+      if (form.status !== initialProduct!.status) {
+        payload.status = form.status;
+      }
     } else {
-      // status envoyé à la création est ignoré (toujours DRAFT) — inutile
-      // de l'envoyer, on envoie categoryId (requis uniquement ici)
       payload.categoryId = form.categoryId;
     }
 
@@ -153,15 +150,6 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
           {fieldError("sku") && (
             <p className="mt-1 text-xs text-red-600">{fieldError("sku")}</p>
           )}
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">Marque</label>
-          <input
-            type="text"
-            value={form.brand}
-            onChange={(e) => update("brand", e.target.value)}
-            className={inputClass}
-          />
         </div>
       </div>
 

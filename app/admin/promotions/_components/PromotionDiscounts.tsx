@@ -52,8 +52,8 @@ function DiscountForm({
           targetMode === "products"
             ? productIdsInput
                 .split(",")
-                .map((s) => Number(s.trim()))
-                .filter((n) => !isNaN(n))
+                .map((s) => s.trim())
+                .filter(Boolean)
             : undefined,
       };
       const created = await apiClient.post<Discount>(

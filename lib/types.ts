@@ -186,7 +186,6 @@ export interface Product {
   price: number;
   status: ProductStatus;
   weight: number | null;
-  brand: string | null;
   categoryId: string;
   category: CategoryRef;
   images: ProductImage[];
@@ -245,7 +244,6 @@ export interface ProductFormInput {
   categoryId: string;
   status?: ProductStatus;
   weight?: number;
-  brand?: string;
 }
 
 export interface CategoryFormInput {

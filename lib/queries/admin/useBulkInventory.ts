@@ -12,7 +12,7 @@ export function useBulkInventoryHelpers() {
 
   async function upsertOne(params: {
     existingItemId?: string;
-    productId: number;
+    productId: string;
     warehouseId: string;
     combinationId: string;
     quantity: number;

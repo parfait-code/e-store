@@ -22,7 +22,7 @@ function invalidateAllInventoryViews(qc: ReturnType<typeof useQueryClient>) {
 export function useAdminInventoryList(page: number) {
   return useQuery({
     queryKey: queryKeys.admin.inventoryList(page),
-    queryFn: () => adminInventoryApi.list({ page }), // était: adminInventoryApi.list(page)
+    queryFn: () => adminInventoryApi.list({ page }),
     placeholderData: (prev) => prev,
   });
 }
@@ -39,12 +39,16 @@ export function useAdminInventoryGrouped(params: {
   });
 }
 
+// productId est désormais un string (Product.id: string) — le fallback
+// utilisait "0" (number) auparavant ; on bascule sur "" pour rester cohérent
+// avec le typage string partout, `enabled` empêche de toute façon l'appel
+// tant que productId est null.
 export function useAdminInventoryGroupedDetail(
   productId: string | null,
   page: number,
 ) {
   return useQuery({
-    queryKey: queryKeys.admin.inventoryGroupedDetail(productId ?? 0, page),
+    queryKey: queryKeys.admin.inventoryGroupedDetail(productId ?? "", page),
     queryFn: () => adminInventoryApi.groupedDetail(productId!, page),
     enabled: productId !== null,
   });
@@ -60,7 +64,7 @@ export function useAdminInventorySearch(keyword: string) {
 
 export function useProductCombinationsForInventory(productId: string | null) {
   return useQuery({
-    queryKey: queryKeys.admin.productCombinations(productId ?? 0),
+    queryKey: queryKeys.admin.productCombinations(productId ?? ""),
     queryFn: () => adminInventoryApi.combinationsForProduct(productId!),
     enabled: productId !== null,
   });

@@ -43,7 +43,7 @@ export function useCreateUser() {
 export function useChangeUserRole() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ userId, role }: { userId: number; role: Role }) =>
+    mutationFn: ({ userId, role }: { userId: string; role: Role }) =>
       adminUsersApi.changeRole(userId, role),
     onSuccess: (_data, { userId, role }) => {
       qc.setQueryData(queryKeys.admin.users, (prev: User[] | undefined) =>
@@ -59,7 +59,7 @@ export function useChangeUserRole() {
 export function useSetUserStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ userId, isActive }: { userId: number; isActive: boolean }) =>
+    mutationFn: ({ userId, isActive }: { userId: string; isActive: boolean }) =>
       adminUsersApi.setStatus(userId, isActive),
     onSuccess: (updated: User) => {
       qc.setQueryData(queryKeys.admin.users, (prev: User[] | undefined) =>
@@ -73,7 +73,7 @@ export function useSetUserStatus() {
 export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (userId: number) => adminUsersApi.remove(userId),
+    mutationFn: (userId: string) => adminUsersApi.remove(userId),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.admin.users }),
   });
 }
