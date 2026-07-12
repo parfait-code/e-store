@@ -1,21 +1,7 @@
 // app/(public)/promotions/[slug]/products/page.tsx
 import type { Metadata } from "next";
+import { fetchPublic } from "@/lib/api-server";
 import { PromotionProductsPageClient } from "./PromotionProductsPageClient";
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
-
-async function fetchPromotionForMetadata(slug: string) {
-  try {
-    const res = await fetch(`${BASE_URL}/promotions/slug/${slug}`, {
-      next: { revalidate: 300 },
-    });
-    const json = await res.json();
-    if (!json.status) return null;
-    return json.data as { name: string };
-  } catch {
-    return null;
-  }
-}
 
 export async function generateMetadata({
   params,
@@ -23,7 +9,9 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const promotion = await fetchPromotionForMetadata(slug);
+  const promotion = await fetchPublic<{ name: string }>(
+    `/promotions/slug/${slug}`,
+  );
 
   return {
     title: promotion

@@ -1,6 +1,6 @@
 // app/(public)/categories/[slug]/page.tsx
 import type { Metadata } from "next";
-import { CategoryPageClient } from "./CategoryPageClient";
+import { CategoryPageClient } from "../CategoryPageClient";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
