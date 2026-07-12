@@ -370,7 +370,7 @@ export interface OrderItem {
   originalPrice: number;
   discountAmount: number;
   combination: OrderItemCombinationRef | null;
-  product: { id: number; name: string; sku: string; images: ProductImage[] };
+  product: { id: string; name: string; sku: string; images: ProductImage[] };
 }
 
 // Remplacer le champ `status: string` de l'interface Payment par :
@@ -449,7 +449,7 @@ export interface Tag {
 }
 
 export interface TagWithProducts extends Tag {
-  products: { id: number; name: string; sku: string }[];
+  products: { id: string; name: string; sku: string }[];
 }
 
 export interface TagFormInput {
@@ -465,7 +465,7 @@ export interface Discount {
   type: DiscountType;
   value: number;
   category: { id: string; name: string; slug: string } | null;
-  products: { product: { id: number; name: string; price: number } }[];
+  products: { product: { id: string; name: string; price: number } }[];
 }
 
 export interface CouponCode {
@@ -551,7 +551,7 @@ export interface InventoryItem {
   combinationId: string | null;
   warehouseId: string;
   quantity: number;
-  product: { id: number; name: string; sku: string; images: ProductImage[] };
+  product: { id: string; name: string; sku: string; images: ProductImage[] };
   warehouse: Warehouse;
   combination: { id: string; sku: string } | null;
 }
@@ -746,7 +746,7 @@ export interface PromotionPublic {
     type: DiscountType;
     value: number;
     category: { id: string; name: string; slug: string } | null;
-    products: { product: { id: number; name: string; price: number } }[];
+    products: { product: { id: string; name: string; price: number } }[];
   }[];
   coupons: {
     id: string;
@@ -827,7 +827,7 @@ export interface WishlistItem {
   productId: string;
   combinationId: string | null;
   product: {
-    id: number;
+    id: string;
     name: string;
     price: number;
     images: { url: string }[];

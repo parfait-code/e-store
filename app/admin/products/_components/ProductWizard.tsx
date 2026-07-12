@@ -1,7 +1,7 @@
 // app/admin/products/_components/ProductWizard.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -16,6 +16,7 @@ import { Stepper, type StepDefinition } from "@/components/admin/Stepper";
 import { StagedImagesManager } from "@/components/admin/StagedImagesManager";
 import { ProductForm } from "./ProductForm";
 import {
+  useAdminProduct,
   useUploadProductImage,
   useDeleteProductImage,
   useSaveProductAttributes,
@@ -25,6 +26,7 @@ import {
 import { useAdminCategoryAttributes } from "@/lib/queries/admin/useCategories";
 import { useAdminTags } from "@/lib/queries/admin/useTags";
 import { useProductCombinationsList } from "@/lib/queries/admin/useProductVariants";
+import { useEffect } from "react";
 
 const STEPS: StepDefinition[] = [
   { id: "info", label: "Informations" },
@@ -36,12 +38,8 @@ const STEPS: StepDefinition[] = [
 
 // ---------- Étape Images ----------
 function ImagesStep({ product }: { product: Product }) {
-  const { mutateAsync: uploadImage } = useUploadProductImage(
-    String(product.id),
-  );
-  const { mutateAsync: deleteImage } = useDeleteProductImage(
-    String(product.id),
-  );
+  const { mutateAsync: uploadImage } = useUploadProductImage(product.id);
+  const { mutateAsync: deleteImage } = useDeleteProductImage(product.id);
 
   const sortedImages = product.images
     .slice()
@@ -88,7 +86,7 @@ function AttributesStep({ product }: { product: Product }) {
     mutate: saveAttributes,
     isPending: isSaving,
     error: saveErr,
-  } = useSaveProductAttributes(String(product.id));
+  } = useSaveProductAttributes(product.id);
 
   useEffect(() => {
     const initial: Record<string, string> = {};
@@ -214,13 +212,12 @@ function AttributesStep({ product }: { product: Product }) {
 function TagsStep({ productId }: { productId: string }) {
   const { data: allTags = [], isLoading: isLoadingTags } = useAdminTags();
   const { data: productTags = [], isLoading: isLoadingProductTags } =
-    useProductTags(String(productId));
+    useProductTags(productId);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { mutate: saveTags, isPending: isSaving } = useSaveProductTags(
-    String(productId),
-  );
+  const { mutate: saveTags, isPending: isSaving } =
+    useSaveProductTags(productId);
 
   useEffect(() => {
     setSelectedIds(productTags.map((pt) => pt.tag.id));
@@ -307,7 +304,7 @@ function TagsStep({ productId }: { productId: string }) {
 // ---------- Étape Variantes ----------
 function VariantsStep({ product }: { product: Product }) {
   const { data: combinations = [], isLoading } = useProductCombinationsList(
-    String(product.id),
+    product.id,
   );
 
   return (
@@ -351,40 +348,49 @@ export function ProductWizard({
 }) {
   const router = useRouter();
   const isEditingInitially = Boolean(initialProduct);
-  const [product, setProduct] = useState<Product | null>(
-    initialProduct ?? null,
+  // On ne garde plus le produit complet en state local — seulement son id.
+  // Le produit lui-même est relu en continu depuis le cache react-query
+  // (voir `product` ci-dessous), pour rester à jour après chaque mutation
+  // faite dans une étape (images, attributs, tags...). C'était la cause du
+  // bug : une copie locale figée ne reflétait jamais ces mises à jour, ce
+  // qui donnait l'impression que l'upload d'image, le changement de statut,
+  // etc. échouaient alors qu'ils avaient réussi côté serveur.
+  const [productId, setProductId] = useState<string | null>(
+    initialProduct?.id ?? null,
   );
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(
     new Set(isEditingInitially ? ["info"] : []),
   );
 
-  const productExists = Boolean(product);
+  const { data: product } = useAdminProduct(productId ?? "");
+  // Tant que le fetch n'a pas résolu juste après une création, on retombe
+  // sur `initialProduct` pour éviter un flash vide.
+  const effectiveProduct = product ?? initialProduct;
+
+  const productExists = Boolean(productId);
 
   const disabledIndexes = new Set<number>(
     !productExists ? STEPS.map((_, i) => i).filter((i) => i > 0) : [],
   );
 
-  // Les hooks ci-dessous sont partagés (même query key) avec les composants
-  // d'étape correspondants — react-query dédoublonne automatiquement,
-  // aucun appel réseau supplémentaire n'est déclenché.
   const { data: categoryAttrs = [] } = useAdminCategoryAttributes(
-    product?.categoryId ?? "",
+    effectiveProduct?.categoryId ?? "",
   );
-  const { data: productTags = [] } = useProductTags(String(product?.id ?? ""));
+  const { data: productTags = [] } = useProductTags(productId ?? "");
   const { data: combinations = [] } = useProductCombinationsList(
-    String(product?.id ?? ""),
+    productId ?? "",
   );
 
   const derivedCompleted = new Set(completedSteps);
-  if (product) {
+  if (effectiveProduct) {
     derivedCompleted.add("info");
-    if (product.images.length > 0) derivedCompleted.add("images");
+    if (effectiveProduct.images.length > 0) derivedCompleted.add("images");
 
     const nonVariantDefs = categoryAttrs.filter((d) => !d.isVariant);
     const requiredNonVariant = nonVariantDefs.filter((d) => d.isRequired);
     const coveredIds = new Set(
-      product.attributeValues.map((av) => av.attributeDefinition.id),
+      effectiveProduct.attributeValues.map((av) => av.attributeDefinition.id),
     );
     const allRequiredCovered = requiredNonVariant.every((d) =>
       coveredIds.has(d.id),
@@ -403,8 +409,8 @@ export function ProductWizard({
   }
 
   function handleInfoSaved(saved: Product) {
-    const wasNew = !product;
-    setProduct(saved);
+    const wasNew = !productId;
+    setProductId(saved.id);
     setCompletedSteps((prev) => new Set(prev).add("info"));
     if (wasNew) {
       setCurrentStep(1);
@@ -426,16 +432,22 @@ export function ProductWizard({
       <div className="rounded-lg border border-gray-200 bg-white p-6">
         {stepId === "info" && (
           <ProductForm
-            initialProduct={product ?? undefined}
+            initialProduct={effectiveProduct}
             onSuccess={handleInfoSaved}
           />
         )}
-        {stepId === "images" && product && <ImagesStep product={product} />}
-        {stepId === "attributes" && product && (
-          <AttributesStep product={product} />
+        {stepId === "images" && effectiveProduct && (
+          <ImagesStep product={effectiveProduct} />
         )}
-        {stepId === "tags" && product && <TagsStep productId={product.id} />}
-        {stepId === "variants" && product && <VariantsStep product={product} />}
+        {stepId === "attributes" && effectiveProduct && (
+          <AttributesStep product={effectiveProduct} />
+        )}
+        {stepId === "tags" && effectiveProduct && (
+          <TagsStep productId={effectiveProduct.id} />
+        )}
+        {stepId === "variants" && effectiveProduct && (
+          <VariantsStep product={effectiveProduct} />
+        )}
       </div>
 
       <div className="mt-4 flex items-center justify-between">

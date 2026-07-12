@@ -22,7 +22,7 @@ export function useAdminLoyaltyHistory(userId: string | null) {
   });
 }
 
-export function useAdjustLoyaltyPoints(userId: number) {
+export function useAdjustLoyaltyPoints(userId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: LoyaltyAdjustInput) => loyaltyApi.adjust(payload),

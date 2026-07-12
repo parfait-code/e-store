@@ -40,7 +40,8 @@ export function useCreateProduct() {
   return useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
       adminCatalogApi.createProduct(payload),
-    onSuccess: () => {
+    onSuccess: (created: Product) => {
+      qc.setQueryData(queryKeys.admin.product(created.id), created);
       qc.invalidateQueries({ queryKey: ["admin", "products"] });
     },
   });

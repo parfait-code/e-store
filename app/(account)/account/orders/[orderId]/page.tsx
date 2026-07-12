@@ -52,7 +52,7 @@ function ReviewForm({
   onCancel,
 }: {
   orderItemId: string;
-  productId: number;
+  productId: string;
   existingReview?: ProductReview;
   onDone: (review: ProductReview) => void;
   onCancel: () => void;

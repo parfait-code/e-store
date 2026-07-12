@@ -26,7 +26,7 @@ const TYPE_STYLES: Record<LoyaltyTransactionType, string> = {
   ADJUSTED: "text-blue-600",
 };
 
-function AdjustPointsForm({ userId }: { userId: number }) {
+function AdjustPointsForm({ userId }: { userId: string }) {
   const [points, setPoints] = useState(0);
   const [type, setType] = useState<LoyaltyTransactionType>("ADJUSTED");
   const [orderId, setOrderId] = useState("");
@@ -153,12 +153,12 @@ export default function LoyaltyPage() {
   function handleSearch(e: FormEvent) {
     e.preventDefault();
     setSearchError(null);
-    const id = Number(userIdInput);
+    const id = userIdInput.trim();
     if (!id) {
       setSearchError("Entrez un ID utilisateur valide.");
       return;
     }
-    setActiveUserId(String(id));
+    setActiveUserId(id);
   }
 
   const error =
@@ -180,7 +180,7 @@ export default function LoyaltyPage() {
             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
           />
           <input
-            type="number"
+            type="text"
             placeholder="ID utilisateur"
             value={userIdInput}
             onChange={(e) => setUserIdInput(e.target.value)}
@@ -222,7 +222,7 @@ export default function LoyaltyPage() {
             </div>
           </div>
 
-          <AdjustPointsForm userId={Number(activeUserId)} />
+          <AdjustPointsForm userId={activeUserId!} />
 
           <div>
             <h2 className="mb-3 text-sm font-medium">Historique</h2>
