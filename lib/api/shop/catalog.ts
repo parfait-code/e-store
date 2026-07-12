@@ -61,6 +61,26 @@ export const shopCatalogApi = {
       .then(normalizePaginated);
   },
 
+  // À ajouter dans l'objet shopCatalogApi, après listProducts
+
+  // Pas de paramètre de tri documenté côté API (voir GUIDE §6.2) — on
+  // sur-fetch un lot plus large puis on trie par createdAt côté client.
+  // Solution temporaire en attendant un ?sort=newest ou /product/latest
+  // côté backend.
+  newestProducts: (limit = 8, fetchPoolSize = 24) =>
+    apiClient
+      .get<Paginated<Product>>(`/product?page=1&limit=${fetchPoolSize}`)
+      .then(normalizePaginated)
+      .then((res) => ({
+        ...res,
+        items: [...res.items]
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          )
+          .slice(0, limit),
+      })),
+
   productById: (id: string) => apiClient.get<Product>(`/product/${id}`),
 
   combinations: (productId: string) =>

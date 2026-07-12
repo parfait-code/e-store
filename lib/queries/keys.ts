@@ -32,6 +32,8 @@ export const queryKeys = {
       ["shop", "promotions", "slug", slug] as const,
     promotionProductsBySlug: (slug: string) =>
       ["shop", "promotions", "slug", slug, "products"] as const,
+    newestProducts: (limit: number) =>
+      ["shop", "products", "newest", limit] as const,
   },
   admin: {
     products: (params: Record<string, unknown>) =>

@@ -44,6 +44,14 @@ export function useProducts(params: {
   });
 }
 
+export function useNewestProducts(limit = 8) {
+  return useQuery({
+    queryKey: queryKeys.shop.newestProducts(limit),
+    queryFn: () => shopCatalogApi.newestProducts(limit),
+    staleTime: 5 * 60 * 1000, // pas besoin de re-fetch agressif pour ce bloc
+  });
+}
+
 export function useProduct(productId: string) {
   return useQuery({
     queryKey: queryKeys.shop.product(productId),

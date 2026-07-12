@@ -12,10 +12,15 @@ import {
   HeadphonesIcon,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { ProductGrid } from "@/components/ProductGrid";
 import { formatDate } from "@/lib/format";
-import { useCategories, useProducts } from "@/lib/queries/shop/useCatalog";
+import {
+  useCategories,
+  useProducts,
+  useNewestProducts,
+} from "@/lib/queries/shop/useCatalog";
 import { useActivePromotions } from "@/lib/queries/shop/usePromotions";
 
 const TRUST_ITEMS = [
@@ -91,7 +96,7 @@ function PromotionsCarousel({ promotions }: { promotions: any[] }) {
 
     const timer = setInterval(() => {
       setCurrentIndex((prev) =>
-        prev + currentSlidesToShow >= totalSlides ? 0 : prev + 1
+        prev + currentSlidesToShow >= totalSlides ? 0 : prev + 1,
       );
     }, 4000);
 
@@ -100,13 +105,13 @@ function PromotionsCarousel({ promotions }: { promotions: any[] }) {
 
   const goToPrevious = () => {
     setCurrentIndex((prev) =>
-      prev - 1 < 0 ? Math.max(0, totalSlides - currentSlidesToShow) : prev - 1
+      prev - 1 < 0 ? Math.max(0, totalSlides - currentSlidesToShow) : prev - 1,
     );
   };
 
   const goToNext = () => {
     setCurrentIndex((prev) =>
-      prev + currentSlidesToShow >= totalSlides ? 0 : prev + 1
+      prev + currentSlidesToShow >= totalSlides ? 0 : prev + 1,
     );
   };
 
@@ -127,13 +132,19 @@ function PromotionsCarousel({ promotions }: { promotions: any[] }) {
 
   const visiblePromotions = promotions.slice(
     currentIndex,
-    currentIndex + currentSlidesToShow
+    currentIndex + currentSlidesToShow,
   );
 
   // Si on est à la fin, compléter avec les premiers éléments pour un défilement infini
   const displayPromotions =
     visiblePromotions.length < currentSlidesToShow
-      ? [...visiblePromotions, ...promotions.slice(0, currentSlidesToShow - visiblePromotions.length)]
+      ? [
+          ...visiblePromotions,
+          ...promotions.slice(
+            0,
+            currentSlidesToShow - visiblePromotions.length,
+          ),
+        ]
       : visiblePromotions;
 
   return (
@@ -279,6 +290,32 @@ function PromotionsSection() {
   );
 }
 
+function NewArrivalsSection() {
+  const { data, isLoading, isError } = useNewestProducts(8);
+  const products = Array.isArray(data?.items) ? data!.items : [];
+
+  if (isError) return null; // section discrète : pas grave si ça échoue, pas de bandeau d'erreur agressif en home
+  if (!isLoading && products.length === 0) return null;
+
+  return (
+    <section>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles size={20} className="text-amber-500" />
+          <h2 className="text-xl font-semibold">Nouveautés</h2>
+        </div>
+        <Link
+          href="/products"
+          className="text-sm font-medium text-gray-900 hover:underline"
+        >
+          Voir tout →
+        </Link>
+      </div>
+      <ProductGrid products={products} isLoading={isLoading} />
+    </section>
+  );
+}
+
 export default function HomePage() {
   const { data: productsData, isLoading: isLoadingProducts } = useProducts({
     page: 1,
@@ -335,6 +372,9 @@ export default function HomePage() {
 
       {/* Promotions avec carrousel */}
       <PromotionsSection />
+
+      {/* Nouveautés */}
+      <NewArrivalsSection />
 
       {/* Catégories */}
       {categories.length > 0 && (
