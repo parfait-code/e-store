@@ -3,8 +3,14 @@ import { apiClient } from "@/lib/api-client";
 import type { PromotionPublic, PromotionProductsResponse } from "@/lib/types";
 
 export const shopPromotionsApi = {
-  // ⚠️ Route en attente de confirmation côté backend — voir doc transmise.
-  active: () => apiClient.get<PromotionPublic[]>("/promotions/active"),
+  // Normalisé défensivement : que l'API renvoie un tableau brut ou un objet
+  // paginé {items,...}, le composant reçoit toujours un tableau exploitable.
+  active: () =>
+    apiClient
+      .get<
+        PromotionPublic[] | { items: PromotionPublic[] }
+      >("/promotions/active")
+      .then((res) => (Array.isArray(res) ? res : (res?.items ?? []))),
 
   bySlug: (slug: string) =>
     apiClient.get<PromotionPublic>(`/promotions/slug/${slug}`),

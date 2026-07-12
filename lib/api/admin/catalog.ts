@@ -5,6 +5,7 @@ import type {
   Paginated,
   CategoryRef,
   ProductStatus,
+  Tag,
 } from "@/lib/types";
 
 export const adminCatalogApi = {
@@ -27,6 +28,8 @@ export const adminCatalogApi = {
     return apiClient.get<Paginated<Product>>(`/product?${qs.toString()}`);
   },
 
+  // Corrigé — sans includeInactive, un produit DRAFT/ARCHIVED n'était pas
+  // renvoyé pour l'admin, bloquant la vue/l'édition de sa fiche.
   productById: (id: string | number) =>
     apiClient.get<Product>(`/product/${id}?includeInactive=true`),
 
@@ -39,4 +42,32 @@ export const adminCatalogApi = {
   deleteProduct: (id: string | number) => apiClient.delete(`/product/${id}`),
 
   listCategories: () => apiClient.get<CategoryRef[]>("/categories"),
+
+  // --- Images ---
+  uploadImage: (productId: string | number, file: File) => {
+    const fd = new FormData();
+    fd.append("images", file);
+    return apiClient.post<Product>(`/product/${productId}/images`, fd, {
+      isFormData: true,
+    });
+  },
+  deleteImage: (productId: string | number, imageId: string) =>
+    apiClient.delete<Product>(`/product/${productId}/images`, { imageId }),
+
+  // --- Attributs non-variante (§7.4 du guide) ---
+  saveAttributes: (
+    productId: string | number,
+    attributes: { attributeDefinitionId: string; value: string }[],
+  ) =>
+    apiClient.put<Product>(`/product/${productId}/attributes`, {
+      attributes,
+    }),
+
+  // --- Tags ---
+  productTags: (productId: string | number) =>
+    apiClient
+      .get<{ tag: Tag }[]>(`/product/${productId}/tags`)
+      .catch(() => [] as { tag: Tag }[]),
+  saveProductTags: (productId: string | number, tagIds: string[]) =>
+    apiClient.put(`/product/${productId}/tags`, { tagIds }),
 };

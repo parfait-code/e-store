@@ -11,16 +11,20 @@ import {
   ArrowLeft,
   CheckCircle2,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import type {
-  Product,
-  Tag,
-  AttributeDefinition,
-  ProductCombination,
-} from "@/lib/types";
+import type { Product } from "@/lib/types";
 import { Stepper, type StepDefinition } from "@/components/admin/Stepper";
 import { StagedImagesManager } from "@/components/admin/StagedImagesManager";
 import { ProductForm } from "./ProductForm";
+import {
+  useUploadProductImage,
+  useDeleteProductImage,
+  useSaveProductAttributes,
+  useProductTags,
+  useSaveProductTags,
+} from "@/lib/queries/admin/useCatalog";
+import { useAdminCategoryAttributes } from "@/lib/queries/admin/useCategories";
+import { useAdminTags } from "@/lib/queries/admin/useTags";
+import { useProductCombinationsList } from "@/lib/queries/admin/useProductVariants";
 
 const STEPS: StepDefinition[] = [
   { id: "info", label: "Informations" },
@@ -31,31 +35,13 @@ const STEPS: StepDefinition[] = [
 ];
 
 // ---------- Étape Images ----------
-function ImagesStep({
-  product,
-  onUpdated,
-}: {
-  product: Product;
-  onUpdated: (p: Product) => void;
-}) {
-  async function uploadOne(file: File) {
-    const formData = new FormData();
-    formData.append("images", file);
-    const updated = await apiClient.post<Product>(
-      `/product/${product.id}/images`,
-      formData,
-      { isFormData: true },
-    );
-    onUpdated(updated);
-  }
-
-  async function deleteOne(imageId: string) {
-    const updated = await apiClient.delete<Product>(
-      `/product/${product.id}/images`,
-      { imageId },
-    );
-    onUpdated(updated);
-  }
+function ImagesStep({ product }: { product: Product }) {
+  const { mutateAsync: uploadImage } = useUploadProductImage(
+    String(product.id),
+  );
+  const { mutateAsync: deleteImage } = useDeleteProductImage(
+    String(product.id),
+  );
 
   const sortedImages = product.images
     .slice()
@@ -74,8 +60,12 @@ function ImagesStep({
       <h2 className="mb-3 text-sm font-medium">Images du produit</h2>
       <StagedImagesManager
         existingImages={existingImages}
-        deleteOne={deleteOne}
-        uploadOne={uploadOne}
+        deleteOne={async (imageId) => {
+          await deleteImage(imageId);
+        }}
+        uploadOne={async (file) => {
+          await uploadImage(file);
+        }}
         maxTotal={5}
       />
       <p className="mt-3 text-xs text-gray-400">
@@ -86,68 +76,40 @@ function ImagesStep({
 }
 
 // ---------- Étape Caractéristiques (attributs isVariant:false) ----------
-function AttributesStep({
-  product,
-  onUpdated,
-}: {
-  product: Product;
-  onUpdated: (p: Product) => void;
-}) {
-  const [definitions, setDefinitions] = useState<AttributeDefinition[]>([]);
+function AttributesStep({ product }: { product: Product }) {
+  const { data: allDefinitions = [], isLoading } = useAdminCategoryAttributes(
+    product.categoryId,
+  );
+  const definitions = allDefinitions.filter((d) => !d.isVariant);
+
   const [values, setValues] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const {
+    mutate: saveAttributes,
+    isPending: isSaving,
+    error: saveErr,
+  } = useSaveProductAttributes(String(product.id));
 
   useEffect(() => {
-    setIsLoading(true);
-    apiClient
-      .get<AttributeDefinition[]>(
-        `/categories/${product.categoryId}/attributes`,
-      )
-      .then((defs) => {
-        const productDefs = (defs ?? []).filter((d) => !d.isVariant);
-        setDefinitions(productDefs);
-        const initial: Record<string, string> = {};
-        product.attributeValues.forEach((av) => {
-          initial[av.attributeDefinition.id] = av.value;
-        });
-        setValues(initial);
-      })
-      .catch(() =>
-        setError("Erreur lors du chargement des attributs de la catégorie"),
-      )
-      .finally(() => setIsLoading(false));
-  }, [product.categoryId, product.attributeValues]);
+    const initial: Record<string, string> = {};
+    product.attributeValues.forEach((av) => {
+      initial[av.attributeDefinition.id] = av.value;
+    });
+    setValues(initial);
+  }, [product.attributeValues]);
 
-  async function handleSave() {
-    setIsSaving(true);
-    setError(null);
+  function handleSave() {
     setSaved(false);
-    try {
-      const attributes = definitions
-        .filter((def) => values[def.id]?.trim())
-        .map((def) => ({
-          attributeDefinitionId: def.id,
-          value: values[def.id],
-        }));
+    const attributes = definitions
+      .filter((def) => values[def.id]?.trim())
+      .map((def) => ({
+        attributeDefinitionId: def.id,
+        value: values[def.id],
+      }));
 
-      const updated = await apiClient.put<Product>(
-        `/product/${product.id}/attributes`,
-        { attributes },
-      );
-      onUpdated(updated);
-      setSaved(true);
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Erreur lors de l'enregistrement des attributs",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+    saveAttributes(attributes, {
+      onSuccess: () => setSaved(true),
+    });
   }
 
   const inputClass =
@@ -177,7 +139,11 @@ function AttributesStep({
         <span className="text-red-500">*</span> sont requis pour activer le
         produit.
       </p>
-      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+      {saveErr && (
+        <p className="mb-2 text-xs text-red-600">
+          Erreur lors de l'enregistrement des attributs
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3">
         {definitions.map((def) => (
           <div key={def.id}>
@@ -246,34 +212,19 @@ function AttributesStep({
 
 // ---------- Étape Tags ----------
 function TagsStep({ productId }: { productId: number }) {
-  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const { data: allTags = [], isLoading: isLoadingTags } = useAdminTags();
+  const { data: productTags = [], isLoading: isLoadingProductTags } =
+    useProductTags(String(productId));
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { mutate: saveTags, isPending: isSaving } = useSaveProductTags(
+    String(productId),
+  );
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [tags, productTags] = await Promise.all([
-          apiClient.get<Tag[]>("/tags"),
-          apiClient.get<{ tag: Tag }[]>(`/product/${productId}/tags`),
-        ]);
-        setAllTags(tags);
-        setSelectedIds(productTags.map((pt) => pt.tag.id));
-      } catch (err) {
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : "Erreur de chargement des tags",
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    load();
-  }, [productId]);
+    setSelectedIds(productTags.map((pt) => pt.tag.id));
+  }, [productTags]);
 
   function toggle(tagId: string) {
     setSelectedIds((prev) =>
@@ -281,31 +232,22 @@ function TagsStep({ productId }: { productId: number }) {
         ? prev.filter((id) => id !== tagId)
         : [...prev, tagId],
     );
+    setSaved(false);
   }
 
-  async function handleSave() {
+  function handleSave() {
+    setError(null);
     if (selectedIds.length === 0) {
       setError("Sélectionnez au moins un tag.");
       return;
     }
-    setIsSaving(true);
-    setError(null);
-    setSaved(false);
-    try {
-      await apiClient.put(`/product/${productId}/tags`, {
-        tagIds: selectedIds,
-      });
-      setSaved(true);
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Erreur lors de l'enregistrement",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+    saveTags(selectedIds, {
+      onSuccess: () => setSaved(true),
+      onError: () => setError("Erreur lors de l'enregistrement"),
+    });
   }
+
+  const isLoading = isLoadingTags || isLoadingProductTags;
 
   if (isLoading)
     return <Loader2 size={16} className="animate-spin text-gray-400" />;
@@ -364,16 +306,9 @@ function TagsStep({ productId }: { productId: number }) {
 
 // ---------- Étape Variantes ----------
 function VariantsStep({ product }: { product: Product }) {
-  const [combinations, setCombinations] = useState<ProductCombination[] | null>(
-    null,
+  const { data: combinations = [], isLoading } = useProductCombinationsList(
+    String(product.id),
   );
-
-  useEffect(() => {
-    apiClient
-      .get<ProductCombination[]>(`/product/${product.id}/combinations`)
-      .then(setCombinations)
-      .catch(() => setCombinations([]));
-  }, [product.id]);
 
   return (
     <div className="max-w-2xl">
@@ -388,7 +323,7 @@ function VariantsStep({ product }: { product: Product }) {
           <Boxes size={20} className="text-gray-400" />
           <div>
             <p className="text-sm font-medium">
-              {combinations === null
+              {isLoading
                 ? "Chargement..."
                 : `${combinations.length} combinaison(s) active(s)`}
             </p>
@@ -430,66 +365,37 @@ export function ProductWizard({
     !productExists ? STEPS.map((_, i) => i).filter((i) => i > 0) : [],
   );
 
-  // Calcule les étapes RÉELLEMENT complétées à partir des données existantes
-  // (et non plus seulement des étapes traversées manuellement) — corrige le
-  // cas où l'on modifie un produit déjà complet sans re-cliquer "Continuer"
-  // sur chaque étape.
-  useEffect(() => {
-    if (!product) return;
-    let cancelled = false;
+  // Les hooks ci-dessous sont partagés (même query key) avec les composants
+  // d'étape correspondants — react-query dédoublonne automatiquement,
+  // aucun appel réseau supplémentaire n'est déclenché.
+  const { data: categoryAttrs = [] } = useAdminCategoryAttributes(
+    product?.categoryId ?? "",
+  );
+  const { data: productTags = [] } = useProductTags(String(product?.id ?? ""));
+  const { data: combinations = [] } = useProductCombinationsList(
+    String(product?.id ?? ""),
+  );
 
-    async function computeCompleted() {
-      const next = new Set<string>(["info"]);
+  const derivedCompleted = new Set(completedSteps);
+  if (product) {
+    derivedCompleted.add("info");
+    if (product.images.length > 0) derivedCompleted.add("images");
 
-      if (product!.images.length > 0) next.add("images");
-
-      try {
-        const defs = await apiClient.get<AttributeDefinition[]>(
-          `/categories/${product!.categoryId}/attributes`,
-        );
-        const nonVariantDefs = defs.filter((d) => !d.isVariant);
-        const requiredNonVariant = nonVariantDefs.filter((d) => d.isRequired);
-        const coveredIds = new Set(
-          product!.attributeValues.map((av) => av.attributeDefinition.id),
-        );
-        const allRequiredCovered = requiredNonVariant.every((d) =>
-          coveredIds.has(d.id),
-        );
-        if (nonVariantDefs.length === 0 || allRequiredCovered) {
-          next.add("attributes");
-        }
-      } catch {
-        // ignore — n'empêche pas l'affichage du reste du stepper
-      }
-
-      try {
-        const productTags = await apiClient.get<{ tag: { id: string } }[]>(
-          `/product/${product!.id}/tags`,
-        );
-        if (productTags.length > 0) next.add("tags");
-      } catch {
-        // ignore
-      }
-
-      try {
-        const combos = await apiClient.get<ProductCombination[]>(
-          `/product/${product!.id}/combinations`,
-        );
-        if (combos.length > 0) next.add("variants");
-      } catch {
-        // ignore
-      }
-
-      if (!cancelled) {
-        setCompletedSteps((prev) => new Set([...prev, ...next]));
-      }
+    const nonVariantDefs = categoryAttrs.filter((d) => !d.isVariant);
+    const requiredNonVariant = nonVariantDefs.filter((d) => d.isRequired);
+    const coveredIds = new Set(
+      product.attributeValues.map((av) => av.attributeDefinition.id),
+    );
+    const allRequiredCovered = requiredNonVariant.every((d) =>
+      coveredIds.has(d.id),
+    );
+    if (nonVariantDefs.length === 0 || allRequiredCovered) {
+      derivedCompleted.add("attributes");
     }
 
-    computeCompleted();
-    return () => {
-      cancelled = true;
-    };
-  }, [product]);
+    if (productTags.length > 0) derivedCompleted.add("tags");
+    if (combinations.length > 0) derivedCompleted.add("variants");
+  }
 
   function goTo(index: number) {
     if (disabledIndexes.has(index)) return;
@@ -512,7 +418,7 @@ export function ProductWizard({
       <Stepper
         steps={STEPS}
         currentIndex={currentStep}
-        completed={completedSteps}
+        completed={derivedCompleted}
         onStepClick={goTo}
         disabledIndexes={disabledIndexes}
       />
@@ -524,11 +430,9 @@ export function ProductWizard({
             onSuccess={handleInfoSaved}
           />
         )}
-        {stepId === "images" && product && (
-          <ImagesStep product={product} onUpdated={setProduct} />
-        )}
+        {stepId === "images" && product && <ImagesStep product={product} />}
         {stepId === "attributes" && product && (
-          <AttributesStep product={product} onUpdated={setProduct} />
+          <AttributesStep product={product} />
         )}
         {stepId === "tags" && product && <TagsStep productId={product.id} />}
         {stepId === "variants" && product && <VariantsStep product={product} />}

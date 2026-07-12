@@ -37,6 +37,10 @@ export const queryKeys = {
     products: (params: Record<string, unknown>) =>
       ["admin", "products", params] as const,
     product: (id: string | number) => ["admin", "product", id] as const,
+    productTags: (productId: string) =>
+      ["admin", "product", productId, "tags"] as const,
+    productVariantSelections: (productId: string) =>
+      ["admin", "product", productId, "variant-selections"] as const,
     categories: ["admin", "categories"] as const,
     category: (id: string) => ["admin", "category", id] as const,
     categoryAttributes: (categoryId: string) =>
@@ -61,7 +65,7 @@ export const queryKeys = {
       ["admin", "inventory", "grouped", productId, page] as const,
     inventorySearch: (keyword: string) =>
       ["admin", "inventory", "search", keyword] as const,
-    productCombinations: (productId: number) =>
+    productCombinations: (productId: number | string) =>
       ["admin", "product", productId, "combinations"] as const,
     tags: ["admin", "tags"] as const,
     users: ["admin", "users"] as const,
@@ -81,5 +85,8 @@ export const queryKeys = {
     pickupRequests: (params: Record<string, unknown>) =>
       ["admin", "pickup-requests", params] as const,
     pickupRequest: (id: string) => ["admin", "pickup-request", id] as const,
+    promotions: (params: Record<string, unknown>) =>
+      ["admin", "promotions", params] as const,
+    promotion: (id: string) => ["admin", "promotion", id] as const,
   },
 };

@@ -1,16 +1,16 @@
 // app/admin/products/_components/ProductForm.tsx
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import { Loader2, Save, AlertTriangle } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import type {
-  CategoryRef,
-  ProductFormInput,
-  ProductStatus,
-  Product,
-  AttributeDefinition,
-} from "@/lib/types";
+import { ApiError } from "@/lib/api-client";
+import type { ProductFormInput, ProductStatus, Product } from "@/lib/types";
+import {
+  useAdminCategories,
+  useCreateProduct,
+  useUpdateProduct,
+} from "@/lib/queries/admin/useCatalog";
+import { useAdminCategoryAttributes } from "@/lib/queries/admin/useCategories";
 
 interface ProductFormProps {
   initialProduct?: Product; // présent en mode édition
@@ -21,7 +21,7 @@ const STATUS_OPTIONS: ProductStatus[] = ["DRAFT", "ACTIVE", "ARCHIVED"];
 
 export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
   const isEditing = Boolean(initialProduct);
-  const [categories, setCategories] = useState<CategoryRef[]>([]);
+  const { data: categories = [] } = useAdminCategories();
   const [form, setForm] = useState<ProductFormInput>({
     sku: initialProduct?.sku ?? "",
     name: initialProduct?.name ?? "",
@@ -34,48 +34,32 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { mutate: createProduct, isPending: isCreating } = useCreateProduct();
+  const { mutate: updateProduct, isPending: isUpdating } = useUpdateProduct(
+    String(initialProduct?.id ?? ""),
+  );
+  const isSubmitting = isCreating || isUpdating;
 
   // Règle backend #3 : le passage à ACTIVE est refusé (400) tant que les
   // attributs produit (isVariant:false) marqués isRequired:true n'ont pas
-  // tous une valeur. On le vérifie ici pour ne pas laisser l'admin essuyer
-  // l'erreur serveur sans indication.
-  const [missingRequiredAttrs, setMissingRequiredAttrs] = useState<
-    AttributeDefinition[]
-  >([]);
-  const [isCheckingAttrs, setIsCheckingAttrs] = useState(isEditing);
+  // tous une valeur. On le vérifie ici à partir des données déjà en cache
+  // (product.attributeValues est embarqué sur le produit, pas besoin d'un
+  // appel séparé pour la couverture).
+  const { data: categoryAttributes = [], isLoading: isCheckingAttrs } =
+    useAdminCategoryAttributes(initialProduct?.categoryId ?? "");
 
-  // La catégorie n'est sélectionnable qu'à la création (règle backend #1 :
-  // categoryId est immuable ensuite, PATCH l'ignore silencieusement).
-  useEffect(() => {
-    if (isEditing) return;
-    apiClient
-      .get<CategoryRef[]>("/categories")
-      .then((data) => setCategories(data ?? []))
-      .catch(() => {});
-  }, [isEditing]);
-
-  useEffect(() => {
-    if (!initialProduct) return;
-    setIsCheckingAttrs(true);
-    apiClient
-      .get<AttributeDefinition[]>(
-        `/categories/${initialProduct.categoryId}/attributes`,
-      )
-      .then((defs) => {
-        const requiredProductAttrs = defs.filter(
-          (d) => !d.isVariant && d.isRequired,
-        );
+  const missingRequiredAttrs = isEditing
+    ? categoryAttributes.filter((d) => {
+        if (d.isVariant || !d.isRequired) return false;
         const coveredIds = new Set(
-          initialProduct.attributeValues.map((av) => av.attributeDefinition.id),
+          initialProduct!.attributeValues.map(
+            (av) => av.attributeDefinition.id,
+          ),
         );
-        setMissingRequiredAttrs(
-          requiredProductAttrs.filter((d) => !coveredIds.has(d.id)),
-        );
+        return !coveredIds.has(d.id);
       })
-      .catch(() => setMissingRequiredAttrs([]))
-      .finally(() => setIsCheckingAttrs(false));
-  }, [initialProduct]);
+    : [];
 
   function update<K extends keyof ProductFormInput>(
     key: K,
@@ -84,7 +68,7 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setFieldErrors({});
@@ -104,34 +88,25 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const payload: Record<string, unknown> = {
-        sku: form.sku,
-        name: form.name,
-        description: form.description,
-        price: Number(form.price),
-        weight: form.weight ? Number(form.weight) : undefined,
-        brand: form.brand,
-      };
+    const payload: Record<string, unknown> = {
+      sku: form.sku,
+      name: form.name,
+      description: form.description,
+      price: Number(form.price),
+      weight: form.weight ? Number(form.weight) : undefined,
+      brand: form.brand,
+    };
 
-      if (isEditing) {
-        // categoryId n'est pas accepté par PATCH — on ne l'envoie pas
-        payload.status = form.status;
-      } else {
-        // status envoyé à la création est ignoré (toujours DRAFT) — inutile
-        // de l'envoyer, on envoie categoryId (requis uniquement ici)
-        payload.categoryId = form.categoryId;
-      }
+    if (isEditing) {
+      // categoryId n'est pas accepté par PATCH — on ne l'envoie pas
+      payload.status = form.status;
+    } else {
+      // status envoyé à la création est ignoré (toujours DRAFT) — inutile
+      // de l'envoyer, on envoie categoryId (requis uniquement ici)
+      payload.categoryId = form.categoryId;
+    }
 
-      const result = isEditing
-        ? await apiClient.patch<Product>(
-            `/product/${initialProduct!.id}`,
-            payload,
-          )
-        : await apiClient.post<Product>("/product", payload);
-      onSuccess(result);
-    } catch (err) {
+    const onError = (err: unknown) => {
       if (err instanceof ApiError) {
         setError(err.message);
         const details = err.details as
@@ -141,8 +116,12 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
       } else {
         setError("Une erreur est survenue.");
       }
-    } finally {
-      setIsSubmitting(false);
+    };
+
+    if (isEditing) {
+      updateProduct(payload, { onSuccess, onError });
+    } else {
+      createProduct(payload, { onSuccess, onError });
     }
   }
 

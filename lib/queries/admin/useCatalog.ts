@@ -67,3 +67,62 @@ export function useDeleteProduct() {
     },
   });
 }
+
+// --- Images ---
+
+export function useUploadProductImage(productId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => adminCatalogApi.uploadImage(productId, file),
+    onSuccess: (updated: Product) => {
+      qc.setQueryData(queryKeys.admin.product(productId), updated);
+    },
+  });
+}
+
+export function useDeleteProductImage(productId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (imageId: string) =>
+      adminCatalogApi.deleteImage(productId, imageId),
+    onSuccess: (updated: Product) => {
+      qc.setQueryData(queryKeys.admin.product(productId), updated);
+    },
+  });
+}
+
+// --- Attributs non-variante ---
+
+export function useSaveProductAttributes(productId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      attributes: { attributeDefinitionId: string; value: string }[],
+    ) => adminCatalogApi.saveAttributes(productId, attributes),
+    onSuccess: (updated: Product) => {
+      qc.setQueryData(queryKeys.admin.product(productId), updated);
+    },
+  });
+}
+
+// --- Tags ---
+
+export function useProductTags(productId: string) {
+  return useQuery({
+    queryKey: queryKeys.admin.productTags(productId),
+    queryFn: () => adminCatalogApi.productTags(productId),
+    enabled: Boolean(productId),
+  });
+}
+
+export function useSaveProductTags(productId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tagIds: string[]) =>
+      adminCatalogApi.saveProductTags(productId, tagIds),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: queryKeys.admin.productTags(productId),
+      }),
+  });
+}

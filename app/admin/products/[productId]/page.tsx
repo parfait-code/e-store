@@ -1,40 +1,24 @@
 // app/admin/products/[productId]/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import type { Product } from "@/lib/types";
+import { useAdminProduct } from "@/lib/queries/admin/useCatalog";
 import { ProductWizard } from "../_components/ProductWizard";
 
 export default function EditProductPage() {
   const { productId } = useParams<{ productId: string }>();
-  const [product, setProduct] = useState<Product | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .get<Product>(`/product/${productId}`)
-      .then(setProduct)
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [productId]);
+  const { data: product, isLoading, isError } = useAdminProduct(productId);
 
   if (isLoading) {
     return <Loader2 size={20} className="animate-spin text-gray-400" />;
   }
 
-  if (error || !product) {
+  if (isError || !product) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Produit introuvable."}
+        Produit introuvable.
       </div>
     );
   }

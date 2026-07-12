@@ -1,7 +1,7 @@
 // app/admin/products/[productId]/variants/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,33 +11,40 @@ import {
   Pencil,
   Trash2,
   X,
-  Save,
   Check,
 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import { formatXAF } from "@/lib/format";
 import type {
-  Product,
   AttributeDefinition,
   ProductCombination,
   CombinationFormInput,
 } from "@/lib/types";
+import { useAdminProduct } from "@/lib/queries/admin/useCatalog";
+import { useAdminCategoryAttributes } from "@/lib/queries/admin/useCategories";
+import {
+  useProductVariantSelections,
+  useUpdateVariantSelection,
+  useProductCombinationsList,
+  useGenerateCombinations,
+  useUpdateCombination,
+  useDeleteCombination,
+} from "@/lib/queries/admin/useProductVariants";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
 // Sélecteur des options disponibles pour UN attribut de variante donné.
-// PUT /product/:productId/combinations/selections/:attributeDefinitionId
 function AttributeSelectionEditor({
   productId,
   definition,
   selectedOptionIds,
-  onSaved,
 }: {
   productId: string;
   definition: AttributeDefinition;
   selectedOptionIds: string[];
-  onSaved: (optionIds: string[]) => void;
 }) {
   const [selected, setSelected] = useState<string[]>(selectedOptionIds);
-  const [isSaving, setIsSaving] = useState(false);
+  const { mutate: updateSelection, isPending: isSaving } =
+    useUpdateVariantSelection(productId);
 
   function toggle(optionId: string) {
     setSelected((prev) =>
@@ -47,23 +54,11 @@ function AttributeSelectionEditor({
     );
   }
 
-  async function handleSave() {
-    setIsSaving(true);
-    try {
-      await apiClient.put(
-        `/product/${productId}/combinations/selections/${definition.id}`,
-        { optionIds: selected },
-      );
-      onSaved(selected);
-    } catch (err) {
-      alert(
-        err instanceof ApiError
-          ? err.message
-          : "Erreur lors de l'enregistrement des options",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+  function handleSave() {
+    updateSelection({
+      attributeDefinitionId: definition.id,
+      optionIds: selected,
+    });
   }
 
   return (
@@ -110,16 +105,13 @@ function AttributeSelectionEditor({
     </div>
   );
 }
+
 function CombinationEditRow({
   productId,
   combination,
-  onUpdated,
-  onDeleted,
 }: {
   productId: string;
   combination: ProductCombination;
-  onUpdated: (updated: ProductCombination) => void;
-  onDeleted: () => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState<CombinationFormInput>({
@@ -127,51 +119,41 @@ function CombinationEditRow({
     price: combination.price ?? undefined,
     isActive: combination.isActive,
   });
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { mutate: updateCombination, isPending: isSaving } =
+    useUpdateCombination(productId);
+  const { mutate: deleteCombination, isPending: isDeleting } =
+    useDeleteCombination(productId);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  async function handleSave() {
-    setIsSaving(true);
+  function handleSave() {
     setError(null);
-    try {
-      const updated = await apiClient.patch<ProductCombination>(
-        `/product/${productId}/combinations/${combination.id}`,
-        form,
-      );
-      onUpdated(updated);
-      setIsEditing(false);
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+    updateCombination(
+      { combinationId: combination.id, payload: form },
+      {
+        onSuccess: () => setIsEditing(false),
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la mise à jour",
+          ),
+      },
+    );
   }
 
-  async function handleDelete() {
-    if (
-      !confirm(
-        "Supprimer cette combinaison ? Impossible si du stock existe encore dessus.",
-      )
-    )
-      return;
-    setIsDeleting(true);
-    try {
-      await apiClient.delete(
-        `/product/${productId}/combinations/${combination.id}`,
-      );
-      onDeleted();
-    } catch (err) {
-      alert(
-        err instanceof ApiError
-          ? err.message
-          : "Suppression impossible (stock encore présent ?)",
-      );
-    } finally {
-      setIsDeleting(false);
-    }
+  function handleConfirmDelete() {
+    deleteCombination(combination.id, {
+      onSuccess: () => setConfirmDelete(false),
+      onError: (err) => {
+        alert(
+          err instanceof ApiError
+            ? err.message
+            : "Suppression impossible (stock encore présent ?)",
+        );
+        setConfirmDelete(false);
+      },
+    });
   }
 
   const inputClass =
@@ -236,134 +218,109 @@ function CombinationEditRow({
   }
 
   return (
-    <div className="flex items-center justify-between rounded-md border border-gray-200 bg-white p-3">
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">{combination.sku ?? "—"}</span>
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs ${
-              combination.isActive
-                ? "bg-green-100 text-green-700"
-                : "bg-gray-100 text-gray-500"
-            }`}
-          >
-            {combination.isActive ? "Active" : "Inactive"}
-          </span>
+    <>
+      <div className="flex items-center justify-between rounded-md border border-gray-200 bg-white p-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">
+              {combination.sku ?? "—"}
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs ${
+                combination.isActive
+                  ? "bg-green-100 text-green-700"
+                  : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {combination.isActive ? "Active" : "Inactive"}
+            </span>
+          </div>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {combination.values
+              .map(
+                (v) =>
+                  `${v.attributeDefinition.name}: ${v.attributeOption.value}`,
+              )
+              .join(" · ")}
+            {combination.price !== null && ` · ${formatXAF(combination.price)}`}
+          </p>
+          <p className="mt-0.5 text-xs text-gray-400">
+            Stock total : {totalStock} unité(s) sur{" "}
+            {combination.inventory.length} entrepôt(s)
+          </p>
         </div>
-        <p className="mt-0.5 text-xs text-gray-500">
-          {combination.values
-            .map(
-              (v) =>
-                `${v.attributeDefinition.name}: ${v.attributeOption.value}`,
-            )
-            .join(" · ")}
-          {combination.price !== null && ` · ${formatXAF(combination.price)}`}
-        </p>
-        <p className="mt-0.5 text-xs text-gray-400">
-          Stock total : {totalStock} unité(s) sur {combination.inventory.length}{" "}
-          entrepôt(s)
-        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsEditing(true)}
+            className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            onClick={() => setConfirmDelete(true)}
+            disabled={isDeleting}
+            className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+          >
+            {isDeleting ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Trash2 size={16} />
+            )}
+          </button>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setIsEditing(true)}
-          className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-        >
-          <Pencil size={16} />
-        </button>
-        <button
-          onClick={handleDelete}
-          disabled={isDeleting}
-          className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-        >
-          {isDeleting ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <Trash2 size={16} />
-          )}
-        </button>
-      </div>
-    </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Supprimer la combinaison"
+        message="Impossible si du stock existe encore dessus. Voulez-vous vraiment continuer ?"
+        confirmLabel="Supprimer"
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
+    </>
   );
 }
 
 export default function ProductCombinationsPage() {
   const { productId } = useParams<{ productId: string }>();
-  const [product, setProduct] = useState<Product | null>(null);
-  const [variantAttributes, setVariantAttributes] = useState<
-    AttributeDefinition[]
-  >([]);
-  const [selections, setSelections] = useState<Record<string, string[]>>({});
-  const [combinations, setCombinations] = useState<ProductCombination[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: product,
+    isLoading: isLoadingProduct,
+    isError,
+  } = useAdminProduct(productId);
+  const { data: categoryAttrs = [] } = useAdminCategoryAttributes(
+    product?.categoryId ?? "",
+  );
+  const variantAttributes = categoryAttrs.filter((a) => a.isVariant);
 
-  async function loadAll() {
-    setIsLoading(true);
-    try {
-      const productRes = await apiClient.get<Product>(
-        `/product/${productId}?includeInactive=true`,
-      );
-      setProduct(productRes);
+  const { data: selectionsRaw = [] } = useProductVariantSelections(productId);
+  const selections: Record<string, string[]> = {};
+  selectionsRaw.forEach((s) => {
+    selections[s.attributeDefinitionId] = s.optionIds;
+  });
 
-      const [attrsRes, selectionsRes, combosRes] = await Promise.all([
-        apiClient.get<AttributeDefinition[]>(
-          `/categories/${productRes.categoryId}/attributes`,
+  const { data: combinations = [] } = useProductCombinationsList(productId);
+  const { mutate: generate, isPending: isGenerating } =
+    useGenerateCombinations(productId);
+
+  function handleGenerate() {
+    generate(undefined, {
+      onError: (err) =>
+        alert(
+          err instanceof ApiError
+            ? err.message
+            : "Erreur lors de la génération des combinaisons",
         ),
-        apiClient
-          .get<
-            { attributeDefinitionId: string; optionIds: string[] }[]
-          >(`/product/${productId}/combinations/selections`)
-          .catch(() => []),
-        apiClient
-          .get<ProductCombination[]>(`/product/${productId}/combinations`)
-          .catch(() => []),
-      ]);
-
-      setVariantAttributes(attrsRes.filter((a) => a.isVariant));
-      const selMap: Record<string, string[]> = {};
-      selectionsRes.forEach((s) => {
-        selMap[s.attributeDefinitionId] = s.optionIds;
-      });
-      setSelections(selMap);
-      setCombinations(combosRes);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Erreur de chargement");
-    } finally {
-      setIsLoading(false);
-    }
+    });
   }
 
-  useEffect(() => {
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId]);
-
-  async function handleGenerate() {
-    setIsGenerating(true);
-    try {
-      const generated = await apiClient.post<ProductCombination[]>(
-        `/product/${productId}/combinations/generate`,
-      );
-      setCombinations(generated);
-    } catch (err) {
-      alert(
-        err instanceof ApiError
-          ? err.message
-          : "Erreur lors de la génération des combinaisons",
-      );
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  if (isLoading)
+  if (isLoadingProduct)
     return <Loader2 size={20} className="animate-spin text-gray-400" />;
-  if (error || !product) {
+  if (isError || !product) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Produit introuvable."}
+        Produit introuvable.
       </div>
     );
   }
@@ -398,9 +355,6 @@ export default function ProductCombinationsPage() {
               productId={productId}
               definition={def}
               selectedOptionIds={selections[def.id] ?? []}
-              onSaved={(optionIds) =>
-                setSelections((prev) => ({ ...prev, [def.id]: optionIds }))
-              }
             />
           ))}
         </div>
@@ -438,14 +392,6 @@ export default function ProductCombinationsPage() {
               key={combo.id}
               productId={productId}
               combination={combo}
-              onUpdated={(updated) =>
-                setCombinations((prev) =>
-                  prev.map((c) => (c.id === updated.id ? updated : c)),
-                )
-              }
-              onDeleted={() =>
-                setCombinations((prev) => prev.filter((c) => c.id !== combo.id))
-              }
             />
           ))}
         </div>

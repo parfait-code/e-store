@@ -1,12 +1,18 @@
 // app/admin/promotions/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Plus, Loader2, Pencil, Trash2, Power, TagIcon } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
-import type { Promotion, PromotionStatus } from "@/lib/types";
+import type { PromotionStatus } from "@/lib/types";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import {
+  useAdminPromotions,
+  useTogglePromotion,
+  useDeletePromotion,
+} from "@/lib/queries/admin/usePromotions";
 
 const STATUS_OPTIONS: PromotionStatus[] = [
   "SCHEDULED",
@@ -30,65 +36,30 @@ const STATUS_LABELS: Record<PromotionStatus, string> = {
 };
 
 export default function PromotionsPage() {
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [status, setStatus] = useState<PromotionStatus | "">("");
   const [isActive, setIsActive] = useState<"" | "true" | "false">("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const fetchPromotions = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    const params = new URLSearchParams();
-    if (status) params.set("status", status);
-    if (isActive) params.set("isActive", isActive);
+  const { data, isLoading, isError } = useAdminPromotions({ status, isActive });
+  // `data?.items` garantit toujours un tableau — même si l'API renvoyait un
+  // format inattendu, `adminPromotionsApi.list` l'a déjà normalisé en amont.
+  const promotions = data?.items ?? [];
 
-    apiClient
-      .get<Promotion[]>(`/promotions?${params.toString()}`)
-      .then((data) => setPromotions(data ?? []))
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [status, isActive]);
+  const {
+    mutate: togglePromotion,
+    isPending: isToggling,
+    variables: togglingId,
+  } = useTogglePromotion();
+  const { mutate: deletePromotion, isPending: isDeleting } =
+    useDeletePromotion();
 
-  useEffect(() => {
-    fetchPromotions();
-  }, [fetchPromotions]);
-
-  async function handleDelete(promotionId: string) {
-    if (!confirm("Supprimer cette promotion ?")) return;
-    setDeletingId(promotionId);
-    try {
-      await apiClient.delete(`/promotions/${promotionId}`);
-      setPromotions((prev) => prev.filter((p) => p.id !== promotionId));
-    } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
-  async function handleToggle(promotionId: string) {
-    setTogglingId(promotionId);
-    try {
-      const updated = await apiClient.patch<Promotion>(
-        `/promotions/${promotionId}/toggle`,
-      );
-      setPromotions((prev) =>
-        prev.map((p) => (p.id === promotionId ? updated : p)),
-      );
-    } catch (err) {
-      alert(
-        err instanceof ApiError ? err.message : "Erreur lors du basculement",
-      );
-    } finally {
-      setTogglingId(null);
-    }
+  function confirmDelete() {
+    if (!confirmDeleteId) return;
+    deletePromotion(confirmDeleteId, {
+      onError: (err) =>
+        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+      onSettled: () => setConfirmDeleteId(null),
+    });
   }
 
   const selectClass =
@@ -136,9 +107,9 @@ export default function PromotionsPage() {
         </select>
       </div>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 
@@ -204,14 +175,14 @@ export default function PromotionsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => handleToggle(promo.id)}
-                        disabled={togglingId === promo.id}
+                        onClick={() => togglePromotion(promo.id)}
+                        disabled={isToggling && togglingId === promo.id}
                         title={promo.isActive ? "Désactiver" : "Activer"}
                         className={`rounded-md p-1.5 hover:bg-gray-100 disabled:opacity-50 ${
                           promo.isActive ? "text-green-600" : "text-gray-400"
                         }`}
                       >
-                        {togglingId === promo.id ? (
+                        {isToggling && togglingId === promo.id ? (
                           <Loader2 size={16} className="animate-spin" />
                         ) : (
                           <Power size={16} />
@@ -224,11 +195,11 @@ export default function PromotionsPage() {
                         <Pencil size={16} />
                       </Link>
                       <button
-                        onClick={() => handleDelete(promo.id)}
-                        disabled={deletingId === promo.id}
+                        onClick={() => setConfirmDeleteId(promo.id)}
+                        disabled={isDeleting}
                         className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                       >
-                        {deletingId === promo.id ? (
+                        {isDeleting && confirmDeleteId === promo.id ? (
                           <Loader2 size={16} className="animate-spin" />
                         ) : (
                           <Trash2 size={16} />
@@ -242,6 +213,16 @@ export default function PromotionsPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Supprimer la promotion"
+        message="Cette action est irréversible. Voulez-vous vraiment continuer ?"
+        confirmLabel="Supprimer"
+        isLoading={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }
