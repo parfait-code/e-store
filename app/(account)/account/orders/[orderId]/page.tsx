@@ -225,16 +225,23 @@ function ReturnRequestForm({
             </p>
           )}
           <div className="space-y-2">
-            {order.items.map((item) => (
-              <label key={item.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={item.id in selected}
-                  onChange={() => toggleItem(item.id, item.quantity)}
-                />
-                {item.product.name} (qté {item.quantity})
-              </label>
-            ))}
+            {order.items.map((item) => {
+              const productName =
+                item.product?.name ?? item.productName ?? "Produit supprimé";
+              return (
+                <label
+                  key={item.id}
+                  className="flex items-center gap-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={item.id in selected}
+                    onChange={() => toggleItem(item.id, item.quantity)}
+                  />
+                  {productName} (qté {item.quantity})
+                </label>
+              );
+            })}
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -375,69 +382,73 @@ export default function OrderDetailPage() {
           <Package size={16} /> Articles
         </h2>
         <div className="divide-y divide-gray-100">
-          {order.items.map((item) => (
-            <div key={item.id} className="py-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">{item.product.name}</p>
-                  <p className="text-xs text-gray-500">Qté {item.quantity}</p>
-                </div>
-                <span className="text-sm">
-                  {formatXAF(item.price * item.quantity)}
-                </span>
-              </div>
-
-              {order.status === "DELIVERED" &&
-                (reviewingItemId === item.id ||
-                editingReviewItemId === item.id ? (
-                  <ReviewForm
-                    orderItemId={item.id}
-                    productId={item.productId}
-                    existingReview={reviewsByItem[item.id]}
-                    onDone={(review) => {
-                      setReviewsByItem((prev) => ({
-                        ...prev,
-                        [item.id]: review,
-                      }));
-                      setReviewingItemId(null);
-                      setEditingReviewItemId(null);
-                    }}
-                    onCancel={() => setEditingReviewItemId(null)}
-                  />
-                ) : reviewsByItem[item.id] ? (
-                  <div className="mt-1 flex items-center gap-3 text-xs">
-                    <span className="text-green-600">
-                      Avis envoyé ({reviewsByItem[item.id].rating}★)
-                    </span>
-                    <button
-                      onClick={() => setEditingReviewItemId(item.id)}
-                      className="flex items-center gap-1 text-gray-500 hover:text-gray-900"
-                    >
-                      <Pencil size={12} /> Modifier
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleDeleteReview(item.id, reviewsByItem[item.id].id)
-                      }
-                      disabled={
-                        isDeletingReview &&
-                        deletingReviewId === reviewsByItem[item.id].id
-                      }
-                      className="flex items-center gap-1 text-gray-500 hover:text-red-600 disabled:opacity-50"
-                    >
-                      <Trash2 size={12} /> Supprimer
-                    </button>
+          {order.items.map((item) => {
+            const productName =
+              item.product?.name ?? item.productName ?? "Produit supprimé";
+            return (
+              <div key={item.id} className="py-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{productName}</p>
+                    <p className="text-xs text-gray-500">Qté {item.quantity}</p>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setReviewingItemId(item.id)}
-                    className="mt-1 flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900"
-                  >
-                    <Star size={12} /> Laisser un avis
-                  </button>
-                ))}
-            </div>
-          ))}
+                  <span className="text-sm">
+                    {formatXAF(item.price * item.quantity)}
+                  </span>
+                </div>
+
+                {order.status === "DELIVERED" &&
+                  (reviewingItemId === item.id ||
+                  editingReviewItemId === item.id ? (
+                    <ReviewForm
+                      orderItemId={item.id}
+                      productId={item.productId}
+                      existingReview={reviewsByItem[item.id]}
+                      onDone={(review) => {
+                        setReviewsByItem((prev) => ({
+                          ...prev,
+                          [item.id]: review,
+                        }));
+                        setReviewingItemId(null);
+                        setEditingReviewItemId(null);
+                      }}
+                      onCancel={() => setEditingReviewItemId(null)}
+                    />
+                  ) : reviewsByItem[item.id] ? (
+                    <div className="mt-1 flex items-center gap-3 text-xs">
+                      <span className="text-green-600">
+                        Avis envoyé ({reviewsByItem[item.id].rating}★)
+                      </span>
+                      <button
+                        onClick={() => setEditingReviewItemId(item.id)}
+                        className="flex items-center gap-1 text-gray-500 hover:text-gray-900"
+                      >
+                        <Pencil size={12} /> Modifier
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleDeleteReview(item.id, reviewsByItem[item.id].id)
+                        }
+                        disabled={
+                          isDeletingReview &&
+                          deletingReviewId === reviewsByItem[item.id].id
+                        }
+                        className="flex items-center gap-1 text-gray-500 hover:text-red-600 disabled:opacity-50"
+                      >
+                        <Trash2 size={12} /> Supprimer
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setReviewingItemId(item.id)}
+                      className="mt-1 flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900"
+                    >
+                      <Star size={12} /> Laisser un avis
+                    </button>
+                  ))}
+              </div>
+            );
+          })}
         </div>
         <div className="mt-3 flex justify-end border-t border-gray-100 pt-3 text-sm">
           <div className="text-right">

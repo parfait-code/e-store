@@ -437,35 +437,43 @@ export default function OrderDetailPage() {
               <Package size={16} /> Articles ({order.items.length})
             </h2>
             <div className="divide-y divide-gray-100">
-              {order.items.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between py-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{item.product.name}</p>
-                    <p className="text-xs text-gray-500">
-                      SKU {item.combination?.sku ?? item.product.sku} · Qté{" "}
-                      {item.quantity}
-                    </p>
-                    {item.combinationSnapshot && (
-                      <p className="mt-0.5 text-xs text-gray-400">
-                        {Object.entries(item.combinationSnapshot)
-                          .map(([k, v]) => `${k}: ${v}`)
-                          .join(" · ")}
+              {order.items.map((item) => {
+                const productName =
+                  item.product?.name ?? item.productName ?? "Produit supprimé";
+                const productSku =
+                  item.combination?.sku ??
+                  item.product?.sku ??
+                  item.productSku ??
+                  "—";
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between py-3"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{productName}</p>
+                      <p className="text-xs text-gray-500">
+                        SKU {productSku} · Qté {item.quantity}
                       </p>
-                    )}
+                      {item.combinationSnapshot && (
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {Object.entries(item.combinationSnapshot)
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right text-sm">
+                      <p>{formatXAF(item.price * item.quantity)}</p>
+                      {item.discountAmount > 0 && (
+                        <p className="text-xs text-green-600">
+                          -{formatXAF(item.discountAmount)}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right text-sm">
-                    <p>{formatXAF(item.price * item.quantity)}</p>
-                    {item.discountAmount > 0 && (
-                      <p className="text-xs text-green-600">
-                        -{formatXAF(item.discountAmount)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="mt-3 flex justify-end border-t border-gray-100 pt-3 text-sm">
               <div className="text-right">

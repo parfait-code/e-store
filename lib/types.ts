@@ -370,7 +370,9 @@ export interface OrderItem {
   originalPrice: number;
   discountAmount: number;
   combination: OrderItemCombinationRef | null;
-  product: { id: string; name: string; sku: string; images: ProductImage[] };
+  product: { id: string; name: string; sku: string; images: ProductImage[] } | null;
+  productName?: string;
+  productSku?: string;
 }
 
 // Remplacer le champ `status: string` de l'interface Payment par :
