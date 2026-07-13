@@ -795,18 +795,50 @@ function inventoryItemLabel(item: InventoryItem): string {
 // Détail par entrepôt/combinaison d'un produit du tableau groupé. Reçoit les
 // entrepôts depuis le parent (plus de tableau vide en dur passé au transfert).
 function ExpandedProductRows({
-  productId,
+  group,
   warehouses,
 }: {
-  productId: string;
+  group: InventoryGroupedProduct;
   warehouses: Warehouse[];
 }) {
-  const { data, isLoading } = useAdminInventoryGroupedDetail(productId, 1);
-  const items = data?.items ?? [];
+  // Produits à variantes uniquement : la réponse groupée n'inclut pas le
+  // détail par combinaison × entrepôt, il faut l'endpoint dédié.
+  const needsFetch = group.hasVariants;
+  const { data, isLoading } = useAdminInventoryGroupedDetail(
+    needsFetch ? group.product.id : null,
+    1,
+  );
+
+  // Produits sans variantes : les lignes sont déjà dans `group.lines`,
+  // on les adapte simplement à la forme InventoryItem attendue par
+  // QuantityEditor / TransferModal, sans requête supplémentaire.
+  const items: InventoryItem[] = needsFetch
+    ? (data?.items ?? [])
+    : (group.lines ?? []).map((line) => ({
+        id: line.id,
+        productId: group.product.id,
+        combinationId: null,
+        warehouseId: line.warehouseId,
+        quantity: line.quantity,
+        product: {
+          id: group.product.id,
+          name: group.product.name,
+          sku: group.product.sku,
+          images: [],
+        },
+        warehouse: {
+          id: line.warehouse.id,
+          name: line.warehouse.name,
+          location: "",
+          capacity: null,
+        },
+        combination: null,
+      }));
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [transferItem, setTransferItem] = useState<InventoryItem | null>(null);
 
-  if (isLoading) {
+  if (needsFetch && isLoading) {
     return (
       <tr>
         <td colSpan={5} className="px-8 py-3">
@@ -823,8 +855,6 @@ function ExpandedProductRows({
           key={item.id}
           className="border-b border-gray-100 bg-white last:border-0"
         >
-          {/* FIX : affiche le nom du produit + la variante, au lieu du SKU
-              de la combinaison dupliqué avec la colonne suivante. */}
           <td className="px-4 py-2.5 pl-10 text-gray-600">
             {inventoryItemLabel(item)}
           </td>
@@ -1121,16 +1151,18 @@ export default function InventoryPage() {
                   Aucun article trouvé.
                 </td>
               </tr>
-            ) : (
+           ) : (
               groupedProducts.map((group) => {
-                const isExpanded = expandedProductIds.has(group.productId);
+                const isExpanded = expandedProductIds.has(group.product.id);
+                const isOutOfStock = group.outOfStockLineCount > 0;
+                const isLowStock = !isOutOfStock && group.lowStockLineCount > 0;
                 return (
-                  <React.Fragment key={group.productId}>
+                  <React.Fragment key={group.product.id}>
                     <tr className="border-b border-gray-100 bg-gray-50/60">
                       <td colSpan={5} className="px-4 py-2.5">
                         <button
                           type="button"
-                          onClick={() => toggleExpand(group.productId)}
+                          onClick={() => toggleExpand(group.product.id)}
                           className="flex w-full items-center gap-2 text-left"
                         >
                           <ChevronRight
@@ -1138,23 +1170,26 @@ export default function InventoryPage() {
                             className={`shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`}
                           />
                           <span className="font-medium">
-                            {group.productName}
+                            {group.product.name}
                           </span>
                           <span className="text-xs text-gray-400">
-                            {group.productSku}
+                            {group.product.sku}
                           </span>
-                          {group.isOutOfStock && (
+                          {isOutOfStock && (
                             <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">
                               Rupture
                             </span>
                           )}
-                          {!group.isOutOfStock && group.isLowStock && (
+                          {!isOutOfStock && isLowStock && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
                               Stock faible
                             </span>
                           )}
                           <span className="ml-auto whitespace-nowrap text-xs text-gray-500">
-                            {group.lineCount} ligne(s) ·{" "}
+                            {group.warehouseCount} entrepôt(s)
+                            {group.hasVariants &&
+                              ` · ${group.combinationsWithStockCount} combinaison(s)`}
+                            {" · "}
                             <span
                               className={
                                 group.totalQuantity === 0 ? "text-red-600" : ""
@@ -1168,10 +1203,7 @@ export default function InventoryPage() {
                       </td>
                     </tr>
                     {isExpanded && (
-                      <ExpandedProductRows
-                        productId={group.productId}
-                        warehouses={warehouses}
-                      />
+                      <ExpandedProductRows group={group} warehouses={warehouses} />
                     )}
                   </React.Fragment>
                 );

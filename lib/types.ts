@@ -321,14 +321,23 @@ export interface OrderAddressInput {
   postalCode: string | null;
 }
 
+
+export interface InventoryGroupedLine {
+  id: string;
+  warehouseId: string;
+  warehouse: { id: string; name: string };
+  quantity: number;
+}
+
 export interface InventoryGroupedProduct {
-  productId: string;
-  productName: string;
-  productSku: string;
+  product: { id: string; name: string; sku: string; status: ProductStatus };
+  hasVariants: boolean;
   totalQuantity: number;
-  lineCount: number;
-  isLowStock: boolean;
-  isOutOfStock: boolean;
+  warehouseCount: number;
+  combinationsWithStockCount: number;
+  lowStockLineCount: number;
+  outOfStockLineCount: number;
+  lines?: InventoryGroupedLine[];
 }
 
 // --- Pickup requests : refonte complète du modèle ---
