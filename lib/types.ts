@@ -48,17 +48,52 @@ export interface Paginated<T> {
 }
 
 export interface DashboardStats {
-  products: { total: number; addedThisMonth: number };
-  orders: { total: number; thisMonth: number; trend: number };
-  users: { total: number; active: number };
-  payments: { totalAmountThisMonth: number; currency: "XAF"; trend: number };
-  inventory: { lowStockCount: number };
-  shipments: { inProgress: number; trend: number };
+  products: {
+    total: number;
+    byStatus: Record<ProductStatus, number>;
+    addedThisMonth: number;
+  };
+  orders: {
+    total: number;
+    byStatus: Record<OrderStatus, number>;
+    thisMonth: number;
+    trend: number;
+  };
+  users: {
+    total: number;
+    active: number;
+    newThisMonth: number;
+    byRole: Record<Role, number>;
+  };
+  payments: {
+    totalAmountThisMonth: number;
+    totalAmountAllTime: number;
+    currency: "XAF";
+    trend: number;
+    pendingCodCount: number;
+  };
+  inventory: {
+    lowStockCount: number;
+    outOfStockCount: number;
+  };
+  shipments: {
+    inProgress: number;
+    trend: number;
+    pendingPickupRequests: number;
+  };
   promotions: {
     active: number;
     couponUsageThisMonth: number;
     revenueFromCouponsThisMonth: number;
     currency: "XAF";
+  };
+  returns: {
+    pending: number;
+    thisMonth: number;
+  };
+  reviews: {
+    total: number;
+    averageRating: number;
   };
 }
 

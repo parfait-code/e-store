@@ -13,6 +13,11 @@ import {
   TrendingUp,
   TrendingDown,
   Loader2,
+  RotateCcw,
+  Star,
+  XCircle,
+  Clock,
+  UserPlus,
 } from "lucide-react";
 import {
   LineChart,
@@ -27,6 +32,7 @@ import {
   useDashboardStats,
   useSalesChart,
 } from "@/lib/queries/admin/useDashboard";
+import type { OrderStatus, ProductStatus, Role } from "@/lib/types";
 
 function formatXAF(amount: number) {
   return (
@@ -35,6 +41,29 @@ function formatXAF(amount: number) {
     ) + " XAF"
   );
 }
+
+const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
+  DRAFT: "Brouillon",
+  ACTIVE: "Actif",
+  ARCHIVED: "Archivé",
+};
+
+const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  PENDING: "En attente",
+  CONFIRMED: "Confirmée",
+  PROCESSING: "En traitement",
+  SHIPPED: "Expédiée",
+  DELIVERED: "Livrée",
+  CANCELLED: "Annulée",
+  REFUNDED: "Remboursée",
+};
+
+const ROLE_LABELS: Record<Role, string> = {
+  USER: "Utilisateurs",
+  ADMIN: "Admins",
+  MANAGER: "Managers",
+  SUPPORT: "Support",
+};
 
 function TrendBadge({ value }: { value: number }) {
   const positive = value >= 0;
@@ -48,16 +77,43 @@ function TrendBadge({ value }: { value: number }) {
   );
 }
 
+function BreakdownChips({
+  data,
+  labels,
+}: {
+  data: Record<string, number>;
+  labels: Record<string, string>;
+}) {
+  const entries = Object.entries(data).filter(([, v]) => v > 0);
+  if (entries.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-1.5 border-t border-gray-100 pt-3">
+      {entries.map(([key, value]) => (
+        <span
+          key={key}
+          className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600"
+        >
+          {labels[key] ?? key} : <span className="font-medium">{value}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function StatCard({
   icon: Icon,
   label,
   value,
   trend,
+  subValue,
+  breakdown,
 }: {
   icon: React.ElementType;
   label: string;
   value: string | number;
   trend?: number;
+  subValue?: string;
+  breakdown?: React.ReactNode;
 }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5">
@@ -69,6 +125,8 @@ function StatCard({
       </div>
       <p className="text-2xl font-semibold">{value}</p>
       <p className="mt-1 text-sm text-gray-500">{label}</p>
+      {subValue && <p className="mt-0.5 text-xs text-gray-400">{subValue}</p>}
+      {breakdown}
     </div>
   );
 }
@@ -157,33 +215,76 @@ export default function DashboardPage() {
           label={`Commandes ce mois (${stats.orders.total} total)`}
           value={stats.orders.thisMonth}
           trend={stats.orders.trend}
+          breakdown={
+            <BreakdownChips
+              data={stats.orders.byStatus}
+              labels={ORDER_STATUS_LABELS}
+            />
+          }
         />
         <StatCard
           icon={Wallet}
           label="Revenu ce mois"
           value={formatXAF(stats.payments.totalAmountThisMonth)}
           trend={stats.payments.trend}
+          subValue={`Total cumulé : ${formatXAF(stats.payments.totalAmountAllTime)}`}
+          breakdown={
+            stats.payments.pendingCodCount > 0 ? (
+              <BreakdownChips
+                data={{ pendingCod: stats.payments.pendingCodCount }}
+                labels={{ pendingCod: "Paiements à la livraison en attente" }}
+              />
+            ) : undefined
+          }
         />
         <StatCard
           icon={Package}
           label={`Produits (+${stats.products.addedThisMonth} ce mois)`}
           value={stats.products.total}
+          breakdown={
+            <BreakdownChips
+              data={stats.products.byStatus}
+              labels={PRODUCT_STATUS_LABELS}
+            />
+          }
         />
         <StatCard
           icon={Users}
           label={`Utilisateurs actifs (/ ${stats.users.total})`}
           value={stats.users.active}
+          subValue={`+${stats.users.newThisMonth} nouveaux ce mois`}
+          breakdown={
+            <BreakdownChips data={stats.users.byRole} labels={ROLE_LABELS} />
+          }
         />
         <StatCard
           icon={AlertTriangle}
           label="Stock faible"
           value={stats.inventory.lowStockCount}
+          breakdown={
+            stats.inventory.outOfStockCount > 0 ? (
+              <BreakdownChips
+                data={{ outOfStock: stats.inventory.outOfStockCount }}
+                labels={{ outOfStock: "En rupture" }}
+              />
+            ) : undefined
+          }
         />
         <StatCard
           icon={Truck}
           label="Expéditions en cours"
           value={stats.shipments.inProgress}
           trend={stats.shipments.trend}
+          breakdown={
+            stats.shipments.pendingPickupRequests > 0 ? (
+              <BreakdownChips
+                data={{
+                  pendingPickup: stats.shipments.pendingPickupRequests,
+                }}
+                labels={{ pendingPickup: "Enlèvements en attente" }}
+              />
+            ) : undefined
+          }
         />
         <StatCard
           icon={Tag}
@@ -194,6 +295,18 @@ export default function DashboardPage() {
           icon={Wallet}
           label="Revenu via coupons ce mois"
           value={formatXAF(stats.promotions.revenueFromCouponsThisMonth)}
+        />
+        <StatCard
+          icon={RotateCcw}
+          label={`Retours (${stats.returns.thisMonth} ce mois)`}
+          value={stats.returns.pending}
+          subValue="En attente de traitement"
+        />
+        <StatCard
+          icon={Star}
+          label={`Avis clients (${stats.reviews.total} au total)`}
+          value={stats.reviews.averageRating.toFixed(1)}
+          subValue="Note moyenne"
         />
       </div>
 
