@@ -540,8 +540,18 @@ export interface Promotion {
   isActive: boolean;
   startDate: string;
   endDate: string;
+  // NOUVEAU — nécessaires pour piloter le carrousel hero de la home
+  isFeaturedInHero: boolean;
+  heroPosition: number | null;
+  heroImages: string[];
   discounts: Discount[];
   coupons: CouponCode[];
+}
+
+export interface PromotionHeroUpdateInput {
+  isFeaturedInHero: boolean;
+  heroPosition?: number;
+  heroImages: string[];
 }
 
 export interface PromotionFormInput {

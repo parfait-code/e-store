@@ -122,6 +122,7 @@ export default function PromotionsPage() {
               <th className="px-4 py-3">Statut</th>
               <th className="px-4 py-3">Remises</th>
               <th className="px-4 py-3">Coupons</th>
+              <th className="px-4 py-3">Hero</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -171,6 +172,15 @@ export default function PromotionsPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-500">
                     {promo.coupons.length}
+                  </td>
+                  <td className="px-4 py-3">
+                    {promo.isFeaturedInHero ? (
+                      <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+                        ✨ Position {promo.heroPosition ?? "—"}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">

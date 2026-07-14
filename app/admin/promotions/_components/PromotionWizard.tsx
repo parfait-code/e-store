@@ -8,12 +8,16 @@ import type { Promotion } from "@/lib/types";
 import { Stepper, type StepDefinition } from "@/components/admin/Stepper";
 import { PromotionInfoForm } from "./PromotionInfoForm";
 import { PromotionImages } from "./PromotionImages";
+import { PromotionHeroSettings } from "./PromotionHeroSettings";
 import { PromotionDiscounts } from "./PromotionDiscounts";
 import { PromotionCoupons } from "./PromotionCoupons";
 
+// NOUVEAU : étape "hero" ajoutée après "images" — elle dépend des images
+// déjà uploadées, donc placée juste après cette étape dans le flux.
 const STEPS: StepDefinition[] = [
   { id: "info", label: "Informations" },
   { id: "images", label: "Images" },
+  { id: "hero", label: "Carrousel accueil" },
   { id: "discounts", label: "Remises" },
   { id: "coupons", label: "Coupons" },
 ];
@@ -39,12 +43,11 @@ export function PromotionWizard({
     !promotionExists ? STEPS.map((_, i) => i).filter((i) => i > 0) : [],
   );
 
-  // Ici, toutes les données sont déjà sur l'objet `Promotion` — pas besoin
-  // d'appel réseau supplémentaire pour savoir ce qui est réellement complété.
   useEffect(() => {
     if (!promotion) return;
     const next = new Set<string>(["info"]);
     if (promotion.images.length > 0) next.add("images");
+    if (promotion.isFeaturedInHero) next.add("hero");
     if (promotion.discounts.length > 0) next.add("discounts");
     if (promotion.coupons.length > 0) next.add("coupons");
     setCompletedSteps((prev) => new Set([...prev, ...next]));
@@ -85,6 +88,12 @@ export function PromotionWizard({
         )}
         {stepId === "images" && promotion && (
           <PromotionImages promotion={promotion} onUpdated={setPromotion} />
+        )}
+        {stepId === "hero" && promotion && (
+          <PromotionHeroSettings
+            promotion={promotion}
+            onUpdated={setPromotion}
+          />
         )}
         {stepId === "discounts" && promotion && (
           <PromotionDiscounts promotion={promotion} onUpdated={setPromotion} />
