@@ -1,5 +1,7 @@
+// app/(public)/layout.tsx
 import { PublicHeader } from "@/components/PublicHeader";
 import { PublicFooter } from "@/components/PublicFooter";
+import { PopupDisplay } from "@/components/PopupDisplay";
 
 export default function PublicLayout({
   children,
@@ -13,6 +15,7 @@ export default function PublicLayout({
         {children}
       </main>
       <PublicFooter />
+      <PopupDisplay />
     </div>
   );
 }
