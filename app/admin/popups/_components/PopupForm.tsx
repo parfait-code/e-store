@@ -16,6 +16,37 @@ import { useCreatePopup, useUpdatePopup } from "@/lib/queries/admin/usePopups";
 import { useAdminPromotions } from "@/lib/queries/admin/usePromotions";
 import { useAdminCategoriesList } from "@/lib/queries/admin/useCategories";
 
+import { StagedImagesManager } from "@/components/admin/StagedImagesManager";
+import {
+  useUploadPopupImage,
+  useDeletePopupImage,
+} from "@/lib/queries/admin/usePopups";
+
+export function PopupImageUploader({ popup }: { popup: Popup }) {
+  const { mutateAsync: uploadImage } = useUploadPopupImage(popup.id);
+  const { mutateAsync: deleteImage } = useDeletePopupImage(popup.id);
+
+  return (
+    <div className="max-w-2xl">
+      <h2 className="mb-3 text-sm font-medium">Image</h2>
+      <StagedImagesManager
+        existingImages={
+          popup.imageUrl ? [{ key: "image", url: popup.imageUrl }] : []
+        }
+        deleteOne={async () => {
+          await deleteImage();
+        }}
+        uploadOne={async (file) => {
+          await uploadImage(file);
+        }}
+        maxTotal={1}
+        addLabel="Ajouter"
+        helpText="JPEG, PNG, WEBP ou GIF · 5 Mo max."
+      />
+    </div>
+  );
+}
+
 const TARGET_LABELS: Record<PopupTargetType, string> = {
   PROMOTION: "Promotion",
   CATEGORY: "Catégorie",
@@ -34,7 +65,6 @@ function toDateTimeLocal(iso: string | null | undefined) {
   return iso ? iso.slice(0, 16) : "";
 }
 
-// Picker minimal pour cibler un produit précis (targetType === "PRODUCT").
 function ProductTargetPicker({
   value,
   onChange,
@@ -146,9 +176,8 @@ export function PopupForm({
   onSuccess: (popup: Popup) => void;
 }) {
   const isEditing = Boolean(initialPopup);
-  const [form, setForm] = useState<PopupFormInput>({
+  const [form, setForm] = useState<Omit<PopupFormInput, "imageUrl">>({
     title: initialPopup?.title ?? "",
-    imageUrl: initialPopup?.imageUrl ?? "",
     message: initialPopup?.message ?? "",
     isActive: initialPopup?.isActive ?? true,
     startDate: toDateTimeLocal(initialPopup?.startDate),
@@ -170,9 +199,9 @@ export function PopupForm({
   const { mutate: createPopup } = useCreatePopup();
   const { mutate: updatePopup } = useUpdatePopup(initialPopup?.id ?? "");
 
-  function update<K extends keyof PopupFormInput>(
+  function update<K extends keyof typeof form>(
     key: K,
-    value: PopupFormInput[K],
+    value: (typeof form)[K],
   ) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -208,7 +237,6 @@ export function PopupForm({
         ? new Date(form.startDate).toISOString()
         : undefined,
       endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
-      imageUrl: form.imageUrl || undefined,
       message: form.message || undefined,
       ctaLabel: form.ctaLabel || undefined,
       targetId: form.targetId || undefined,
@@ -263,19 +291,6 @@ export function PopupForm({
           value={form.title}
           onChange={(e) => update("title", e.target.value)}
           className={inputClass}
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">
-          URL de l'image (optionnel)
-        </label>
-        <input
-          type="text"
-          value={form.imageUrl}
-          onChange={(e) => update("imageUrl", e.target.value)}
-          className={inputClass}
-          placeholder="https://..."
         />
       </div>
 
@@ -446,6 +461,12 @@ export function PopupForm({
         />
         Popup actif
       </label>
+
+      {!isEditing && (
+        <p className="text-xs text-gray-400">
+          L'image se gère une fois le popup créé.
+        </p>
+      )}
 
       <button
         type="submit"

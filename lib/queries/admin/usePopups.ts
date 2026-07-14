@@ -64,3 +64,31 @@ export function useDeletePopup() {
       }),
   });
 }
+
+export function useUploadPopupImage(popupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => adminPopupsApi.uploadImage(popupId, file),
+    onSuccess: (updated) => {
+      qc.setQueryData(queryKeys.admin.popup(popupId), updated);
+      qc.invalidateQueries({
+        predicate: (q) =>
+          q.queryKey[0] === "admin" && q.queryKey[1] === "popups",
+      });
+    },
+  });
+}
+
+export function useDeletePopupImage(popupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminPopupsApi.deleteImage(popupId),
+    onSuccess: (updated) => {
+      qc.setQueryData(queryKeys.admin.popup(popupId), updated);
+      qc.invalidateQueries({
+        predicate: (q) =>
+          q.queryKey[0] === "admin" && q.queryKey[1] === "popups",
+      });
+    },
+  });
+}

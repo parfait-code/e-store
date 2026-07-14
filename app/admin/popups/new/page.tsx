@@ -19,7 +19,9 @@ export default function NewPopupPage() {
       </Link>
       <h1 className="mb-6 text-xl font-semibold">Nouveau popup</h1>
 
-      <PopupForm onSuccess={() => router.push("/admin/popups")} />
+      <PopupForm
+        onSuccess={(popup) => router.push(`/admin/popups/${popup.id}`)}
+      />
     </div>
   );
 }

@@ -32,4 +32,17 @@ export const adminPopupsApi = {
     apiClient.put<PopupWithResolvedUrl>(`/popups/${popupId}`, payload),
 
   remove: (popupId: string) => apiClient.delete(`/popups/${popupId}`),
+
+  uploadImage: (popupId: string, file: File) => {
+    const fd = new FormData();
+    fd.append("image", file);
+    return apiClient.post<PopupWithResolvedUrl>(
+      `/popups/${popupId}/image`,
+      fd,
+      { isFormData: true },
+    );
+  },
+
+  deleteImage: (popupId: string) =>
+    apiClient.delete<PopupWithResolvedUrl>(`/popups/${popupId}/image`),
 };

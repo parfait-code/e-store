@@ -7,7 +7,7 @@ export const adminProductVariantsApi = {
     apiClient
       .get<
         { attributeDefinitionId: string; optionIds: string[] }[]
-      >(`/product/${productId}/combinations/selections`)
+      >(`/product/${productId}/combinations/selections?includeInactive=true`)
       .catch(() => []),
 
   updateSelection: (
@@ -16,18 +16,20 @@ export const adminProductVariantsApi = {
     optionIds: string[],
   ) =>
     apiClient.put(
-      `/product/${productId}/combinations/selections/${attributeDefinitionId}`,
+      `/product/${productId}/combinations/selections/${attributeDefinitionId}?includeInactive=true`,
       { optionIds },
     ),
 
   generate: (productId: string) =>
     apiClient.post<ProductCombination[]>(
-      `/product/${productId}/combinations/generate`,
+      `/product/${productId}/combinations/generate?includeInactive=true`,
     ),
 
   list: (productId: string) =>
     apiClient
-      .get<ProductCombination[]>(`/product/${productId}/combinations`)
+      .get<
+        ProductCombination[]
+      >(`/product/${productId}/combinations?includeInactive=true`)
       .catch(() => []),
 
   update: (
@@ -36,10 +38,12 @@ export const adminProductVariantsApi = {
     payload: CombinationFormInput,
   ) =>
     apiClient.patch<ProductCombination>(
-      `/product/${productId}/combinations/${combinationId}`,
+      `/product/${productId}/combinations/${combinationId}?includeInactive=true`,
       payload,
     ),
 
   remove: (productId: string, combinationId: string) =>
-    apiClient.delete(`/product/${productId}/combinations/${combinationId}`),
+    apiClient.delete(
+      `/product/${productId}/combinations/${combinationId}?includeInactive=true`,
+    ),
 };

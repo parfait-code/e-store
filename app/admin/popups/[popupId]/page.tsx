@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useAdminPopup } from "@/lib/queries/admin/usePopups";
-import { PopupForm } from "../_components/PopupForm";
+import { PopupForm, PopupImageUploader } from "../_components/PopupForm";
 
 export default function EditPopupPage() {
   const { popupId } = useParams<{ popupId: string }>();
@@ -32,10 +32,13 @@ export default function EditPopupPage() {
       </Link>
       <h1 className="mb-6 text-xl font-semibold">Modifier « {popup.title} »</h1>
 
-      <PopupForm
-        initialPopup={popup}
-        onSuccess={() => router.push("/admin/popups")}
-      />
+      <div className="space-y-8">
+        <PopupImageUploader popup={popup} />
+        <PopupForm
+          initialPopup={popup}
+          onSuccess={() => router.push("/admin/popups")}
+        />
+      </div>
     </div>
   );
 }
