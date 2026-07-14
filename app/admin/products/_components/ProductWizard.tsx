@@ -27,6 +27,7 @@ import { useAdminCategoryAttributes } from "@/lib/queries/admin/useCategories";
 import { useAdminTags } from "@/lib/queries/admin/useTags";
 import { useProductCombinationsList } from "@/lib/queries/admin/useProductVariants";
 import { useEffect } from "react";
+import { ApiError } from "@/lib/api-client";
 
 const STEPS: StepDefinition[] = [
   { id: "info", label: "Informations" },
@@ -41,7 +42,7 @@ function ImagesStep({ product }: { product: Product }) {
   const { mutateAsync: uploadImage } = useUploadProductImage(product.id);
   const { mutateAsync: deleteImage } = useDeleteProductImage(product.id);
 
-  const sortedImages = product.images
+  const sortedImages = (Array.isArray(product.images) ? product.images : [])
     .slice()
     .sort((a, b) => a.position - b.position);
   const primaryImage =
@@ -90,7 +91,10 @@ function AttributesStep({ product }: { product: Product }) {
 
   useEffect(() => {
     const initial: Record<string, string> = {};
-    product.attributeValues.forEach((av) => {
+    (Array.isArray(product.attributeValues)
+      ? product.attributeValues
+      : []
+    ).forEach((av) => {
       initial[av.attributeDefinition.id] = av.value;
     });
     setValues(initial);
@@ -139,7 +143,9 @@ function AttributesStep({ product }: { product: Product }) {
       </p>
       {saveErr && (
         <p className="mb-2 text-xs text-red-600">
-          Erreur lors de l'enregistrement des attributs
+          {saveErr instanceof ApiError
+            ? saveErr.message
+            : "Erreur lors de l'enregistrement des attributs"}
         </p>
       )}
       <div className="grid grid-cols-2 gap-3">
@@ -348,13 +354,6 @@ export function ProductWizard({
 }) {
   const router = useRouter();
   const isEditingInitially = Boolean(initialProduct);
-  // On ne garde plus le produit complet en state local — seulement son id.
-  // Le produit lui-même est relu en continu depuis le cache react-query
-  // (voir `product` ci-dessous), pour rester à jour après chaque mutation
-  // faite dans une étape (images, attributs, tags...). C'était la cause du
-  // bug : une copie locale figée ne reflétait jamais ces mises à jour, ce
-  // qui donnait l'impression que l'upload d'image, le changement de statut,
-  // etc. échouaient alors qu'ils avaient réussi côté serveur.
   const [productId, setProductId] = useState<string | null>(
     initialProduct?.id ?? null,
   );
@@ -364,8 +363,6 @@ export function ProductWizard({
   );
 
   const { data: product } = useAdminProduct(productId ?? "");
-  // Tant que le fetch n'a pas résolu juste après une création, on retombe
-  // sur `initialProduct` pour éviter un flash vide.
   const effectiveProduct = product ?? initialProduct;
 
   const productExists = Boolean(productId);
@@ -385,12 +382,20 @@ export function ProductWizard({
   const derivedCompleted = new Set(completedSteps);
   if (effectiveProduct) {
     derivedCompleted.add("info");
-    if (effectiveProduct.images.length > 0) derivedCompleted.add("images");
+
+    const images = Array.isArray(effectiveProduct.images)
+      ? effectiveProduct.images
+      : [];
+    if (images.length > 0) derivedCompleted.add("images");
+
+    const attributeValues = Array.isArray(effectiveProduct.attributeValues)
+      ? effectiveProduct.attributeValues
+      : [];
 
     const nonVariantDefs = categoryAttrs.filter((d) => !d.isVariant);
     const requiredNonVariant = nonVariantDefs.filter((d) => d.isRequired);
     const coveredIds = new Set(
-      effectiveProduct.attributeValues.map((av) => av.attributeDefinition.id),
+      attributeValues.map((av) => av.attributeDefinition.id),
     );
     const allRequiredCovered = requiredNonVariant.every((d) =>
       coveredIds.has(d.id),

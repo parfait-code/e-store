@@ -13,7 +13,7 @@ import {
 import { useAdminCategoryAttributes } from "@/lib/queries/admin/useCategories";
 
 interface ProductFormProps {
-  initialProduct?: Product; // présent en mode édition
+  initialProduct?: Product;
   onSuccess: (product: Product) => void;
 }
 
@@ -40,21 +40,17 @@ export function ProductForm({ initialProduct, onSuccess }: ProductFormProps) {
   );
   const isSubmitting = isCreating || isUpdating;
 
-  // Règle backend #3 : le passage à ACTIVE est refusé (400) tant que les
-  // attributs produit (isVariant:false) marqués isRequired:true n'ont pas
-  // tous une valeur. On le vérifie ici à partir des données déjà en cache
-  // (product.attributeValues est embarqué sur le produit, pas besoin d'un
-  // appel séparé pour la couverture).
   const { data: categoryAttributes = [], isLoading: isCheckingAttrs } =
     useAdminCategoryAttributes(initialProduct?.categoryId ?? "");
 
   const missingRequiredAttrs = isEditing
     ? categoryAttributes.filter((d) => {
         if (d.isVariant || !d.isRequired) return false;
+        const attributeValues = Array.isArray(initialProduct?.attributeValues)
+          ? initialProduct!.attributeValues
+          : [];
         const coveredIds = new Set(
-          initialProduct!.attributeValues.map(
-            (av) => av.attributeDefinition.id,
-          ),
+          attributeValues.map((av) => av.attributeDefinition.id),
         );
         return !coveredIds.has(d.id);
       })
