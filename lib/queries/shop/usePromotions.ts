@@ -5,10 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 import { shopPromotionsApi } from "@/lib/api/shop/promotions";
 import { queryKeys } from "@/lib/queries/keys";
 
-export function useActivePromotions() {
+export function useActivePromotions(
+  params: { page?: number; limit?: number; slot?: "hero" } = {},
+) {
   return useQuery({
-    queryKey: queryKeys.shop.activePromotions,
-    queryFn: shopPromotionsApi.active,
+    queryKey: queryKeys.shop.activePromotions(params),
+    queryFn: () => shopPromotionsApi.active(params),
   });
 }
 

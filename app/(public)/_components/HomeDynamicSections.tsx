@@ -51,8 +51,8 @@ function SkeletonGrid({
 }
 
 export function PromotionsSection() {
-  const { data: promotions = [], isLoading, isError } = useActivePromotions();
-  const safePromotions = Array.isArray(promotions) ? promotions : [];
+  const { data, isLoading, isError } = useActivePromotions();
+  const safePromotions = data?.items ?? [];
 
   if (isError) {
     return (

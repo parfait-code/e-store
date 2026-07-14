@@ -1,19 +1,13 @@
 // app/(public)/page.tsx
-import Link from "next/link";
 import type { Metadata } from "next";
-import {
-  ArrowRight,
-  Truck,
-  ShieldCheck,
-  RotateCcw,
-  HeadphonesIcon,
-} from "lucide-react";
+import { Truck, ShieldCheck, RotateCcw, HeadphonesIcon } from "lucide-react";
 import {
   PromotionsSection,
   CategoriesSection,
   CatalogPreviewSection,
   NewArrivalsSection,
 } from "./_components/HomeDynamicSections";
+import { HeroSection } from "./_components/HeroSection";
 
 export const metadata: Metadata = {
   title: "E-Store — Boutique en ligne",
@@ -47,25 +41,7 @@ const TRUST_ITEMS = [
 export default function HomePage() {
   return (
     <div className="space-y-14">
-      {/* Bannière — statique, rendue côté serveur */}
-      <section className="overflow-hidden rounded-2xl bg-gray-900 px-8 py-16 text-center text-white sm:py-20">
-        <p className="mb-3 text-xs font-medium uppercase tracking-widest text-gray-400">
-          Nouvelle collection disponible
-        </p>
-        <h1 className="text-3xl font-semibold sm:text-4xl">
-          Bienvenue sur E-Store
-        </h1>
-        <p className="mx-auto mt-3 max-w-md text-gray-300">
-          Découvrez notre sélection de produits au meilleur prix, livrés où que
-          vous soyez.
-        </p>
-        <Link
-          href="/products"
-          className="mt-7 inline-flex items-center gap-2 rounded-md bg-white px-5 py-2.5 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
-        >
-          Voir le catalogue <ArrowRight size={16} />
-        </Link>
-      </section>
+      <HeroSection />
 
       {/* Réassurance — statique */}
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">

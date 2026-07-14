@@ -356,7 +356,6 @@ export interface OrderAddressInput {
   postalCode: string | null;
 }
 
-
 export interface InventoryGroupedLine {
   id: string;
   warehouseId: string;
@@ -414,7 +413,12 @@ export interface OrderItem {
   originalPrice: number;
   discountAmount: number;
   combination: OrderItemCombinationRef | null;
-  product: { id: string; name: string; sku: string; images: ProductImage[] } | null;
+  product: {
+    id: string;
+    name: string;
+    sku: string;
+    images: ProductImage[];
+  } | null;
   productName?: string;
   productSku?: string;
 }
@@ -787,6 +791,9 @@ export interface PromotionPublic {
   isActive: boolean;
   startDate: string;
   endDate: string;
+  isFeaturedInHero: boolean;
+  heroPosition: number | null;
+  heroImages: string[];
   discounts: {
     id: string;
     type: DiscountType;

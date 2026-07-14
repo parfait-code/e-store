@@ -27,7 +27,8 @@ export const queryKeys = {
     loyaltyHistory: (userId: number | string) =>
       ["shop", "loyalty", userId, "history"] as const,
     myPickupRequests: ["shop", "pickup-requests"] as const,
-    activePromotions: ["shop", "promotions", "active"] as const,
+    activePromotions: (params: Record<string, unknown> = {}) =>
+      ["shop", "promotions", "active", params] as const,
     promotionBySlug: (slug: string) =>
       ["shop", "promotions", "slug", slug] as const,
     promotionProductsBySlug: (slug: string) =>

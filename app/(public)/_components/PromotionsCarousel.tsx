@@ -124,7 +124,7 @@ export function PromotionsCarousel({
           {promotions.map((promo, index) => (
             <div
               key={`${promo.id}-${index}`}
-              className="flex-shrink-0 px-2"
+              className="shrink-0 px-2"
               style={{ width: `${100 / slidesToShow}%` }}
             >
               <PromotionCard promo={promo} />
