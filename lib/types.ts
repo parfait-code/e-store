@@ -1016,3 +1016,51 @@ export interface Setting {
   createdAt: string;
   updatedAt: string;
 }
+export type PopupTargetType =
+  | "PROMOTION"
+  | "CATEGORY"
+  | "PRODUCT"
+  | "INFO"
+  | "EXTERNAL_LINK";
+
+export type PopupDisplayFrequency =
+  | "ONCE_PER_SESSION"
+  | "ONCE_PER_DAY"
+  | "ALWAYS";
+
+export interface Popup {
+  id: string;
+  title: string;
+  imageUrl: string | null;
+  message: string | null;
+  isActive: boolean;
+  startDate: string | null;
+  endDate: string | null;
+  targetType: PopupTargetType;
+  targetId: string | null;
+  externalUrl: string | null;
+  ctaLabel: string | null;
+  displayFrequency: PopupDisplayFrequency;
+  priority: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PopupWithResolvedUrl extends Popup {
+  resolvedUrl: string | null;
+}
+
+export interface PopupFormInput {
+  title: string;
+  imageUrl?: string;
+  message?: string;
+  isActive?: boolean;
+  startDate?: string;
+  endDate?: string;
+  targetType: PopupTargetType;
+  targetId?: string;
+  externalUrl?: string;
+  ctaLabel?: string;
+  displayFrequency?: PopupDisplayFrequency;
+  priority?: number;
+}

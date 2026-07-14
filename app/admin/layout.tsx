@@ -20,6 +20,7 @@ import {
   PackageCheck,
   CreditCard,
   SlidersHorizontal,
+  MessageSquarePlus,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
   { href: "/admin/inventory", label: "Inventaire", icon: Warehouse },
   { href: "/admin/warehouses", label: "Entrepôts", icon: Building2 },
   { href: "/admin/promotions", label: "Promotions", icon: Tag },
+  { href: "/admin/popups", label: "Popups", icon: MessageSquarePlus },
   { href: "/admin/payments", label: "Paiements", icon: CreditCard },
   { href: "/admin/shipments", label: "Expéditions", icon: Truck },
   {

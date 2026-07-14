@@ -35,6 +35,7 @@ export const queryKeys = {
       ["shop", "promotions", "slug", slug, "products"] as const,
     newestProducts: (limit: number) =>
       ["shop", "products", "newest", limit] as const,
+    activePopups: ["shop", "popups", "active"] as const,
   },
   admin: {
     products: (params: Record<string, unknown>) =>
@@ -93,5 +94,8 @@ export const queryKeys = {
     promotions: (params: Record<string, unknown>) =>
       ["admin", "promotions", params] as const,
     promotion: (id: string) => ["admin", "promotion", id] as const,
+    popups: (params: Record<string, unknown>) =>
+      ["admin", "popups", params] as const,
+    popup: (id: string) => ["admin", "popup", id] as const,
   },
 };
