@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { Loader2, Package, ChevronRight } from "lucide-react";
+import { Package, ChevronRight } from "lucide-react";
 import { formatXAF, formatDate } from "@/lib/format";
 import type { OrderStatus } from "@/lib/types";
 import { useMyOrders } from "@/lib/queries/shop/useOrders";
@@ -16,6 +16,25 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
   CANCELLED: "bg-red-100 text-red-700",
   REFUNDED: "bg-amber-100 text-amber-700",
 };
+
+function OrderRowSkeleton() {
+  return (
+    <div className="flex items-center justify-between px-4 py-4">
+      <div className="flex items-center gap-3">
+        <div className="h-8 w-8 animate-pulse rounded-md bg-gray-200" />
+        <div>
+          <div className="h-4 w-28 animate-pulse rounded bg-gray-200" />
+          <div className="mt-2 h-3 w-36 animate-pulse rounded bg-gray-100" />
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="h-4 w-16 animate-pulse rounded bg-gray-200" />
+        <div className="h-6 w-20 animate-pulse rounded-full bg-gray-200" />
+        <div className="h-4 w-4 animate-pulse rounded bg-gray-100" />
+      </div>
+    </div>
+  );
+}
 
 export default function OrdersHistoryPage() {
   const { data, isLoading, isError } = useMyOrders();
@@ -32,7 +51,11 @@ export default function OrdersHistoryPage() {
       )}
 
       {isLoading ? (
-        <Loader2 size={20} className="animate-spin text-gray-400" />
+        <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <OrderRowSkeleton key={i} />
+          ))}
+        </div>
       ) : orders.length === 0 ? (
         <p className="text-sm text-gray-400">
           Vous n'avez pas encore passé de commande.

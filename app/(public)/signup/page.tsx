@@ -9,6 +9,7 @@ import Cookies from "js-cookie";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { AuthResponse, SignupFormInput } from "@/lib/types";
 import { useCart } from "@/lib/cart/cart-context";
+import { useWishlist } from "@/lib/wishlist/wishlist-context";
 
 function SignupForm() {
   const searchParams = useSearchParams();
@@ -25,6 +26,7 @@ function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { syncToServer } = useCart();
+  const { syncToServer: syncWishlistToServer } = useWishlist();
 
   function update<K extends keyof SignupFormInput>(
     key: K,
@@ -48,6 +50,7 @@ function SignupForm() {
         sameSite: "lax",
       });
       await syncToServer();
+      await syncWishlistToServer();
       window.location.href = redirect;
     } catch (err) {
       if (err instanceof ApiError) {

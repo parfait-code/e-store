@@ -7,6 +7,7 @@ import Image from "next/image";
 import { Loader2, Heart, Trash2, ImageOff, ShoppingCart } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { useCart } from "@/lib/cart/cart-context";
+import { useWishlist } from "@/lib/wishlist/wishlist-context";
 import { formatXAF } from "@/lib/format";
 import type { Wishlist } from "@/lib/types";
 
@@ -16,6 +17,7 @@ export default function WishlistPage() {
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const { addItem } = useCart();
+  const { toggle } = useWishlist();
 
   useEffect(() => {
     apiClient
@@ -32,11 +34,21 @@ export default function WishlistPage() {
   async function handleRemove(productId: string, combinationId: string | null) {
     setRemovingId(productId);
     try {
-      const updated = await apiClient.delete<Wishlist>("/wishlist/items", {
-        product_id: productId,
-        combination_id: combinationId ?? undefined,
-      });
-      setWishlist(updated);
+      await toggle(productId, combinationId);
+      setWishlist((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.filter(
+                (i) =>
+                  !(
+                    i.productId === productId &&
+                    i.combinationId === combinationId
+                  ),
+              ),
+            }
+          : prev,
+      );
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Suppression impossible");
     } finally {
@@ -74,7 +86,21 @@ export default function WishlistPage() {
                 key={item.id}
                 className="flex gap-3 rounded-lg border border-gray-200 bg-white p-3"
               >
-                {/* ... image inchangée ... */}
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-gray-100">
+                  {image ? (
+                    <Image
+                      src={image}
+                      alt={item.product.name}
+                      fill
+                      className="object-cover"
+                      sizes="64px"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <ImageOff size={20} className="text-gray-300" />
+                    </div>
+                  )}
+                </div>
                 <div className="flex flex-1 flex-col justify-between">
                   <div>
                     <Link
