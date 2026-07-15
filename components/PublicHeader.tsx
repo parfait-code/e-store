@@ -4,7 +4,7 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, User, Menu, X, Heart } from "lucide-react";
+import { Search, User, Menu, X, Heart, Plus, Minus } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useCategories } from "@/lib/queries/shop/useCatalog";
 import { CartIndicator } from "./CartIndicator";
@@ -16,6 +16,8 @@ export function PublicHeader() {
   const categories = allCategories.filter((c) => c.parentId === null);
   const [searchInput, setSearchInput] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Catégories parentes actuellement dépliées dans le drawer mobile
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   function handleSearch(e: FormEvent) {
     e.preventDefault();
@@ -25,6 +27,19 @@ export function PublicHeader() {
 
   function closeMenu() {
     setMobileMenuOpen(false);
+  }
+
+  function toggleExpanded(categoryId: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
+      return next;
+    });
+  }
+
+  function childrenOf(categoryId: string) {
+    return allCategories.filter((c) => c.parentId === categoryId);
   }
 
   return (
@@ -42,10 +57,7 @@ export function PublicHeader() {
           E-Store
         </Link>
 
-        {/* Barre de recherche centrée sur toute la largeur du header,
-            indépendamment de la largeur du logo et du bloc d'icônes.
-            pointer-events-none sur le conteneur pour ne pas bloquer les
-            clics ailleurs dans la barre, réactivé uniquement sur le champ. */}
+        {/* Barre de recherche centrée sur toute la largeur du header */}
         <form
           onSubmit={handleSearch}
           className="pointer-events-none absolute inset-0 hidden items-center justify-center md:flex"
@@ -53,7 +65,7 @@ export function PublicHeader() {
           <div className="pointer-events-auto relative w-full max-w-md">
             <Search
               size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-900"
             />
             <input
               type="text"
@@ -67,15 +79,6 @@ export function PublicHeader() {
 
         <div className="relative ml-auto flex items-center gap-1">
           <Link
-            href={
-              user ? "/account/wishlist" : "/login?redirect=/account/wishlist"
-            }
-            className="flex items-center gap-2 rounded-md p-2 hover:bg-gray-100"
-            aria-label="Liste de souhaits"
-          >
-            <Heart size={20} className="text-gray-900" />
-          </Link>
-          <Link
             href={user ? "/account" : "/login"}
             className="flex items-center gap-2 rounded-md p-2 hover:bg-gray-100"
           >
@@ -83,6 +86,15 @@ export function PublicHeader() {
             <span className="hidden text-sm font-medium sm:inline">
               {user ? user.firstName : "Connexion"}
             </span>
+          </Link>
+          <Link
+            href={
+              user ? "/account/wishlist" : "/login?redirect=/account/wishlist"
+            }
+            className="flex items-center gap-2 rounded-md p-2 hover:bg-gray-100"
+            aria-label="Liste de souhaits"
+          >
+            <Heart size={20} className="text-gray-900" />
           </Link>
           <CartIndicator />
         </div>
@@ -95,7 +107,7 @@ export function PublicHeader() {
       >
         <Search
           size={16}
-          className="absolute left-7 top-1/2 -translate-y-1/2 text-gray-400"
+          className="absolute left-7 top-1/2 -translate-y-1/2 text-gray-900"
         />
         <input
           type="text"
@@ -106,7 +118,6 @@ export function PublicHeader() {
         />
       </form>
 
-      {/* Nav catégories desktop — plus de trait de séparation avec la barre principale */}
       <nav className="hidden md:block">
         <div className="mx-auto flex max-w-7xl gap-6 overflow-x-auto px-4 py-2 text-sm sm:px-6">
           <Link
@@ -127,8 +138,7 @@ export function PublicHeader() {
         </div>
       </nav>
 
-      {/* Drawer mobile — glisse depuis la gauche, en absolute/fixed avec
-          backdrop, au lieu de l'ancien bloc inline qui poussait le contenu. */}
+      {/* Drawer mobile */}
       <div
         className={`fixed inset-0 z-50 md:hidden ${
           mobileMenuOpen ? "" : "pointer-events-none"
@@ -164,16 +174,56 @@ export function PublicHeader() {
             >
               Tous les produits
             </Link>
-            {categories.map((c) => (
-              <Link
-                key={c.id}
-                href={`/categories/${c.slug}`}
-                onClick={closeMenu}
-                className="block rounded-md px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-100"
-              >
-                {c.name}
-              </Link>
-            ))}
+
+            {categories.map((c) => {
+              const children = childrenOf(c.id);
+              const hasChildren = children.length > 0;
+              const isExpanded = expandedIds.has(c.id);
+
+              return (
+                <div key={c.id}>
+                  <div className="flex items-center">
+                    <Link
+                      href={`/categories/${c.slug}`}
+                      onClick={closeMenu}
+                      className="flex-1 rounded-md px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-100"
+                    >
+                      {c.name}
+                    </Link>
+                    {hasChildren && (
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(c.id)}
+                        aria-label={
+                          isExpanded
+                            ? `Masquer les sous-catégories de ${c.name}`
+                            : `Afficher les sous-catégories de ${c.name}`
+                        }
+                        aria-expanded={isExpanded}
+                        className="mr-1 rounded-md p-2 text-gray-500 hover:bg-gray-100"
+                      >
+                        {isExpanded ? <Minus size={14} /> : <Plus size={14} />}
+                      </button>
+                    )}
+                  </div>
+
+                  {hasChildren && isExpanded && (
+                    <div className="ml-3 border-l border-gray-100 pl-2">
+                      {children.map((child) => (
+                        <Link
+                          key={child.id}
+                          href={`/categories/${child.slug}`}
+                          onClick={closeMenu}
+                          className="block rounded-md px-3 py-2 text-sm text-gray-500 hover:bg-gray-100"
+                        >
+                          {child.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </nav>
         </div>
       </div>

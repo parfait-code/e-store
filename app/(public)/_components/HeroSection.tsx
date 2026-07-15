@@ -9,7 +9,7 @@ import { useActivePromotions } from "@/lib/queries/shop/usePromotions";
 
 function FallbackHero() {
   return (
-    <section className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-gray-900 px-8 py-16 text-center text-white sm:py-20">
+    <section className="overflow-hidden rounded-2xl bg-gray-900 px-8 py-16 text-center text-white sm:py-20">
       <p className="mb-3 text-xs font-medium uppercase tracking-widest text-gray-400">
         Nouvelle collection disponible
       </p>
@@ -32,7 +32,7 @@ function FallbackHero() {
 
 function HeroSkeleton() {
   return (
-    <div className="relative left-1/2 aspect-[12/5] w-screen -translate-x-1/2 animate-pulse bg-gray-200" />
+    <div className="aspect-12/5 w-full animate-pulse rounded-2xl bg-gray-200" />
   );
 }
 
@@ -69,7 +69,7 @@ export function HeroSection() {
 
   return (
     <section
-      className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-gray-100"
+      className="relative overflow-hidden rounded-2xl bg-gray-100"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
@@ -84,7 +84,7 @@ export function HeroSection() {
             <Link
               key={promo.id}
               href={`/promotions/${promo.slug}`}
-              className="relative aspect-[12/5] w-full shrink-0"
+              className="relative aspect-12/5 w-full shrink-0"
               aria-label={promo.name}
             >
               {bgImage ? (
@@ -93,7 +93,7 @@ export function HeroSection() {
                   alt={promo.name}
                   fill
                   className="object-cover"
-                  sizes="100vw"
+                  sizes="(max-width: 1280px) 100vw, 1280px"
                   priority={i === 0}
                 />
               ) : (
@@ -112,17 +112,17 @@ export function HeroSection() {
         <>
           <button
             onClick={goPrev}
-            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white sm:left-6"
+            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white"
             aria-label="Précédent"
           >
-            <ChevronLeft className="h-5 w-5 text-gray-700" />
+            <ChevronLeft className="h-5 w-5 text-gray-900" />
           </button>
           <button
             onClick={goNext}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white sm:right-6"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white"
             aria-label="Suivant"
           >
-            <ChevronRight className="h-5 w-5 text-gray-700" />
+            <ChevronRight className="h-5 w-5 text-gray-900" />
           </button>
           <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2">
             {slides.map((s, i) => (
