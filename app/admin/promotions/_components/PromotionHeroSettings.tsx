@@ -47,9 +47,7 @@ export function PromotionHeroSettings({
         heroPosition: isFeatured ? position : undefined,
         heroImages: selectedImages,
       };
-      // Pas de méthode dédiée dans adminPromotionsApi pour ce sous-ensemble
-      // de champs — on réutilise directement PUT /promotions/:id comme le
-      // fait déjà PromotionInfoForm pour les champs texte.
+
       const updated = await apiClient.put<Promotion>(
         `/promotions/${promotion.id}`,
         payload,
@@ -80,6 +78,12 @@ export function PromotionHeroSettings({
         de la page d'accueil. Les images du carrousel sont indépendantes des
         images de la fiche promotion — sélectionnez celles adaptées à un format
         large (bannière).
+      </p>
+      <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+        Format recommandé : <strong>1920 × 800 px</strong> (ratio 12:5). Le
+        titre, la description et l'appel à l'action doivent être intégrés
+        directement dans l'image — une image qui ne respecte pas ce ratio sera
+        automatiquement recadrée à l'affichage.
       </p>
 
       {error && (

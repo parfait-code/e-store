@@ -67,7 +67,9 @@ export function PublicHeader() {
 
         <div className="relative ml-auto flex items-center gap-1">
           <Link
-            href={user ? "/account/wishlist" : "/login?redirect=/account/wishlist"}
+            href={
+              user ? "/account/wishlist" : "/login?redirect=/account/wishlist"
+            }
             className="flex items-center gap-2 rounded-md p-2 hover:bg-gray-100"
             aria-label="Liste de souhaits"
           >

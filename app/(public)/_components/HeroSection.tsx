@@ -4,13 +4,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useActivePromotions } from "@/lib/queries/shop/usePromotions";
-import { formatDate } from "@/lib/format";
 
 function FallbackHero() {
   return (
-    <section className="overflow-hidden rounded-2xl bg-gray-900 px-8 py-16 text-center text-white sm:py-20">
+    <section className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-gray-900 px-8 py-16 text-center text-white sm:py-20">
       <p className="mb-3 text-xs font-medium uppercase tracking-widest text-gray-400">
         Nouvelle collection disponible
       </p>
@@ -25,7 +24,7 @@ function FallbackHero() {
         href="/products"
         className="mt-7 inline-flex items-center gap-2 rounded-md bg-white px-5 py-2.5 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
       >
-        Voir le catalogue <ArrowRight size={16} />
+        Voir le catalogue
       </Link>
     </section>
   );
@@ -33,7 +32,7 @@ function FallbackHero() {
 
 function HeroSkeleton() {
   return (
-    <div className="h-80 w-full animate-pulse rounded-2xl bg-gray-200 sm:h-100" />
+    <div className="relative left-1/2 aspect-[12/5] w-screen -translate-x-1/2 animate-pulse bg-gray-200" />
   );
 }
 
@@ -70,7 +69,7 @@ export function HeroSection() {
 
   return (
     <section
-      className="relative overflow-hidden rounded-2xl bg-gray-900"
+      className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-gray-100"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
@@ -80,10 +79,13 @@ export function HeroSection() {
       >
         {slides.map((promo, i) => {
           const bgImage = promo.heroImages[0] ?? promo.images[0] ?? null;
+
           return (
-            <div
+            <Link
               key={promo.id}
-              className="relative aspect-2/1 w-full shrink-0 sm:aspect-3/1"
+              href={`/promotions/${promo.slug}`}
+              className="relative aspect-[12/5] w-full shrink-0"
+              aria-label={promo.name}
             >
               {bgImage ? (
                 <Image
@@ -95,29 +97,13 @@ export function HeroSection() {
                   priority={i === 0}
                 />
               ) : (
-                <div className="absolute inset-0 bg-gray-900" />
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+                  <span className="text-lg font-semibold text-white">
+                    {promo.name}
+                  </span>
+                </div>
               )}
-              <div className="absolute inset-0 bg-black/40" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center text-white">
-                <p className="mb-2 text-xs font-medium uppercase tracking-widest text-gray-200">
-                  Jusqu'au {formatDate(promo.endDate)}
-                </p>
-                <h1 className="text-2xl font-semibold sm:text-4xl">
-                  {promo.name}
-                </h1>
-                {promo.description && (
-                  <p className="mx-auto mt-3 max-w-md text-sm text-gray-200 sm:text-base">
-                    {promo.description}
-                  </p>
-                )}
-                <Link
-                  href={`/promotions/${promo.slug}`}
-                  className="mt-6 inline-flex items-center gap-2 rounded-md bg-white px-5 py-2.5 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
-                >
-                  Découvrir <ArrowRight size={16} />
-                </Link>
-              </div>
-            </div>
+            </Link>
           );
         })}
       </div>
@@ -126,14 +112,14 @@ export function HeroSection() {
         <>
           <button
             onClick={goPrev}
-            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white"
+            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white sm:left-6"
             aria-label="Précédent"
           >
             <ChevronLeft className="h-5 w-5 text-gray-700" />
           </button>
           <button
             onClick={goNext}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white sm:right-6"
             aria-label="Suivant"
           >
             <ChevronRight className="h-5 w-5 text-gray-700" />
