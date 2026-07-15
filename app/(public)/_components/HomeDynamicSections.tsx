@@ -1,16 +1,20 @@
 // app/(public)/_components/HomeDynamicSections.tsx
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ArrowRight } from "lucide-react";
 import { ProductGrid } from "@/components/ProductGrid";
 import {
   useCategories,
   useProducts,
   useNewestProducts,
 } from "@/lib/queries/shop/useCatalog";
-import { useActivePromotions } from "@/lib/queries/shop/usePromotions";
+import {
+  useActivePromotions,
+  usePromotionProductsBySlug,
+} from "@/lib/queries/shop/usePromotions";
 import { PromotionsCarousel } from "./PromotionsCarousel";
 
 const AVATAR_COLORS = [
@@ -51,8 +55,15 @@ function SkeletonGrid({
 }
 
 export function PromotionsSection() {
+  const { data: heroData, isLoading: isLoadingHero } = useActivePromotions({
+    slot: "hero",
+    limit: 5,
+  });
   const { data, isLoading, isError } = useActivePromotions();
-  const safePromotions = data?.items ?? [];
+
+  const heroIds = new Set((heroData?.items ?? []).map((p) => p.id));
+  const safePromotions = (data?.items ?? []).filter((p) => !heroIds.has(p.id));
+  const isLoadingAny = isLoading || isLoadingHero;
 
   if (isError) {
     return (
@@ -63,7 +74,7 @@ export function PromotionsSection() {
     );
   }
 
-  if (isLoading || safePromotions.length === 0) return null;
+  if (isLoadingAny || safePromotions.length === 0) return null;
 
   return (
     <section>
@@ -72,9 +83,9 @@ export function PromotionsSection() {
         {safePromotions.length > 2 && (
           <Link
             href="/promotions"
-            className="text-sm font-medium text-gray-900 hover:underline"
+            className="flex items-center gap-1 text-sm font-medium text-gray-900 hover:underline"
           >
-            Voir tout →
+            Voir tout <ArrowRight size={14} />
           </Link>
         )}
       </div>
@@ -118,9 +129,9 @@ export function CategoriesSection() {
         <h2 className="text-xl font-semibold">Catégories</h2>
         <Link
           href="/categories"
-          className="text-sm font-medium text-gray-900 hover:underline"
+          className="flex items-center gap-1 text-sm font-medium text-gray-900 hover:underline"
         >
-          Tout voir →
+          Tout voir <ArrowRight size={14} />
         </Link>
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
@@ -162,10 +173,95 @@ export function CategoriesSection() {
   );
 }
 
-// Anciennement "Produits en vedette" — renommé car ce n'est pas une
-// sélection curatée (pas de critère de mise en avant côté backend), juste
-// la première page du catalogue. Le libellé précédent laissait croire à
-// une curation qui n'existe pas.
+// --- Countdown pour la section "produits d'une promotion" ---
+
+interface CountdownValue {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+}
+
+function computeRemaining(endDate: string): CountdownValue | null {
+  const diff = new Date(endDate).getTime() - Date.now();
+  if (diff <= 0) return null;
+  return {
+    days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+    hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+    minutes: Math.floor((diff / (1000 * 60)) % 60),
+    seconds: Math.floor((diff / 1000) % 60),
+  };
+}
+
+function useCountdown(endDate: string | undefined) {
+  const [remaining, setRemaining] = useState<CountdownValue | null>(() =>
+    endDate ? computeRemaining(endDate) : null,
+  );
+
+  useEffect(() => {
+    if (!endDate) return;
+    const timer = setInterval(() => {
+      setRemaining(computeRemaining(endDate));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [endDate]);
+
+  return remaining;
+}
+
+function CountdownBlock({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="flex flex-col items-center rounded-md bg-gray-900 px-3 py-1.5 text-white">
+      <span className="text-base font-semibold tabular-nums leading-none">
+        {String(value).padStart(2, "0")}
+      </span>
+      <span className="mt-0.5 text-[10px] uppercase tracking-wide text-gray-300">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+export function PromotionProductsSection() {
+  const { data } = useActivePromotions({ limit: 1 });
+  const promotion = data?.items?.[0];
+
+  const { data: productsInfo, isLoading } = usePromotionProductsBySlug(
+    promotion?.slug ?? "",
+  );
+  const countdown = useCountdown(promotion?.endDate);
+
+  if (!promotion) return null;
+
+  const products = productsInfo?.products ?? [];
+  if (!isLoading && products.length === 0) return null;
+
+  return (
+    <section>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold">{promotion.name}</h2>
+          <Link
+            href={`/promotions/${promotion.slug}`}
+            className="mt-1 flex items-center gap-1 text-sm font-medium text-gray-900 hover:underline"
+          >
+            Voir la promotion <ArrowRight size={14} />
+          </Link>
+        </div>
+        {countdown && (
+          <div className="flex items-center gap-2">
+            <CountdownBlock value={countdown.days} label="jours" />
+            <CountdownBlock value={countdown.hours} label="heures" />
+            <CountdownBlock value={countdown.minutes} label="min" />
+            <CountdownBlock value={countdown.seconds} label="sec" />
+          </div>
+        )}
+      </div>
+      <ProductGrid products={products} isLoading={isLoading} />
+    </section>
+  );
+}
+
 export function CatalogPreviewSection() {
   const { data, isLoading, isError } = useProducts({ page: 1, limit: 8 });
   const products = Array.isArray(data?.items) ? data!.items : [];
@@ -176,9 +272,9 @@ export function CatalogPreviewSection() {
         <h2 className="text-xl font-semibold">Aperçu du catalogue</h2>
         <Link
           href="/products"
-          className="text-sm font-medium text-gray-900 hover:underline"
+          className="flex items-center gap-1 text-sm font-medium text-gray-900 hover:underline"
         >
-          Voir tout →
+          Voir tout <ArrowRight size={14} />
         </Link>
       </div>
       {isError ? (
@@ -198,7 +294,7 @@ export function NewArrivalsSection() {
   const { data, isLoading, isError } = useNewestProducts(8);
   const products = Array.isArray(data?.items) ? data!.items : [];
 
-  if (isError) return null; // section discrète, pas de bandeau d'erreur agressif
+  if (isError) return null;
   if (!isLoading && products.length === 0) return null;
 
   return (
@@ -210,9 +306,9 @@ export function NewArrivalsSection() {
         </div>
         <Link
           href="/products"
-          className="text-sm font-medium text-gray-900 hover:underline"
+          className="flex items-center gap-1 text-sm font-medium text-gray-900 hover:underline"
         >
-          Voir tout →
+          Voir tout <ArrowRight size={14} />
         </Link>
       </div>
       <ProductGrid products={products} isLoading={isLoading} />

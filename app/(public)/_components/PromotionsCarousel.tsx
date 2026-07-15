@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { formatDate } from "@/lib/format";
 import type { PromotionPublic } from "@/lib/types";
 
 const DEFAULT_SLIDES_TO_SHOW = 2;
@@ -16,6 +15,7 @@ function PromotionCard({ promo }: { promo: PromotionPublic }) {
   return (
     <Link
       href={`/promotions/${promo.slug}`}
+      aria-label={promo.name}
       className="group block overflow-hidden rounded-lg border border-gray-200 bg-white transition hover:shadow-md"
     >
       <div className="relative aspect-3/1 w-full overflow-hidden bg-gray-100">
@@ -33,17 +33,6 @@ function PromotionCard({ promo }: { promo: PromotionPublic }) {
               {promo.name}
             </span>
           </div>
-        )}
-      </div>
-      <div className="p-4">
-        <h3 className="line-clamp-1 font-medium text-gray-900">{promo.name}</h3>
-        <p className="mt-1 text-xs text-gray-400">
-          Jusqu'au {formatDate(promo.endDate)}
-        </p>
-        {promo.description && (
-          <p className="mt-2 line-clamp-2 text-sm text-gray-600">
-            {promo.description}
-          </p>
         )}
       </div>
     </Link>
@@ -138,14 +127,14 @@ export function PromotionsCarousel({
         className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white sm:-translate-x-3"
         aria-label="Promotion précédente"
       >
-        <ChevronLeft className="h-5 w-5 text-gray-700" />
+        <ChevronLeft className="h-5 w-5 text-gray-900" />
       </button>
       <button
         onClick={goToNext}
         className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white sm:translate-x-3"
         aria-label="Promotion suivante"
       >
-        <ChevronRight className="h-5 w-5 text-gray-700" />
+        <ChevronRight className="h-5 w-5 text-gray-900" />
       </button>
 
       <div className="mt-4 flex justify-center gap-2">

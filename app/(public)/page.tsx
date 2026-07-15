@@ -6,6 +6,7 @@ import {
   CategoriesSection,
   CatalogPreviewSection,
   NewArrivalsSection,
+  PromotionProductsSection,
 } from "./_components/HomeDynamicSections";
 import { HeroSection } from "./_components/HeroSection";
 
@@ -43,7 +44,6 @@ export default function HomePage() {
     <div className="space-y-14">
       <HeroSection />
 
-      {/* Réassurance — statique */}
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {TRUST_ITEMS.map(({ icon: Icon, label, detail }) => (
           <div
@@ -51,7 +51,7 @@ export default function HomePage() {
             className="flex flex-col items-center gap-2 rounded-lg border border-gray-200 bg-white p-4 text-center sm:items-start sm:text-left"
           >
             <div className="rounded-md bg-gray-100 p-2">
-              <Icon size={18} className="text-gray-700" />
+              <Icon size={18} className="text-gray-900" />
             </div>
             <div>
               <p className="text-sm font-medium text-gray-900">{label}</p>
@@ -64,6 +64,7 @@ export default function HomePage() {
       <PromotionsSection />
       <NewArrivalsSection />
       <CategoriesSection />
+      <PromotionProductsSection />
       <CatalogPreviewSection />
     </div>
   );
