@@ -12,14 +12,13 @@
 | `popup.controller.ts`  | ajout `uploadImage` / `deleteImage`                            |
 | `popup.router.ts`      | ajout `POST/DELETE /popups/:popupId/image`                     |
 
-
 ## Récapitulatif tailles d'images
 
-| Emplacement | Taille recommandée | Ratio |
-|---|---|---|
-| Hero (grand carrousel homepage) | 1920 × 800 px | 12:5 |
-| Bannières promotions (carrousel secondaire) | 1200 × 400 px | 3:1 |
-| Images produits | 800 × 800 px | 1:1 |
-| Icônes catégories (page d'accueil) | 200 × 200 px | 1:1 |
+| Emplacement                                 | Taille recommandée | Ratio |
+| ------------------------------------------- | ------------------ | ----- |
+| Hero (grand carrousel homepage)             | 1920 × 800 px      | 12:5  |
+| Bannières promotions (carrousel secondaire) | 1200 × 400 px      | 3:1   |
+| Images produits                             | 800 × 800 px       | 1:1   |
+| Icônes catégories (page d'accueil)          | 200 × 200 px       | 1:1   |
 
 Format JPG/WebP compressé, en respectant le ratio exact pour éviter tout recadrage via `object-cover`.
