@@ -2,7 +2,9 @@
 import Cookies from "js-cookie";
 import type { ApiResponse } from "./types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "https://britannica-glenn-kid-versions.trycloudflare.com";
 
 export class ApiError extends Error {
   details?: unknown;

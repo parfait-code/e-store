@@ -1,7 +1,9 @@
 // lib/api-server.ts
 import type { ApiResponse } from "./types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "https://britannica-glenn-kid-versions.trycloudflare.com";
 
 // Fetch public minimal pour les server components (ex: generateMetadata).
 // Ne remplace PAS apiClient (pas d'auth, pas de POST/PUT/DELETE) — sert
