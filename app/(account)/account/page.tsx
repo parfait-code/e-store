@@ -2,12 +2,11 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import Link from "next/link";
 import {
-  Loader2,
   Save,
   LogOut,
   Pencil,
-  X,
   Check,
   Plus,
   Trash2,
@@ -17,7 +16,6 @@ import {
   Mail,
   Phone,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -29,26 +27,7 @@ import {
   useDeleteAddress,
   useValidateAddress,
 } from "@/lib/queries/shop/useCheckout";
-import {
-  useMyLoyaltyBalance,
-  useMyLoyaltyHistory,
-} from "@/lib/queries/shop/useLoyalty";
-import { formatDate } from "@/lib/format";
-import type { LoyaltyTransactionType } from "@/lib/types";
-
-const TYPE_LABELS: Record<LoyaltyTransactionType, string> = {
-  EARNED: "Gagné",
-  REDEEMED: "Utilisé",
-  EXPIRED: "Expiré",
-  ADJUSTED: "Ajusté",
-};
-
-const TYPE_STYLES: Record<LoyaltyTransactionType, string> = {
-  EARNED: "text-emerald-600",
-  REDEEMED: "text-red-600",
-  EXPIRED: "text-gray-400",
-  ADJUSTED: "text-blue-600",
-};
+import { useMyLoyaltyBalance } from "@/lib/queries/shop/useLoyalty";
 
 const ROLE_LABELS: Record<string, string> = {
   USER: "Client",
@@ -67,10 +46,12 @@ function ProfileHero({
   user,
   onLogout,
   balance,
+  isLoadingBalance,
 }: {
   user: User;
   onLogout: () => void;
   balance: number | undefined;
+  isLoadingBalance: boolean;
 }) {
   return (
     <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-gray-900 via-gray-900 to-gray-700 p-6 text-white sm:p-8">
@@ -93,11 +74,18 @@ function ProfileHero({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
+        <div className="flex items-center justify-end gap-3">
+          <Link
+            href="/account/loyalty"
+            className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 transition hover:bg-white/20"
+          >
             <Coins size={16} className="text-amber-300" />
-            <span className="text-sm font-semibold">{balance ?? 0} pts</span>
-          </div>
+            {isLoadingBalance ? (
+              <span className="h-4 w-10 animate-pulse rounded bg-white/20" />
+            ) : (
+              <span className="text-sm font-semibold">{balance ?? 0} pts</span>
+            )}
+          </Link>
           <button
             onClick={onLogout}
             className="flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white/90 transition hover:bg-white/10"
@@ -241,12 +229,8 @@ function ProfileInfoCard({
               disabled={isSubmitting}
               className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
             >
-              {isSubmitting ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Save size={14} />
-              )}
-              Enregistrer
+              <Save size={14} />
+              {isSubmitting ? "Enregistrement..." : "Enregistrer"}
             </button>
             <button
               type="button"
@@ -276,86 +260,6 @@ function ProfileInfoCard({
             </span>
           </div>
         </dl>
-      )}
-    </div>
-  );
-}
-
-/* ---------------- Carte "Fidélité" ---------------- */
-
-function LoyaltyCard({ userId }: { userId: string }) {
-  const { data: balanceRes, isLoading: isLoadingBalance } =
-    useMyLoyaltyBalance(userId);
-  const { data: history = [], isLoading: isLoadingHistory } =
-    useMyLoyaltyHistory(userId);
-  const [showAll, setShowAll] = useState(false);
-
-  const visibleHistory = showAll ? history : history.slice(0, 4);
-
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-          <Sparkles size={15} className="text-amber-500" />
-          Points fidélité
-        </h2>
-      </div>
-
-      {isLoadingBalance ? (
-        <Loader2 size={18} className="animate-spin text-gray-400" />
-      ) : (
-        <div className="mb-4 flex items-center gap-3 rounded-xl bg-amber-50 p-4">
-          <div className="rounded-lg bg-amber-100 p-2">
-            <Coins size={20} className="text-amber-600" />
-          </div>
-          <div>
-            <p className="text-2xl font-semibold text-gray-900">
-              {balanceRes?.balance ?? 0}
-            </p>
-            <p className="text-xs text-gray-500">points disponibles</p>
-          </div>
-        </div>
-      )}
-
-      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">
-        Historique récent
-      </h3>
-      {isLoadingHistory ? (
-        <Loader2 size={16} className="animate-spin text-gray-400" />
-      ) : history.length === 0 ? (
-        <p className="text-sm text-gray-400">
-          Aucune transaction pour l'instant.
-        </p>
-      ) : (
-        <div className="divide-y divide-gray-100">
-          {visibleHistory.map((t) => (
-            <div
-              key={t.id}
-              className="flex items-center justify-between py-2.5 text-sm"
-            >
-              <div>
-                <span className={`font-medium ${TYPE_STYLES[t.type]}`}>
-                  {t.points > 0 ? "+" : ""}
-                  {t.points} pts
-                </span>
-                <span className="ml-2 text-gray-500">
-                  {TYPE_LABELS[t.type]}
-                </span>
-              </div>
-              <span className="text-xs text-gray-400">
-                {formatDate(t.createdAt)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-      {history.length > 4 && (
-        <button
-          onClick={() => setShowAll((s) => !s)}
-          className="mt-3 text-xs font-medium text-gray-900 hover:underline"
-        >
-          {showAll ? "Voir moins" : `Voir tout (${history.length})`}
-        </button>
       )}
     </div>
   );
@@ -565,12 +469,8 @@ function AddressForm({
           disabled={isSubmitting || isValidating}
           className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
         >
-          {isSubmitting || isValidating ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <Check size={14} />
-          )}
-          Enregistrer
+          <Check size={14} />
+          {isSubmitting || isValidating ? "Enregistrement..." : "Enregistrer"}
         </button>
         <button
           type="button"
@@ -581,6 +481,18 @@ function AddressForm({
         </button>
       </div>
     </form>
+  );
+}
+
+/* ---------------- Skeleton pour les adresses ---------------- */
+
+function AddressCardSkeleton() {
+  return (
+    <div className="animate-pulse rounded-xl border border-gray-200 p-4">
+      <div className="h-4 w-2/5 rounded bg-gray-200" />
+      <div className="mt-3 h-3 w-4/5 rounded bg-gray-100" />
+      <div className="mt-2 h-3 w-3/5 rounded bg-gray-100" />
+    </div>
   );
 }
 
@@ -652,7 +564,10 @@ function AddressesCard() {
       )}
 
       {isLoading ? (
-        <Loader2 size={18} className="animate-spin text-gray-400" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <AddressCardSkeleton />
+          <AddressCardSkeleton />
+        </div>
       ) : addresses.length === 0 && !showCreateForm ? (
         <p className="text-sm text-gray-400">Aucune adresse enregistrée.</p>
       ) : (
@@ -700,11 +615,7 @@ function AddressesCard() {
                     disabled={isDeleting && deletingId === addr.id}
                     className="rounded-md p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                   >
-                    {isDeleting && deletingId === addr.id ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Trash2 size={14} />
-                    )}
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </div>
@@ -738,7 +649,9 @@ function EditAddressRow({
 
 export default function AccountPage() {
   const { user, logout, updateUser } = useAuth();
-  const { data: balanceRes } = useMyLoyaltyBalance(user?.id ?? null);
+  const { data: balanceRes, isLoading: isLoadingBalance } = useMyLoyaltyBalance(
+    user?.id ?? null,
+  );
 
   if (!user) return null;
 
@@ -748,12 +661,12 @@ export default function AccountPage() {
         user={user}
         onLogout={logout}
         balance={balanceRes?.balance}
+        isLoadingBalance={isLoadingBalance}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-1">
+        <div className="lg:col-span-1">
           <ProfileInfoCard user={user} onUpdated={updateUser} />
-          <LoyaltyCard userId={user.id} />
         </div>
         <div className="lg:col-span-2">
           <AddressesCard />
