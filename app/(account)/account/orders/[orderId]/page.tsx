@@ -96,7 +96,6 @@ function OrderActionsMenu({
 
   const canCancel = CANCELLABLE_STATUSES.includes(order.status);
 
-  // Rien à proposer dans le menu pour le moment → pas la peine de l'afficher.
   if (!canCancel) return null;
 
   return (
@@ -367,7 +366,6 @@ function ReturnRequestForm({
 }
 
 /* ---------------- Ligne d'article détaillée ---------------- */
-
 function OrderItemRow({
   item,
   order,
@@ -399,15 +397,18 @@ function OrderItemRow({
     item.combination?.sku ?? item.product?.sku ?? item.productSku ?? "—";
   const image = item.product?.images?.[0]?.url;
 
-  // Variante : `combinationSnapshot` est la source fiable pour l'historique
-  // (préservée même si les options d'attribut ont changé depuis) — on
-  // retombe sur `combination.values` seulement si le snapshot est absent.
-  const variantEntries: [string, string][] = item.combinationSnapshot
-    ? Object.entries(item.combinationSnapshot)
-    : (item.combination?.values ?? []).map((v) => [
-        v.attributeDefinition.name,
-        v.attributeOption.value,
-      ]);
+  let variantEntries: [string, string][] = [];
+
+  if (item.combinationSnapshot) {
+    variantEntries = Object.entries(item.combinationSnapshot);
+  } else if (
+    item.combination?.values &&
+    Array.isArray(item.combination.values)
+  ) {
+    variantEntries = item.combination.values
+      .filter((v) => v?.attributeDefinition?.name && v?.attributeOption?.value)
+      .map((v) => [v.attributeDefinition.name, v.attributeOption.value]);
+  }
 
   const hasDiscount = item.discountAmount > 0;
 
@@ -519,7 +520,6 @@ function OrderItemRow({
     </div>
   );
 }
-
 /* ---------------- Page principale ---------------- */
 
 export default function OrderDetailPage() {
@@ -599,7 +599,6 @@ export default function OrderDetailPage() {
         <ArrowLeft size={14} /> Retour aux commandes
       </Link>
 
-      {/* Header responsive : empile sur mobile, en ligne à partir de sm */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold">
@@ -629,7 +628,6 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Contenu responsive : 1 colonne sur mobile, 2/3 + 1/3 à partir de lg */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <div className="rounded-lg border border-gray-200 bg-white p-4">
