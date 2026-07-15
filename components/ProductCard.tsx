@@ -1,19 +1,17 @@
 // components/ProductCard.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { ImageOff, ShoppingCart, Heart, Check, Loader2 } from "lucide-react";
 import { PriceDisplay } from "./PriceDisplay";
 import { WishlistLoginPromptModal } from "./WishlistLoginPromptModal";
 import { useCart } from "@/lib/cart/cart-context";
-import { useAuth } from "@/lib/auth/auth-context";
-import { apiClient, ApiError } from "@/lib/api-client";
-import {
-  isInGuestWishlist,
-  toggleGuestWishlist,
-} from "@/lib/wishlist/guest-storage";
+import { useWishlist } from "@/lib/wishlist/wishlist-context";
+import { shopCatalogApi } from "@/lib/api/shop/catalog";
+import { ApiError } from "@/lib/api-client";
 import type { Product } from "@/lib/types";
 
 const NEW_PRODUCT_WINDOW_DAYS = 14;
@@ -24,41 +22,60 @@ function isNewProduct(createdAt: string) {
 }
 
 export function ProductCard({ product }: { product: Product }) {
-  const { user } = useAuth();
+  const router = useRouter();
   const { addItem } = useCart();
+  const { isInWishlist, toggle } = useWishlist();
+
   const images = Array.isArray(product.images) ? product.images : [];
   const primaryImage = images.find((img) => img.isPrimary) ?? images[0];
   const isNew = isNewProduct(product.createdAt);
+  const inWishlist = isInWishlist(product.id);
 
   const [justAddedToCart, setJustAddedToCart] = useState(false);
-
-  const [inWishlist, setInWishlist] = useState(false);
+  const [isCheckingVariants, setIsCheckingVariants] = useState(false);
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
-  useEffect(() => {
-    if (!user) setInWishlist(isInGuestWishlist(product.id));
-  }, [user, product.id]);
-
-  function handleAddToCart(e: React.MouseEvent) {
+  async function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (justAddedToCart) return;
+    if (justAddedToCart || isCheckingVariants) return;
 
-    addItem({
-      productId: product.id,
-      combinationId: null,
-      quantity: 1,
-      name: product.name,
-      price: product.price,
-      pricing: product.pricing,
-      image: primaryImage?.url ?? null,
-      sku: product.sku,
-      weight: product.weight ?? undefined,
-    });
+    setIsCheckingVariants(true);
+    try {
+      // Un produit avec des combinaisons actives (taille, couleur...) ne peut
+      // pas être ajouté "en un clic" sans que le client choisisse une
+      // variante — on vérifie donc avant d'ajouter, et on redirige vers la
+      // fiche produit si un choix est nécessaire.
+      const combinations = await shopCatalogApi.combinations(product.id);
+      const requiresChoice = combinations.some((c) => c.isActive);
 
-    setJustAddedToCart(true);
-    setTimeout(() => setJustAddedToCart(false), 1500);
+      if (requiresChoice) {
+        router.push(`/products/${product.id}`);
+        return;
+      }
+
+      addItem({
+        productId: product.id,
+        combinationId: null,
+        quantity: 1,
+        name: product.name,
+        price: product.price,
+        pricing: product.pricing,
+        image: primaryImage?.url ?? null,
+        sku: product.sku,
+        weight: product.weight ?? undefined,
+      });
+      setJustAddedToCart(true);
+      setTimeout(() => setJustAddedToCart(false), 1500);
+    } catch {
+      // En cas d'erreur réseau sur la vérification, on ne bloque pas
+      // l'utilisateur mais on l'envoie sur la fiche produit par prudence
+      // plutôt que de risquer un ajout incorrect.
+      router.push(`/products/${product.id}`);
+    } finally {
+      setIsCheckingVariants(false);
+    }
   }
 
   async function handleToggleWishlist(e: React.MouseEvent) {
@@ -66,22 +83,10 @@ export function ProductCard({ product }: { product: Product }) {
     e.stopPropagation();
     if (isTogglingWishlist) return;
 
-    if (!user) {
-      const nowIn = toggleGuestWishlist(product.id);
-      setInWishlist(nowIn);
-      if (nowIn) setShowLoginPrompt(true);
-      return;
-    }
-
     setIsTogglingWishlist(true);
     try {
-      if (inWishlist) {
-        await apiClient.delete("/wishlist/items", { product_id: product.id });
-        setInWishlist(false);
-      } else {
-        await apiClient.post("/wishlist/items", { product_id: product.id });
-        setInWishlist(true);
-      }
+      const { added, requiresLogin } = await toggle(product.id);
+      if (added && requiresLogin) setShowLoginPrompt(true);
     } catch (err) {
       alert(
         err instanceof ApiError
@@ -114,6 +119,7 @@ export function ProductCard({ product }: { product: Product }) {
             </div>
           )}
 
+          {/* Un seul badge de remise, plus de doublon près du prix */}
           <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
             {product.pricing?.hasDiscount && (
               <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">
@@ -166,14 +172,17 @@ export function ProductCard({ product }: { product: Product }) {
             />
             <button
               onClick={handleAddToCart}
+              disabled={isCheckingVariants}
               aria-label="Ajouter au panier"
-              className={`flex shrink-0 items-center justify-center rounded-md p-2 text-white transition ${
+              className={`flex shrink-0 items-center justify-center rounded-md p-2 text-white transition disabled:opacity-60 ${
                 justAddedToCart
                   ? "bg-green-600"
                   : "bg-gray-900 hover:bg-gray-800"
               }`}
             >
-              {justAddedToCart ? (
+              {isCheckingVariants ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : justAddedToCart ? (
                 <Check size={16} />
               ) : (
                 <ShoppingCart size={16} />

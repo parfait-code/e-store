@@ -1,15 +1,11 @@
 // components/WishlistButton.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Heart, Loader2 } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
-import { useAuth } from "@/lib/auth/auth-context";
+import { ApiError } from "@/lib/api-client";
+import { useWishlist } from "@/lib/wishlist/wishlist-context";
 import { WishlistLoginPromptModal } from "./WishlistLoginPromptModal";
-import {
-  isInGuestWishlist,
-  toggleGuestWishlist,
-} from "@/lib/wishlist/guest-storage";
 
 interface WishlistButtonProps {
   productId: string;
@@ -20,40 +16,20 @@ export function WishlistButton({
   productId,
   combinationId = null,
 }: WishlistButtonProps) {
-  const { user } = useAuth();
+  const { isInWishlist, toggle } = useWishlist();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [added, setAdded] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-
-  useEffect(() => {
-    if (!user) setAdded(isInGuestWishlist(productId));
-  }, [user, productId]);
+  const added = isInWishlist(productId);
 
   async function handleClick() {
     if (isSubmitting) return;
-
-    if (!user) {
-      const nowIn = toggleGuestWishlist(productId);
-      setAdded(nowIn);
-      if (nowIn) setShowLoginPrompt(true);
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      if (added) {
-        await apiClient.delete("/wishlist/items", {
-          product_id: productId,
-          combination_id: combinationId ?? undefined,
-        });
-        setAdded(false);
-      } else {
-        await apiClient.post("/wishlist/items", {
-          product_id: productId,
-          combination_id: combinationId ?? undefined,
-        });
-        setAdded(true);
-      }
+      const { added: nowAdded, requiresLogin } = await toggle(
+        productId,
+        combinationId,
+      );
+      if (nowAdded && requiresLogin) setShowLoginPrompt(true);
     } catch (err) {
       alert(
         err instanceof ApiError
