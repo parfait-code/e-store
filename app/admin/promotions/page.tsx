@@ -218,7 +218,7 @@ export default function PromotionsPage() {
                     </div>
                   </td>
                 </tr>
-              ))
+              )) 
             )}
           </tbody>
         </table>
