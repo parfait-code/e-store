@@ -2,8 +2,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Search as SearchIcon } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { apiClient } from "@/lib/api-client";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Pagination } from "@/components/Pagination";
@@ -11,10 +10,8 @@ import type { Product, Paginated } from "@/lib/types";
 
 function SearchPageContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const query = searchParams.get("q") ?? "";
 
-  const [searchInput, setSearchInput] = useState(query);
   const [products, setProducts] = useState<Product[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -46,35 +43,14 @@ function SearchPageContent() {
 
   useEffect(() => {
     setPage(1);
-    setSearchInput(query);
   }, [query]);
 
   useEffect(() => {
     fetchResults();
   }, [fetchResults]);
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const q = searchInput.trim();
-    if (q) router.push(`/search?q=${encodeURIComponent(q)}`);
-  }
-
   return (
     <div>
-      <form onSubmit={handleSubmit} className="relative mb-6 max-w-lg">
-        <SearchIcon
-          size={16}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-        />
-        <input
-          type="text"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Rechercher un produit..."
-          className="w-full rounded-md border border-gray-300 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
-        />
-      </form>
-
       {query ? (
         <>
           <p className="mb-4 text-sm text-gray-500">
