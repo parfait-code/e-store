@@ -1,11 +1,15 @@
 // components/WishlistButton.tsx
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Heart, Loader2 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth/auth-context";
+import { WishlistLoginPromptModal } from "./WishlistLoginPromptModal";
+import {
+  isInGuestWishlist,
+  toggleGuestWishlist,
+} from "@/lib/wishlist/guest-storage";
 
 interface WishlistButtonProps {
   productId: string;
@@ -17,47 +21,72 @@ export function WishlistButton({
   combinationId = null,
 }: WishlistButtonProps) {
   const { user } = useAuth();
-  const router = useRouter();
-  const [isAdding, setIsAdding] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [added, setAdded] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+
+  useEffect(() => {
+    if (!user) setAdded(isInGuestWishlist(productId));
+  }, [user, productId]);
 
   async function handleClick() {
+    if (isSubmitting) return;
+
     if (!user) {
-      router.push(
-        `/login?redirect=${encodeURIComponent(window.location.pathname)}`,
-      );
+      const nowIn = toggleGuestWishlist(productId);
+      setAdded(nowIn);
+      if (nowIn) setShowLoginPrompt(true);
       return;
     }
-    setIsAdding(true);
+
+    setIsSubmitting(true);
     try {
-      await apiClient.post("/wishlist/items", {
-        product_id: productId,
-        combination_id: combinationId ?? undefined,
-      });
-      setAdded(true);
+      if (added) {
+        await apiClient.delete("/wishlist/items", {
+          product_id: productId,
+          combination_id: combinationId ?? undefined,
+        });
+        setAdded(false);
+      } else {
+        await apiClient.post("/wishlist/items", {
+          product_id: productId,
+          combination_id: combinationId ?? undefined,
+        });
+        setAdded(true);
+      }
     } catch (err) {
       alert(
         err instanceof ApiError
           ? err.message
-          : "Impossible d'ajouter aux favoris",
+          : "Impossible de mettre à jour vos favoris",
       );
     } finally {
-      setIsAdding(false);
+      setIsSubmitting(false);
     }
   }
 
   return (
-    <button
-      onClick={handleClick}
-      disabled={isAdding || added}
-      className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-    >
-      {isAdding ? (
-        <Loader2 size={16} className="animate-spin" />
-      ) : (
-        <Heart size={16} className={added ? "fill-red-500 text-red-500" : ""} />
-      )}
-      {added ? "Ajouté aux favoris" : "Ajouter aux favoris"}
-    </button>
+    <>
+      <button
+        onClick={handleClick}
+        disabled={isSubmitting}
+        className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+      >
+        {isSubmitting ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : (
+          <Heart
+            size={16}
+            className={added ? "fill-red-500 text-red-500" : ""}
+          />
+        )}
+        {added ? "Ajouté aux favoris" : "Ajouter aux favoris"}
+      </button>
+
+      <WishlistLoginPromptModal
+        open={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+      />
+    </>
   );
 }

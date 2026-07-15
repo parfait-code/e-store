@@ -30,9 +30,6 @@ export function PriceDisplay({
         <span className={`${classes.old} text-gray-400 line-through`}>
           {formatXAF(pricing.originalPrice)}
         </span>
-        <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-600">
-          -{pricing.discountPercentage}%
-        </span>
       </div>
     );
   }
