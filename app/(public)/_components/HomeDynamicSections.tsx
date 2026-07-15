@@ -47,7 +47,7 @@ function SkeletonGrid({
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="h-32 animate-pulse rounded-lg border border-gray-200 bg-gray-100"
+          className="aspect-square animate-pulse rounded-lg border border-gray-200 bg-gray-100"
         />
       ))}
     </div>
@@ -139,30 +139,31 @@ export function CategoriesSection() {
           <Link
             key={c.id}
             href={`/categories/${c.slug}`}
-            className="group flex flex-col items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 text-center transition hover:-translate-y-0.5 hover:shadow-md"
+            className="group relative block aspect-square w-full overflow-hidden rounded-lg border border-gray-200 transition hover:-translate-y-0.5 hover:shadow-md"
           >
             {c.imageUrl ? (
-              <div className="relative h-10 w-10 overflow-hidden rounded-full">
-                <Image
-                  src={c.imageUrl}
-                  alt={c.name}
-                  fill
-                  className="object-cover"
-                  sizes="40px"
-                />
-              </div>
+              <Image
+                src={c.imageUrl}
+                alt={c.name}
+                fill
+                className="object-cover transition duration-300 group-hover:scale-105"
+                sizes="(max-width: 768px) 33vw, 16vw"
+              />
             ) : (
-              <span
-                className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${colorForName(c.name)}`}
+              <div
+                className={`absolute inset-0 flex items-center justify-center ${colorForName(c.name)}`}
               >
-                {c.name.charAt(0).toUpperCase()}
-              </span>
+                <span className="text-3xl font-semibold">
+                  {c.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
             )}
-            <div>
-              <span className="block text-sm font-medium text-gray-800">
+            <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 p-3">
+              <span className="block text-sm font-medium text-white drop-shadow-sm">
                 {c.name}
               </span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-white/80">
                 {c._count.products} produit(s)
               </span>
             </div>
@@ -223,8 +224,8 @@ function CountdownBlock({ value, label }: { value: number; label: string }) {
 }
 
 export function PromotionProductsSection() {
-  const { data } = useActivePromotions({ limit: 1 });
-  const promotion = data?.items?.[0];
+  const { data } = useActivePromotions({ limit: 10 });
+  const promotion = (data?.items ?? []).find((p) => p.discounts.length > 0);
 
   const { data: productsInfo, isLoading } = usePromotionProductsBySlug(
     promotion?.slug ?? "",
