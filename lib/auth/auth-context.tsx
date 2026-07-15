@@ -13,6 +13,7 @@ import Cookies from "js-cookie";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { AuthResponse, User } from "@/lib/types";
 import { useCart } from "@/lib/cart/cart-context";
+import { useWishlist } from "@/lib/wishlist/wishlist-context";
 
 interface AuthContextValue {
   user: User | null;
@@ -35,7 +36,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const { syncToServer } = useCart();
+  const { syncToServer: syncCartToServer } = useCart();
+  const { syncToServer: syncWishlistToServer, resetToGuest: resetWishlist } =
+    useWishlist();
 
   useEffect(() => {
     const rawUser = Cookies.get(USER_COOKIE);
@@ -66,7 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sameSite: "lax",
     });
     setUser(data.user);
-    await syncToServer();
+    await syncCartToServer();
+    await syncWishlistToServer();
 
     if (redirectTo) router.push(redirectTo);
     else if (data.user.role === "ADMIN") router.push("/admin/dashboard");
@@ -77,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     Cookies.remove(TOKEN_COOKIE);
     Cookies.remove(USER_COOKIE);
     setUser(null);
+    resetWishlist();
     router.push("/login");
   }
 

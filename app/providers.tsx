@@ -5,6 +5,7 @@ import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { CartProvider } from "@/lib/cart/cart-context";
+import { WishlistProvider } from "@/lib/wishlist/wishlist-context";
 import { AuthProvider } from "@/lib/auth/auth-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -24,7 +25,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <CartProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <WishlistProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </WishlistProvider>
       </CartProvider>
       {process.env.NODE_ENV === "development" && (
         <ReactQueryDevtools initialIsOpen={false} />

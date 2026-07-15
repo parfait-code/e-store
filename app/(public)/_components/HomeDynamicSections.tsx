@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { ProductGrid } from "@/components/ProductGrid";
 import {
   useCategories,
@@ -302,7 +302,6 @@ export function NewArrivalsSection() {
     <section>
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles size={20} className="text-amber-500" />
           <h2 className="text-xl font-semibold">Nouveautés</h2>
         </div>
         <Link
