@@ -14,7 +14,6 @@ import {
   Save,
   ExternalLink,
   AlertTriangle,
-  RefreshCw,
 } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
@@ -381,9 +380,6 @@ function LinkedShipmentCard({
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const { data: order, isLoading, isError } = useAdminOrder(orderId);
-  // Grâce à l'invalidation croisée dans useUpdateOrderStatus (voir hook),
-  // ce panneau se rafraîchit automatiquement après une mise à jour de statut
-  // de la commande — plus besoin d'un fetchShipment() manuel rappelé "au cas où".
   const { data: linkedShipment = null, isLoading: isLoadingShipment } =
     useAdminOrderShipment(orderId);
 
@@ -396,6 +392,12 @@ export default function OrderDetailPage() {
       </div>
     );
   }
+
+  const items = Array.isArray(order.items) ? order.items : [];
+  const payments = Array.isArray(order.payments) ? order.payments : [];
+  const statusHistory = Array.isArray(order.statusHistory)
+    ? order.statusHistory
+    : [];
 
   const shipping = order.shippingAddressSnapshot as {
     street?: string;
@@ -434,10 +436,10 @@ export default function OrderDetailPage() {
         <div className="col-span-2 space-y-6">
           <div className="rounded-lg border border-gray-200 bg-white p-4">
             <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
-              <Package size={16} /> Articles ({order.items.length})
+              <Package size={16} /> Articles ({items.length})
             </h2>
             <div className="divide-y divide-gray-100">
-              {order.items.map((item) => {
+              {items.map((item) => {
                 const productName =
                   item.product?.name ?? item.productName ?? "Produit supprimé";
                 const productSku =
@@ -500,13 +502,13 @@ export default function OrderDetailPage() {
             <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
               <CreditCard size={16} /> Paiements
             </h2>
-            {order.payments.length === 0 ? (
+            {payments.length === 0 ? (
               <p className="text-sm text-gray-400">
                 Aucun paiement enregistré.
               </p>
             ) : (
               <div className="space-y-2">
-                {order.payments.map((p) => (
+                {payments.map((p) => (
                   <div
                     key={p.id}
                     className="flex items-center justify-between text-sm"
@@ -527,28 +529,34 @@ export default function OrderDetailPage() {
             <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
               <History size={16} /> Historique
             </h2>
-            <div className="space-y-2">
-              {order.statusHistory
-                .slice()
-                .reverse()
-                .map((h) => (
-                  <div
-                    key={h.id}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <span>
-                      {h.fromStatus ? `${STATUS_LABELS[h.fromStatus]} → ` : ""}
-                      {STATUS_LABELS[h.toStatus]}
-                      {h.reason && (
-                        <span className="text-gray-400"> · {h.reason}</span>
-                      )}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {formatDate(h.createdAt)}
-                    </span>
-                  </div>
-                ))}
-            </div>
+            {statusHistory.length === 0 ? (
+              <p className="text-sm text-gray-400">Aucun historique.</p>
+            ) : (
+              <div className="space-y-2">
+                {statusHistory
+                  .slice()
+                  .reverse()
+                  .map((h) => (
+                    <div
+                      key={h.id}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span>
+                        {h.fromStatus
+                          ? `${STATUS_LABELS[h.fromStatus]} → `
+                          : ""}
+                        {STATUS_LABELS[h.toStatus]}
+                        {h.reason && (
+                          <span className="text-gray-400"> · {h.reason}</span>
+                        )}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {formatDate(h.createdAt)}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         </div>
 

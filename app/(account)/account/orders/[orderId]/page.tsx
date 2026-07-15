@@ -577,6 +577,12 @@ export default function OrderDetailPage() {
     );
   }
 
+  const items = Array.isArray(order.items) ? order.items : [];
+  const payments = Array.isArray(order.payments) ? order.payments : [];
+  const statusHistory = Array.isArray(order.statusHistory)
+    ? order.statusHistory
+    : [];
+
   const canReturn = order.status === "DELIVERED";
   const shipping = order.shippingAddressSnapshot as {
     recipientName?: string;
@@ -588,7 +594,7 @@ export default function OrderDetailPage() {
     country?: string;
     postalCode?: string;
   };
-  const itemsCount = order.items.reduce((sum, i) => sum + i.quantity, 0);
+  const itemsCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
     <div className="max-w-5xl">
@@ -632,10 +638,10 @@ export default function OrderDetailPage() {
         <div className="space-y-6 lg:col-span-2">
           <div className="rounded-lg border border-gray-200 bg-white p-4">
             <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
-              <Package size={16} /> Articles ({order.items.length})
+              <Package size={16} /> Articles ({items.length})
             </h2>
             <div className="divide-y divide-gray-100">
-              {order.items.map((item) => (
+              {items.map((item) => (
                 <OrderItemRow
                   key={item.id}
                   item={item}
@@ -693,13 +699,13 @@ export default function OrderDetailPage() {
             )}
           </div>
 
-          {order.payments.length > 0 && (
+          {payments.length > 0 && (
             <div className="rounded-lg border border-gray-200 bg-white p-4">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
                 <CreditCard size={16} /> Paiements
               </h2>
               <div className="space-y-2">
-                {order.payments.map((p) => (
+                {payments.map((p) => (
                   <div
                     key={p.id}
                     className="flex flex-wrap items-center justify-between gap-2 text-sm"
@@ -716,13 +722,13 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {order.statusHistory.length > 0 && (
+          {statusHistory.length > 0 && (
             <div className="rounded-lg border border-gray-200 bg-white p-4">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
                 <History size={16} /> Historique
               </h2>
               <div className="space-y-2">
-                {order.statusHistory
+                {statusHistory
                   .slice()
                   .reverse()
                   .map((h) => (
