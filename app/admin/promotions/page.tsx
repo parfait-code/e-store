@@ -13,6 +13,7 @@ import {
   useTogglePromotion,
   useDeletePromotion,
 } from "@/lib/queries/admin/usePromotions";
+import { useAlertDialog } from "@/components/admin/ModalProvider";
 
 const STATUS_OPTIONS: PromotionStatus[] = [
   "SCHEDULED",
@@ -39,10 +40,9 @@ export default function PromotionsPage() {
   const [status, setStatus] = useState<PromotionStatus | "">("");
   const [isActive, setIsActive] = useState<"" | "true" | "false">("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const alertDialog = useAlertDialog();
 
   const { data, isLoading, isError } = useAdminPromotions({ status, isActive });
-  // `data?.items` garantit toujours un tableau — même si l'API renvoyait un
-  // format inattendu, `adminPromotionsApi.list` l'a déjà normalisé en amont.
   const promotions = data?.items ?? [];
 
   const {
@@ -57,7 +57,9 @@ export default function PromotionsPage() {
     if (!confirmDeleteId) return;
     deletePromotion(confirmDeleteId, {
       onError: (err) =>
-        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+        alertDialog(
+          err instanceof ApiError ? err.message : "Suppression impossible",
+        ),
       onSettled: () => setConfirmDeleteId(null),
     });
   }
@@ -218,7 +220,7 @@ export default function PromotionsPage() {
                     </div>
                   </td>
                 </tr>
-              )) 
+              ))
             )}
           </tbody>
         </table>

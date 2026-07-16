@@ -5,6 +5,10 @@ import { useState, FormEvent } from "react";
 import { Plus, Trash2, Ticket, Copy, Loader2 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import type { Promotion, CouponCode, CouponFormInput } from "@/lib/types";
+import {
+  useConfirmDialog,
+  useAlertDialog,
+} from "@/components/admin/ModalProvider";
 
 function CouponForm({
   promotionId,
@@ -163,9 +167,15 @@ export function PromotionCoupons({
   const [showForm, setShowForm] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const confirm = useConfirmDialog();
+  const alertDialog = useAlertDialog();
 
   async function handleDelete(couponId: string) {
-    if (!confirm("Supprimer ce coupon ?")) return;
+    const ok = await confirm({
+      title: "Supprimer le coupon",
+      message: "Supprimer ce coupon ?",
+    });
+    if (!ok) return;
     setDeletingId(couponId);
     try {
       await apiClient.delete(`/promotions/${promotion.id}/coupons/${couponId}`);
@@ -174,7 +184,9 @@ export function PromotionCoupons({
         coupons: promotion.coupons.filter((c) => c.id !== couponId),
       });
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
+      await alertDialog(
+        err instanceof ApiError ? err.message : "Suppression impossible",
+      );
     } finally {
       setDeletingId(null);
     }

@@ -10,6 +10,10 @@ import type {
   DiscountFormInput,
   CategoryRef,
 } from "@/lib/types";
+import {
+  useConfirmDialog,
+  useAlertDialog,
+} from "@/components/admin/ModalProvider";
 
 function DiscountForm({
   promotionId,
@@ -180,9 +184,15 @@ export function PromotionDiscounts({
 }) {
   const [showForm, setShowForm] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const confirm = useConfirmDialog();
+  const alertDialog = useAlertDialog();
 
   async function handleDelete(discountId: string) {
-    if (!confirm("Supprimer cette remise ?")) return;
+    const ok = await confirm({
+      title: "Supprimer la remise",
+      message: "Supprimer cette remise ?",
+    });
+    if (!ok) return;
     setDeletingId(discountId);
     try {
       await apiClient.delete(
@@ -193,7 +203,9 @@ export function PromotionDiscounts({
         discounts: promotion.discounts.filter((d) => d.id !== discountId),
       });
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Suppression impossible");
+      await alertDialog(
+        err instanceof ApiError ? err.message : "Suppression impossible",
+      );
     } finally {
       setDeletingId(null);
     }

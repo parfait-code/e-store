@@ -13,6 +13,7 @@ import {
   useUpdateShippingMethod,
   useDeleteShippingMethod,
 } from "@/lib/queries/admin/useShippingMethods";
+import { useAlertDialog } from "@/components/admin/ModalProvider";
 
 function ShippingMethodForm({
   initial,
@@ -228,12 +229,15 @@ export default function ShippingMethodsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const { mutate: deleteMethod, isPending: isDeleting } =
     useDeleteShippingMethod();
+  const alertDialog = useAlertDialog();
 
   function confirmDelete() {
     if (!confirmDeleteId) return;
     deleteMethod(confirmDeleteId, {
       onError: (err) =>
-        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+        alertDialog(
+          err instanceof ApiError ? err.message : "Suppression impossible",
+        ),
       onSettled: () => setConfirmDeleteId(null),
     });
   }

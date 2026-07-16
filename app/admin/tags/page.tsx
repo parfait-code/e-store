@@ -12,6 +12,7 @@ import {
   useUpdateTag,
   useDeleteTag,
 } from "@/lib/queries/admin/useTags";
+import { useAlertDialog } from "@/components/admin/ModalProvider";
 
 function slugify(text: string) {
   return text
@@ -173,12 +174,15 @@ export default function TagsPage() {
   const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
   const [tagToEdit, setTagToEdit] = useState<Tag | null>(null);
   const { mutate: deleteTag, isPending: isDeleting } = useDeleteTag();
+  const alertDialog = useAlertDialog();
 
   function confirmDelete() {
     if (!tagToDelete) return;
     deleteTag(tagToDelete.id, {
       onError: (err) =>
-        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+        alertDialog(
+          err instanceof ApiError ? err.message : "Suppression impossible",
+        ),
       onSettled: () => setTagToDelete(null),
     });
   }

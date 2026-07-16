@@ -12,17 +12,18 @@ import {
   ImageOff,
   ChevronLeft,
   ChevronRight,
-  Loader2,
 } from "lucide-react";
 import { formatXAF } from "@/lib/format";
 import type { ProductStatus } from "@/lib/types";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { TableRowsSkeleton } from "@/components/admin/TableSkeleton";
 import {
   useAdminProducts,
   useAdminCategories,
   useDeleteProduct,
 } from "@/lib/queries/admin/useCatalog";
 import { ApiError } from "@/lib/api-client";
+import { useAlertDialog } from "@/components/admin/ModalProvider";
 
 const STATUS_STYLES: Record<ProductStatus, string> = {
   ACTIVE: "bg-green-100 text-green-700",
@@ -43,6 +44,7 @@ export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [status, setStatus] = useState<ProductStatus | "">("");
+  const alertDialog = useAlertDialog();
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -69,7 +71,7 @@ export default function ProductsPage() {
     if (confirmDeleteId === null) return;
     deleteProduct(confirmDeleteId, {
       onError: (err) =>
-        alert(
+        alertDialog(
           err instanceof ApiError
             ? err.message
             : "Erreur lors de la suppression",
@@ -152,14 +154,7 @@ export default function ProductsPage() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-10 text-center text-gray-500"
-                >
-                  <Loader2 size={20} className="mx-auto animate-spin" />
-                </td>
-              </tr>
+              <TableRowsSkeleton rows={8} columns={6} />
             ) : products.length === 0 ? (
               <tr>
                 <td

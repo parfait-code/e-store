@@ -15,9 +15,6 @@ import {
   Loader2,
   RotateCcw,
   Star,
-  XCircle,
-  Clock,
-  UserPlus,
 } from "lucide-react";
 import {
   LineChart,
@@ -131,6 +128,40 @@ function StatCard({
   );
 }
 
+function StatCardSkeleton() {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="h-9 w-9 animate-pulse rounded-md bg-gray-200" />
+        <div className="h-4 w-10 animate-pulse rounded bg-gray-100" />
+      </div>
+      <div className="h-7 w-20 animate-pulse rounded bg-gray-200" />
+      <div className="mt-2 h-4 w-32 animate-pulse rounded bg-gray-100" />
+      <div className="mt-1 h-3 w-24 animate-pulse rounded bg-gray-100" />
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div>
+      <div className="mb-6 h-6 w-48 animate-pulse rounded bg-gray-200" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <StatCardSkeleton key={i} />
+        ))}
+      </div>
+      <div className="mt-6 rounded-lg border border-gray-200 bg-white p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="h-4 w-32 animate-pulse rounded bg-gray-200" />
+          <div className="h-8 w-20 animate-pulse rounded bg-gray-100" />
+        </div>
+        <div className="h-64 w-full animate-pulse rounded bg-gray-100" />
+      </div>
+    </div>
+  );
+}
+
 function SalesChart() {
   const [year, setYear] = useState(new Date().getFullYear());
   const { data, isLoading, isError } = useSalesChart(year);
@@ -191,11 +222,7 @@ function SalesChart() {
 export default function DashboardPage() {
   const { data: stats, isLoading, isError } = useDashboardStats();
 
-  if (isLoading) {
-    return (
-      <p className="text-sm text-gray-500">Chargement du tableau de bord...</p>
-    );
-  }
+  if (isLoading) return <DashboardSkeleton />;
 
   if (isError || !stats) {
     return (

@@ -15,6 +15,10 @@ import {
   useSetUserStatus,
   useDeleteUser,
 } from "@/lib/queries/admin/useUsers";
+import {
+  useConfirmDialog,
+  useAlertDialog,
+} from "@/components/admin/ModalProvider";
 
 const ROLE_OPTIONS: Role[] = ["USER", "ADMIN", "MANAGER", "SUPPORT"];
 
@@ -103,16 +107,22 @@ function ChangeRoleModal({
 
 function StatusToggle({ user }: { user: User }) {
   const { mutate: setStatus, isPending } = useSetUserStatus();
+  const confirm = useConfirmDialog();
+  const alertDialog = useAlertDialog();
 
-  function toggle() {
+  async function toggle() {
     const action = user.isActive ? "suspendre" : "réactiver";
-    if (!confirm(`Voulez-vous ${action} le compte de ${user.username} ?`))
-      return;
+    const ok = await confirm({
+      title: user.isActive ? "Suspendre le compte" : "Réactiver le compte",
+      message: `Voulez-vous ${action} le compte de ${user.username} ?`,
+      danger: user.isActive,
+    });
+    if (!ok) return;
     setStatus(
       { userId: user.id, isActive: !user.isActive },
       {
         onError: (err) =>
-          alert(
+          alertDialog(
             err instanceof ApiError
               ? err.message
               : "Erreur lors du changement de statut",
@@ -152,12 +162,15 @@ export default function UsersPage() {
   const [confirmDeleteUser, setConfirmDeleteUser] = useState<User | null>(null);
   const [roleEditUser, setRoleEditUser] = useState<User | null>(null);
   const { mutate: deleteUser, isPending: isDeleting } = useDeleteUser();
+  const alertDialog = useAlertDialog();
 
   function confirmDelete() {
     if (!confirmDeleteUser) return;
     deleteUser(confirmDeleteUser.id, {
       onError: (err) =>
-        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+        alertDialog(
+          err instanceof ApiError ? err.message : "Suppression impossible",
+        ),
       onSettled: () => setConfirmDeleteUser(null),
     });
   }

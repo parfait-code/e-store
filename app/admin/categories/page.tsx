@@ -18,8 +18,8 @@ import {
   useAdminCategoriesList,
   useDeleteCategory,
 } from "@/lib/queries/admin/useCategories";
+import { useAlertDialog } from "@/components/admin/ModalProvider";
 
-// Construit un ordre "arbre affiché à plat" : racines puis leurs enfants juste après
 function flattenTree(
   categories: Category[],
 ): { category: Category; depth: number }[] {
@@ -50,12 +50,15 @@ export default function CategoriesPage() {
   } = useAdminCategoriesList(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const { mutate: deleteCategory, isPending: isDeleting } = useDeleteCategory();
+  const alertDialog = useAlertDialog();
 
   function confirmDelete() {
     if (!confirmDeleteId) return;
     deleteCategory(confirmDeleteId, {
       onError: (err) =>
-        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+        alertDialog(
+          err instanceof ApiError ? err.message : "Suppression impossible",
+        ),
       onSettled: () => setConfirmDeleteId(null),
     });
   }

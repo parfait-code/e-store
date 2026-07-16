@@ -16,6 +16,10 @@ import {
   useCreateWarehouse,
   useDeleteWarehouse,
 } from "@/lib/queries/admin/useInventory";
+import {
+  useConfirmDialog,
+  useAlertDialog,
+} from "@/components/admin/ModalProvider";
 
 function NewWarehouseForm() {
   const [form, setForm] = useState<WarehouseFormInput>({
@@ -112,12 +116,20 @@ export default function WarehousesPage() {
     isPending: isDeleting,
     variables: deletingId,
   } = useDeleteWarehouse();
+  const confirm = useConfirmDialog();
+  const alertDialog = useAlertDialog();
 
-  function handleDelete(warehouseId: string) {
-    if (!confirm("Supprimer cet entrepôt ?")) return;
+  async function handleDelete(warehouseId: string) {
+    const ok = await confirm({
+      title: "Supprimer l'entrepôt",
+      message: "Supprimer cet entrepôt ?",
+    });
+    if (!ok) return;
     deleteWarehouse(warehouseId, {
       onError: (err) =>
-        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+        alertDialog(
+          err instanceof ApiError ? err.message : "Suppression impossible",
+        ),
     });
   }
 
@@ -137,7 +149,18 @@ export default function WarehousesPage() {
       )}
 
       {isLoading ? (
-        <Loader2 size={20} className="animate-spin text-gray-400" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-gray-200 bg-white p-4"
+            >
+              <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+              <div className="mt-3 h-3 w-1/2 animate-pulse rounded bg-gray-100" />
+              <div className="mt-4 h-3 w-1/3 animate-pulse rounded bg-gray-100" />
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {warehouses.map((w) => (

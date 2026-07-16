@@ -31,8 +31,8 @@ import {
   useDeleteCombination,
 } from "@/lib/queries/admin/useProductVariants";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { useAlertDialog } from "@/components/admin/ModalProvider";
 
-// Sélecteur des options disponibles pour UN attribut de variante donné.
 function AttributeSelectionEditor({
   productId,
   definition,
@@ -125,6 +125,7 @@ function CombinationEditRow({
   const { mutate: deleteCombination, isPending: isDeleting } =
     useDeleteCombination(productId);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const alertDialog = useAlertDialog();
 
   function handleSave() {
     setError(null);
@@ -146,7 +147,7 @@ function CombinationEditRow({
     deleteCombination(combination.id, {
       onSuccess: () => setConfirmDelete(false),
       onError: (err) => {
-        alert(
+        alertDialog(
           err instanceof ApiError
             ? err.message
             : "Suppression impossible (stock encore présent ?)",
@@ -303,11 +304,12 @@ export default function ProductCombinationsPage() {
   const { data: combinations = [] } = useProductCombinationsList(productId);
   const { mutate: generate, isPending: isGenerating } =
     useGenerateCombinations(productId);
+  const alertDialog = useAlertDialog();
 
   function handleGenerate() {
     generate(undefined, {
       onError: (err) =>
-        alert(
+        alertDialog(
           err instanceof ApiError
             ? err.message
             : "Erreur lors de la génération des combinaisons",

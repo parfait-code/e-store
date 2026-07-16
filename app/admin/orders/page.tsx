@@ -7,9 +7,9 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  Loader2,
   Eye,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { formatXAF, formatDate } from "@/lib/format";
 import type { OrderStatus } from "@/lib/types";
@@ -18,6 +18,11 @@ import {
   useExpireStaleOrders,
 } from "@/lib/queries/admin/useOrders";
 import { ApiError } from "@/lib/api-client";
+import { TableRowsSkeleton } from "@/components/admin/TableSkeleton";
+import {
+  useConfirmDialog,
+  useAlertDialog,
+} from "@/components/admin/ModalProvider";
 
 const STATUS_OPTIONS: OrderStatus[] = [
   "PENDING",
@@ -54,6 +59,8 @@ export default function OrdersPage() {
   const [status, setStatus] = useState<OrderStatus | "">("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerInput, setCustomerInput] = useState("");
+  const confirm = useConfirmDialog();
+  const alertDialog = useAlertDialog();
 
   const { mutate: expireStale, isPending: isExpiring } = useExpireStaleOrders();
 
@@ -72,22 +79,22 @@ export default function OrdersPage() {
     setCustomerEmail(customerInput.trim());
   }
 
-  function handleExpireStale() {
-    if (
-      !confirm(
+  async function handleExpireStale() {
+    const ok = await confirm({
+      title: "Expirer les commandes en attente",
+      message:
         "Forcer l'annulation des commandes PENDING non payées dépassant le délai configuré ?",
-      )
-    )
-      return;
+    });
+    if (!ok) return;
     expireStale(undefined, {
       onSuccess: (res) =>
-        alert(
+        alertDialog(
           res.cancelledCount !== undefined
             ? `${res.cancelledCount} commande(s) annulée(s).`
             : "Vérification terminée.",
         ),
       onError: (err) =>
-        alert(
+        alertDialog(
           err instanceof ApiError ? err.message : "Erreur lors de l'opération",
         ),
     });
@@ -166,14 +173,7 @@ export default function OrdersPage() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-10 text-center text-gray-500"
-                >
-                  <Loader2 size={20} className="mx-auto animate-spin" />
-                </td>
-              </tr>
+              <TableRowsSkeleton rows={8} columns={7} />
             ) : orders.length === 0 ? (
               <tr>
                 <td

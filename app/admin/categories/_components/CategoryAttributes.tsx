@@ -19,6 +19,7 @@ import {
   useUpdateAttributeOption,
   useDeleteAttributeOption,
 } from "@/lib/queries/admin/useCategories";
+import { useAlertDialog } from "@/components/admin/ModalProvider";
 
 const TYPE_LABELS: Record<AttributeDefinition["type"], string> = {
   TEXT: "Texte",
@@ -47,6 +48,7 @@ function AttributeOptionRow({
   const [position, setPosition] = useState(option.position);
   const { mutate: updateOption, isPending: isSaving } =
     useUpdateAttributeOption(categoryId, definitionId);
+  const alertDialog = useAlertDialog();
 
   function handleSave() {
     updateOption(
@@ -61,7 +63,7 @@ function AttributeOptionRow({
       {
         onSuccess: () => setIsEditing(false),
         onError: (err) =>
-          alert(
+          alertDialog(
             err instanceof ApiError
               ? err.message
               : "Erreur lors de la mise à jour",
@@ -161,6 +163,7 @@ function AttributeOptionsEditor({
   const [position, setPosition] = useState(definition.options.length);
   const { mutate: createOption, isPending: isAdding } =
     useCreateAttributeOption(categoryId, definition.id);
+  const alertDialog = useAlertDialog();
 
   function addOption() {
     if (!value.trim()) return;
@@ -176,7 +179,7 @@ function AttributeOptionsEditor({
           setPosition((p) => p + 1);
         },
         onError: (err) =>
-          alert(
+          alertDialog(
             err instanceof ApiError ? err.message : "Erreur lors de l'ajout",
           ),
       },
@@ -399,16 +402,12 @@ export function CategoryAttributes({ categoryId }: { categoryId: string }) {
     position: 0,
   });
   const [error, setError] = useState<string | null>(null);
+  const alertDialog = useAlertDialog();
 
   const { mutate: createAttribute, isPending: isSubmitting } =
     useCreateAttribute(categoryId);
   const { mutate: deleteAttribute, isPending: isDeletingAttribute } =
     useDeleteAttribute(categoryId);
-  const { mutate: deleteOption, isPending: isDeletingOption } =
-    useDeleteAttributeOption(categoryId, "");
-  // NB : useDeleteAttributeOption prend un definitionId figé au montage —
-  // on l'appelle donc dynamiquement via un hook local par confirmation
-  // plutôt qu'un hook global (voir ConfirmDialog ci-dessous).
 
   const [attrToDelete, setAttrToDelete] = useState<AttributeDefinition | null>(
     null,
@@ -451,7 +450,9 @@ export function CategoryAttributes({ categoryId }: { categoryId: string }) {
     if (!attrToDelete) return;
     deleteAttribute(attrToDelete.id, {
       onError: (err) =>
-        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+        alertDialog(
+          err instanceof ApiError ? err.message : "Suppression impossible",
+        ),
       onSettled: () => setAttrToDelete(null),
     });
   }
@@ -672,9 +673,6 @@ export function CategoryAttributes({ categoryId }: { categoryId: string }) {
   );
 }
 
-// Composant dédié : useDeleteAttributeOption a besoin d'un definitionId fixé
-// au moment du montage — on l'instancie donc seulement quand une suppression
-// est réellement demandée, avec le bon definitionId.
 function DeleteOptionConfirm({
   categoryId,
   definitionId,
@@ -690,11 +688,14 @@ function DeleteOptionConfirm({
     categoryId,
     definitionId,
   );
+  const alertDialog = useAlertDialog();
 
   function confirmDelete() {
     deleteOption(option.id, {
       onError: (err) =>
-        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+        alertDialog(
+          err instanceof ApiError ? err.message : "Suppression impossible",
+        ),
       onSettled: onClose,
     });
   }

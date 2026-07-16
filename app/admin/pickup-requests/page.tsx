@@ -27,6 +27,10 @@ import {
   useUpdatePickupStatus,
 } from "@/lib/queries/admin/usePickupRequests";
 import { useAdminWarehouses } from "@/lib/queries/admin/useInventory";
+import {
+  useConfirmDialog,
+  useAlertDialog,
+} from "@/components/admin/ModalProvider";
 
 const STATUS_OPTIONS: PickupRequestStatus[] = [
   "PENDING",
@@ -52,7 +56,6 @@ const STATUS_LABELS: Record<PickupRequestStatus, string> = {
   EXPIRED: "Expirée",
 };
 
-// Transitions raisonnables — le backend valide de toute façon (400 si invalide)
 const ALLOWED_TRANSITIONS: Record<PickupRequestStatus, PickupRequestStatus[]> =
   {
     PENDING: ["CONFIRMED", "CANCELLED"],
@@ -293,16 +296,21 @@ export default function AdminPickupRequestsPage() {
     useState<PickupRequest | null>(null);
   const [locationEditRequest, setLocationEditRequest] =
     useState<PickupRequest | null>(null);
+  const confirm = useConfirmDialog();
+  const alertDialog = useAlertDialog();
 
   const { mutate: expireOverdue, isPending: isExpiring } =
     useExpireOverduePickupRequests();
 
-  function handleExpireOverdue() {
-    if (!confirm("Forcer l'expiration des demandes d'enlèvement en retard ?"))
-      return;
+  async function handleExpireOverdue() {
+    const ok = await confirm({
+      title: "Expirer les demandes en retard",
+      message: "Forcer l'expiration des demandes d'enlèvement en retard ?",
+    });
+    if (!ok) return;
     expireOverdue(undefined, {
       onError: (err) =>
-        alert(
+        alertDialog(
           err instanceof ApiError ? err.message : "Erreur lors de l'opération",
         ),
     });

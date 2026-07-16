@@ -20,6 +20,7 @@ import {
   useUpdatePopup,
   useDeletePopup,
 } from "@/lib/queries/admin/usePopups";
+import { useAlertDialog } from "@/components/admin/ModalProvider";
 
 const TARGET_OPTIONS: PopupTargetType[] = [
   "PROMOTION",
@@ -71,6 +72,7 @@ export default function PopupsPage() {
   const [isActive, setIsActive] = useState<"" | "true" | "false">("");
   const [targetType, setTargetType] = useState<PopupTargetType | "">("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const alertDialog = useAlertDialog();
 
   const {
     data: popups = [],
@@ -86,7 +88,9 @@ export default function PopupsPage() {
     if (!confirmDeleteId) return;
     deletePopup(confirmDeleteId, {
       onError: (err) =>
-        alert(err instanceof ApiError ? err.message : "Suppression impossible"),
+        alertDialog(
+          err instanceof ApiError ? err.message : "Suppression impossible",
+        ),
       onSettled: () => setConfirmDeleteId(null),
     });
   }

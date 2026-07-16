@@ -3,15 +3,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import {
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  CreditCard,
-  Pencil,
-  Check,
-  X,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, CreditCard, Pencil } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
 import type {
@@ -20,6 +12,7 @@ import type {
   PaymentMethodType,
   PaymentStatus,
 } from "@/lib/types";
+import { TableRowsSkeleton } from "@/components/admin/TableSkeleton";
 
 const METHOD_OPTIONS: PaymentMethodType[] = [
   "CASH_ON_DELIVERY",
@@ -44,8 +37,6 @@ const STATUS_STYLES: Record<PaymentStatus, string> = {
   CANCELLED: "bg-gray-200 text-gray-500",
 };
 
-// Transitions validées côté backend (payment.service) : COMPLETED → uniquement
-// REFUNDED ; FAILED / REFUNDED / CANCELLED sont terminaux.
 const ALLOWED_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
   PENDING: ["COMPLETED", "FAILED", "CANCELLED"],
   COMPLETED: ["REFUNDED"],
@@ -252,14 +243,7 @@ export default function PaymentsPage() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-10 text-center text-gray-500"
-                >
-                  <Loader2 size={20} className="mx-auto animate-spin" />
-                </td>
-              </tr>
+              <TableRowsSkeleton rows={8} columns={6} />
             ) : payments.length === 0 ? (
               <tr>
                 <td
