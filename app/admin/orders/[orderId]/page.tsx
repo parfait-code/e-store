@@ -377,14 +377,71 @@ function LinkedShipmentCard({
   );
 }
 
+function OrderDetailSkeleton() {
+  return (
+    <div className="max-w-4xl animate-pulse">
+      <div className="mb-4 h-4 w-44 rounded bg-gray-200" />
+
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <div className="h-6 w-48 rounded bg-gray-200" />
+          <div className="mt-2 h-4 w-32 rounded bg-gray-100" />
+        </div>
+        <div className="h-7 w-24 rounded-full bg-gray-200" />
+      </div>
+
+      <div className="grid grid-cols-3 gap-6">
+        <div className="col-span-2 space-y-6">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="mb-3 h-4 w-28 rounded bg-gray-200" />
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <div className="h-4 w-40 rounded bg-gray-200" />
+                    <div className="h-3 w-24 rounded bg-gray-100" />
+                  </div>
+                  <div className="h-4 w-16 rounded bg-gray-200" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="mb-3 h-4 w-24 rounded bg-gray-200" />
+            <div className="h-4 w-full rounded bg-gray-100" />
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="mb-3 h-4 w-24 rounded bg-gray-200" />
+            <div className="h-4 w-full rounded bg-gray-100" />
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="mb-3 h-4 w-32 rounded bg-gray-200" />
+            <div className="h-14 w-full rounded bg-gray-100" />
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="mb-3 h-4 w-32 rounded bg-gray-200" />
+            <div className="h-10 w-full rounded bg-gray-100" />
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="mb-3 h-4 w-24 rounded bg-gray-200" />
+            <div className="h-24 w-full rounded bg-gray-100" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const { data: order, isLoading, isError } = useAdminOrder(orderId);
   const { data: linkedShipment = null, isLoading: isLoadingShipment } =
     useAdminOrderShipment(orderId);
 
-  if (isLoading)
-    return <Loader2 size={20} className="animate-spin text-gray-400" />;
+  if (isLoading) return <OrderDetailSkeleton />;
   if (isError || !order) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">

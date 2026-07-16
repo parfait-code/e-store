@@ -845,6 +845,11 @@ export interface SignupFormInput {
 
 // --- Cart local avec combinationId ---
 
+export interface CartCombinationValue {
+  name: string;
+  value: string;
+}
+
 export interface CartLocalItem {
   productId: string;
   combinationId: string | null;
@@ -857,6 +862,7 @@ export interface CartLocalItem {
   slug?: string;
   maxQuantity?: number;
   weight?: number;
+  combinationValues?: CartCombinationValue[];
 }
 
 export interface CartContextValue {

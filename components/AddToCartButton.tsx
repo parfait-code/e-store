@@ -5,6 +5,10 @@ import { useState } from "react";
 import { ShoppingCart, Check } from "lucide-react";
 import { useCart } from "@/lib/cart/cart-context";
 import { QuantitySelector } from "./QuantitySelector";
+import {
+  computeCombinationPricing,
+  combinationValuesForDisplay,
+} from "@/lib/pricing";
 import type { Product, ProductCombination } from "@/lib/types";
 
 interface AddToCartButtonProps {
@@ -22,8 +26,6 @@ export function AddToCartButton({
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
 
-  // `inventory` peut être absent si le backend omet le champ pour cette
-  // combinaison — on ne suppose jamais sa présence.
   const stock = selectedCombination
     ? (Array.isArray(selectedCombination.inventory)
         ? selectedCombination.inventory
@@ -46,11 +48,12 @@ export function AddToCartButton({
       quantity,
       name: product.name,
       price: selectedCombination?.price ?? product.price,
-      pricing: selectedCombination ? undefined : product.pricing,
+      pricing: computeCombinationPricing(product, selectedCombination),
       image: primaryImage?.url ?? null,
       sku: selectedCombination?.sku ?? product.sku,
       maxQuantity: stock,
       weight: product.weight ?? undefined,
+      combinationValues: combinationValuesForDisplay(selectedCombination),
     });
 
     setJustAdded(true);

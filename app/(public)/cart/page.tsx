@@ -77,6 +77,20 @@ export default function CartPage() {
                         {item.name}
                       </Link>
                       <p className="text-xs text-gray-400">SKU {item.sku}</p>
+                      {item.combinationValues &&
+                        item.combinationValues.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {item.combinationValues.map((v) => (
+                              <span
+                                key={v.name}
+                                className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600"
+                              >
+                                {v.name} :{" "}
+                                <span className="font-medium">{v.value}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                     </div>
                     <div className="flex items-center justify-between">
                       <QuantitySelector
@@ -86,9 +100,18 @@ export default function CartPage() {
                           updateQuantity(item.productId, item.combinationId, q)
                         }
                       />
-                      <span className="text-sm font-semibold">
-                        {formatXAF(unitPrice * item.quantity)}
-                      </span>
+                      <div className="text-right">
+                        {item.pricing?.hasDiscount && (
+                          <p className="text-xs text-gray-400 line-through">
+                            {formatXAF(
+                              item.pricing.originalPrice * item.quantity,
+                            )}
+                          </p>
+                        )}
+                        <span className="text-sm font-semibold">
+                          {formatXAF(unitPrice * item.quantity)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
