@@ -22,31 +22,71 @@ function normalizePaginated<T>(
   };
 }
 
-function normalizeImages(images: unknown): ProductImage[] {
-  if (!Array.isArray(images)) return [];
-  return images.map((img, i) => {
-    if (typeof img === "string") {
-      return {
-        id: `img-${i}`,
-        url: img,
-        altText: null,
-        position: i,
-        isPrimary: i === 0,
-      };
-    }
-    const raw = (img ?? {}) as Partial<ProductImage>;
-    return {
-      id: raw.id ?? `img-${i}`,
-      url: raw.url ?? "",
-      altText: raw.altText ?? null,
-      position: raw.position ?? i,
-      isPrimary: raw.isPrimary ?? i === 0,
-    };
-  });
+function extractUrl(raw: Record<string, unknown>): string {
+  return (
+    (raw.url as string) ??
+    (raw.imageUrl as string) ??
+    (raw.image_url as string) ??
+    ""
+  );
 }
 
-function normalizeProductImages(product: Product): Product {
-  return { ...product, images: normalizeImages(product.images) };
+function normalizeImages(
+  images: unknown,
+  fallbackUrl?: string | null,
+): ProductImage[] {
+  if (Array.isArray(images) && images.length > 0) {
+    const normalized = images.map((img, i) => {
+      if (typeof img === "string") {
+        return {
+          id: `img-${i}`,
+          url: img,
+          altText: null,
+          position: i,
+          isPrimary: i === 0,
+        };
+      }
+      const raw = (img ?? {}) as Record<string, unknown>;
+      return {
+        id: (raw.id as string) ?? `img-${i}`,
+        url: extractUrl(raw),
+        altText: (raw.altText as string) ?? null,
+        position: (raw.position as number) ?? i,
+        isPrimary: (raw.isPrimary as boolean) ?? i === 0,
+      };
+    });
+    const withUrl = normalized.filter((img) => img.url);
+    if (withUrl.length > 0) return withUrl;
+  }
+  if (fallbackUrl) {
+    return [
+      {
+        id: "img-0",
+        url: fallbackUrl,
+        altText: null,
+        position: 0,
+        isPrimary: true,
+      },
+    ];
+  }
+  return [];
+}
+
+function normalizeProductImages(
+  product: Product & {
+    image?: string;
+    imageUrl?: string;
+    mainImage?: string;
+    thumbnail?: string;
+  },
+): Product {
+  const fallback =
+    product.image ??
+    product.imageUrl ??
+    product.mainImage ??
+    product.thumbnail ??
+    null;
+  return { ...product, images: normalizeImages(product.images, fallback) };
 }
 
 export const shopCatalogApi = {

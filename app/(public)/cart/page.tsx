@@ -1,6 +1,7 @@
 // app/(public)/cart/page.tsx
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Trash2, ShoppingBag, ImageOff, ArrowRight } from "lucide-react";
@@ -55,6 +56,20 @@ export default function CartPage() {
     useCart();
   const { user } = useAuth();
 
+  const mainCtaRef = useRef<HTMLDivElement>(null);
+  const [isMainCtaVisible, setIsMainCtaVisible] = useState(true);
+
+  useEffect(() => {
+    const el = mainCtaRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsMainCtaVisible(entry.isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isLoaded, items.length]);
+
   if (!isLoaded) return <CartSkeleton />;
 
   if (items.length === 0) {
@@ -76,6 +91,8 @@ export default function CartPage() {
       </div>
     );
   }
+
+  const showFloatingCta = !isMainCtaVisible;
 
   return (
     <div className="pb-24 lg:pb-0">
@@ -184,13 +201,15 @@ export default function CartPage() {
             <span>{formatXAF(totalAmount)}</span>
           </div>
 
-          <Link
-            href={user ? "/checkout" : "/login?redirect=/checkout"}
-            className="mt-5 flex items-center justify-center gap-2 rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
-          >
-            {user ? "Passer commande" : "Se connecter pour commander"}
-            <ArrowRight size={16} />
-          </Link>
+          <div ref={mainCtaRef}>
+            <Link
+              href={user ? "/checkout" : "/login?redirect=/checkout"}
+              className="mt-5 flex items-center justify-center gap-2 rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
+            >
+              {user ? "Passer commande" : "Se connecter pour commander"}
+              <ArrowRight size={16} />
+            </Link>
+          </div>
           {!user && (
             <p className="mt-2 text-center text-xs text-gray-400">
               Un compte est nécessaire pour finaliser votre commande.
@@ -199,7 +218,13 @@ export default function CartPage() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] lg:hidden">
+      <div
+        className={`fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] transition-transform duration-200 lg:hidden ${
+          showFloatingCta
+            ? "translate-y-0"
+            : "pointer-events-none translate-y-full"
+        }`}
+      >
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs text-gray-500">Total</p>

@@ -17,6 +17,7 @@ interface AddToCartButtonProps {
   requiresCombination: boolean;
   quantity: number;
   onQuantityChange: (quantity: number) => void;
+  hideQuantitySelector?: boolean;
 }
 
 export function AddToCartButton({
@@ -25,6 +26,7 @@ export function AddToCartButton({
   requiresCombination,
   quantity,
   onQuantityChange,
+  hideQuantitySelector = false,
 }: AddToCartButtonProps) {
   const { addItem } = useCart();
   const [justAdded, setJustAdded] = useState(false);
@@ -64,12 +66,14 @@ export function AddToCartButton({
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <QuantitySelector
-        quantity={quantity}
-        onChange={onQuantityChange}
-        max={stock}
-      />
+    <div className="flex flex-1 items-center gap-3">
+      {!hideQuantitySelector && (
+        <QuantitySelector
+          quantity={quantity}
+          onChange={onQuantityChange}
+          max={stock}
+        />
+      )}
       <button
         onClick={handleAdd}
         disabled={missingSelection || isOutOfStock}

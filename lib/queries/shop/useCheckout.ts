@@ -65,13 +65,10 @@ export function useShippingMethods() {
   });
 }
 
-// Une requête par méthode de livraison, en parallèle, chacune avec son
-// propre cache — équivalent typé du Promise.allSettled manuel d'origine,
-// mais avec dédoublonnage/cache automatique par (methodId, weight).
 export function useShippingCosts(
   methods: ShippingMethod[],
   weight: number,
-  country: string, // NOUVEAU paramètre requis
+  country: string,
 ) {
   const results = useQueries({
     queries: methods.map((m) => ({
@@ -84,13 +81,22 @@ export function useShippingCosts(
   });
 
   const costsByMethodId: Record<string, number | null> = {};
+  const estimatedDaysByMethodId: Record<string, number | null> = {};
   methods.forEach((m, i) => {
     const r = results[i];
     costsByMethodId[m.id] =
       r.isSuccess && typeof r.data?.cost === "number" ? r.data.cost : null;
+    estimatedDaysByMethodId[m.id] =
+      r.isSuccess && typeof r.data?.estimatedDays === "number"
+        ? r.data.estimatedDays
+        : null;
   });
 
-  return { costsByMethodId, isLoading: results.some((r) => r.isLoading) };
+  return {
+    costsByMethodId,
+    estimatedDaysByMethodId,
+    isLoading: results.some((r) => r.isLoading),
+  };
 }
 
 export function usePaymentMethods() {
@@ -102,7 +108,13 @@ export function usePaymentMethods() {
 
 export function useValidateCoupon() {
   return useMutation({
-    mutationFn: (code: string) => shopCheckoutApi.validateCoupon(code),
+    mutationFn: ({
+      code,
+      items,
+    }: {
+      code: string;
+      items: { id: string; combinationId?: string; quantity: number }[];
+    }) => shopCheckoutApi.validateCoupon(code, items),
   });
 }
 

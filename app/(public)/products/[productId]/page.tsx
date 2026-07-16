@@ -8,6 +8,7 @@ import { ProductGallery } from "@/components/ProductGallery";
 import { VariantSelector } from "@/components/VariantSelector";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { WishlistButton } from "@/components/WishlistButton";
+import { QuantitySelector } from "@/components/QuantitySelector";
 import { PriceDisplay } from "@/components/PriceDisplay";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -104,8 +105,15 @@ export default function ProductDetailPage() {
     : [];
   const showFloatingCta = !isLoading && !isMainCtaVisible;
 
+  const stock = selectedCombination
+    ? (Array.isArray(selectedCombination.inventory)
+        ? selectedCombination.inventory
+        : []
+      ).reduce((sum, inv) => sum + inv.quantity, 0)
+    : undefined;
+
   return (
-    <div className="pb-24 lg:pb-0">
+    <div className="pb-24">
       <Breadcrumb
         items={[
           ...(product.category
@@ -155,20 +163,42 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          <div ref={mainCtaRef} className="mt-6 flex items-center gap-3">
-            <div className="flex-1">
+          <div ref={mainCtaRef} className="mt-6">
+            <div className="flex items-center justify-between gap-3 lg:hidden">
+              <QuantitySelector
+                quantity={quantity}
+                onChange={setQuantity}
+                max={stock}
+              />
+              <WishlistButton
+                productId={product.id}
+                combinationId={selectedCombination?.id ?? null}
+              />
+            </div>
+
+            <div className="mt-3 flex items-center gap-3 lg:mt-0">
+              <div className="hidden lg:block">
+                <QuantitySelector
+                  quantity={quantity}
+                  onChange={setQuantity}
+                  max={stock}
+                />
+              </div>
               <AddToCartButton
                 product={product}
                 selectedCombination={selectedCombination}
                 requiresCombination={requiresCombination}
                 quantity={quantity}
                 onQuantityChange={setQuantity}
+                hideQuantitySelector
               />
+              <div className="hidden lg:block">
+                <WishlistButton
+                  productId={product.id}
+                  combinationId={selectedCombination?.id ?? null}
+                />
+              </div>
             </div>
-            <WishlistButton
-              productId={product.id}
-              combinationId={selectedCombination?.id ?? null}
-            />
           </div>
 
           {attributeValues.length > 0 && (
@@ -200,7 +230,7 @@ export default function ProductDetailPage() {
       </div>
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] transition-transform duration-200 lg:hidden ${
+        className={`fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] transition-transform duration-200 ${
           showFloatingCta
             ? "translate-y-0"
             : "pointer-events-none translate-y-full"

@@ -57,11 +57,35 @@ export const shopPromotionsApi = {
 
   productsBySlug: (slug: string) =>
     apiClient
-      .get<PromotionProductsResponse>(`/promotions/slug/${slug}/products`)
-      .then((res) => ({
-        ...res,
-        products: (Array.isArray(res?.products) ? res.products : []).map(
-          normalizeProduct,
-        ),
-      })),
+      .get<
+        | PromotionProductsResponse
+        | (Omit<PromotionProductsResponse, "products"> & {
+            items?: Product[];
+          })
+        | Product[]
+      >(`/promotions/slug/${slug}/products`)
+      .then((res) => {
+        const rawProducts: Product[] = Array.isArray(res)
+          ? res
+          : Array.isArray((res as PromotionProductsResponse)?.products)
+            ? (res as PromotionProductsResponse).products
+            : Array.isArray((res as { items?: Product[] })?.items)
+              ? (res as { items?: Product[] }).items!
+              : [];
+
+        const products = rawProducts.map(normalizeProduct);
+
+        return {
+          promotionId: Array.isArray(res)
+            ? ""
+            : ((res as PromotionProductsResponse)?.promotionId ?? ""),
+          promotionName: Array.isArray(res)
+            ? ""
+            : ((res as PromotionProductsResponse)?.promotionName ?? ""),
+          count: Array.isArray(res)
+            ? products.length
+            : ((res as PromotionProductsResponse)?.count ?? products.length),
+          products,
+        };
+      }),
 };

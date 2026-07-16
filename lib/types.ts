@@ -961,6 +961,9 @@ export interface ShippingCalculateInput {
 }
 
 export interface ShippingCostResponse {
+  shippingMethodId: string;
+  name: string;
+  estimatedDays: number;
   cost: number;
 }
 
@@ -974,15 +977,19 @@ export interface PaymentsAdminQuery {
 
 export interface CouponValidateInput {
   code: string;
-  basketId: string;
+  items?: { id: string; combinationId?: string; quantity: number }[];
 }
 
 export interface CouponValidateResponse {
-  valid: boolean;
-  message?: string;
-  discount?: {
-    type: DiscountType;
-    value: number;
+  valid: true;
+  couponId: string;
+  code: string;
+  promotion: { id: string; name: string; slug: string };
+  discounts: Discount[];
+  preview?: {
+    totalAmount: number;
+    meetsMinimum: boolean;
+    minOrderAmount: number | null;
   };
 }
 

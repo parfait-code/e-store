@@ -4,7 +4,6 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
-  Loader2,
   Ticket,
   Copy,
   Percent,
@@ -20,8 +19,6 @@ import {
   usePromotionBySlug,
   usePromotionProductsBySlug,
 } from "@/lib/queries/shop/usePromotions";
-
-// --- Countdown ---
 
 interface CountdownValue {
   days: number;
@@ -69,8 +66,6 @@ function CountdownBlock({ value, label }: { value: number; label: string }) {
     </div>
   );
 }
-
-// --- Carousel d'images de la promotion ---
 
 function PromotionImagesCarousel({
   images,
@@ -153,6 +148,18 @@ function PromotionImagesCarousel({
   );
 }
 
+function PromotionPageSkeleton() {
+  return (
+    <div className="max-w-3xl animate-pulse">
+      <div className="mb-6 h-4 w-48 rounded bg-gray-200" />
+      <div className="mb-8 aspect-3/1 w-full rounded-lg bg-gray-100" />
+      <div className="h-6 w-2/3 rounded bg-gray-200" />
+      <div className="mt-3 h-4 w-full rounded bg-gray-100" />
+      <div className="mt-2 h-4 w-5/6 rounded bg-gray-100" />
+    </div>
+  );
+}
+
 export function PromotionPageClient({ slug }: { slug: string }) {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [copyError, setCopyError] = useState(false);
@@ -181,11 +188,7 @@ export function PromotionPageClient({ slug }: { slug: string }) {
   const countdown = useCountdown(promotion?.endDate);
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-20">
-        <Loader2 size={24} className="animate-spin text-gray-400" />
-      </div>
-    );
+    return <PromotionPageSkeleton />;
   }
 
   if (isError || !promotion) {
@@ -217,19 +220,18 @@ export function PromotionPageClient({ slug }: { slug: string }) {
       />
 
       {hasImages ? (
-        // --- Cas 1 : image(s) présente(s) — pas de texte, produits affectés seulement ---
         <>
           <PromotionImagesCarousel images={images} alt={promotion.name} />
-          {isLoadingProducts ? (
-            <div className="flex justify-center py-10">
-              <Loader2 size={20} className="animate-spin text-gray-400" />
-            </div>
-          ) : hasProducts ? (
-            <ProductGrid products={products} />
-          ) : null}
+          {(isLoadingProducts || hasProducts) && (
+            <ProductGrid products={products} isLoading={isLoadingProducts} />
+          )}
         </>
+      ) : isLoadingProducts ? (
+        <div>
+          <div className="mb-6 h-6 w-2/3 animate-pulse rounded bg-gray-200" />
+          <ProductGrid products={[]} isLoading />
+        </div>
       ) : hasProducts ? (
-        // --- Cas 2 : pas d'image, produits affectés — titre + countdown + produits ---
         <>
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <h1 className="text-2xl font-semibold">{promotion.name}</h1>
@@ -244,12 +246,7 @@ export function PromotionPageClient({ slug }: { slug: string }) {
           </div>
           <ProductGrid products={products} />
         </>
-      ) : isLoadingProducts ? (
-        <div className="flex justify-center py-20">
-          <Loader2 size={24} className="animate-spin text-gray-400" />
-        </div>
       ) : (
-        // --- Cas 3 : pas d'image, pas de produit affecté — tout le texte ---
         <>
           <div>
             <h1 className="text-2xl font-semibold">{promotion.name}</h1>

@@ -8,7 +8,6 @@ import type {
   ShippingMethod,
   ShippingCostResponse,
   PaymentMethodOption,
-  Basket,
   CouponValidateResponse,
   Order,
   OrderCreateInput,
@@ -26,16 +25,14 @@ export const shopCheckoutApi = {
   deleteAddress: (addressId: string) =>
     apiClient.delete(`/addresses/${addressId}`),
 
-  // Body désormais en camelCase, recipientName requis, postalCode optionnel
   validateAddress: (payload: AddressValidateInput) =>
     apiClient.post<AddressValidateResponse>("/address/validate", payload, {
-      auth: false, // route publique
+      auth: false,
     }),
 
   listShippingMethods: () =>
     apiClient.get<ShippingMethod[]>("/shipping-methods?active=true"),
 
-  // Le calcul exige désormais `country` en plus de shippingMethodId/weight
   calculateShippingCost: (
     shippingMethodId: string,
     weight: number,
@@ -50,13 +47,14 @@ export const shopCheckoutApi = {
   listPaymentMethods: () =>
     apiClient.get<PaymentMethodOption[]>("/payment-methods"),
 
-  validateCoupon: async (code: string) => {
-    const basket = await apiClient.get<Basket>("/user/basket");
-    return apiClient.post<CouponValidateResponse>("/coupons/validate", {
+  validateCoupon: (
+    code: string,
+    items: { id: string; combinationId?: string; quantity: number }[],
+  ) =>
+    apiClient.post<CouponValidateResponse>("/coupons/validate", {
       code,
-      basketId: basket.id,
-    });
-  },
+      items,
+    }),
 
   createOrder: (payload: OrderCreateInput) =>
     apiClient.post<Order>("/orders", payload),

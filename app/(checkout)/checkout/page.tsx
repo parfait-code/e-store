@@ -1,9 +1,9 @@
 // app/(checkout)/checkout/page.tsx
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, useRef, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, CreditCard, MapPin, Truck, Tag, Check } from "lucide-react";
+import { CreditCard, MapPin, Truck, Tag, Check } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useCart } from "@/lib/cart/cart-context";
@@ -15,6 +15,7 @@ import type {
 } from "@/lib/types";
 import {
   useAddresses,
+  useCreateAddress,
   useShippingMethods,
   useShippingCosts,
   usePaymentMethods,
@@ -93,7 +94,22 @@ export default function CheckoutPage() {
   const { mutateAsync: createOrder, isPending: isCreatingOrder } =
     useCreateOrder();
   const { mutateAsync: createPayment } = useCreatePayment();
+  const { mutateAsync: createAddress } = useCreateAddress();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const mainCtaRef = useRef<HTMLButtonElement>(null);
+  const [isMainCtaVisible, setIsMainCtaVisible] = useState(true);
+
+  useEffect(() => {
+    const el = mainCtaRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsMainCtaVisible(entry.isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const totalWeight = items.reduce(
     (sum, i) => sum + (i.weight ?? 0) * i.quantity,
@@ -104,8 +120,11 @@ export default function CheckoutPage() {
     : (addresses.find((a) => a.id === selectedAddressId)?.country ?? "");
   const hasShippingAddressInfo = Boolean(shippingCountry.trim());
 
-  const { costsByMethodId: shippingCosts, isLoading: isLoadingCosts } =
-    useShippingCosts(shippingMethods, totalWeight, shippingCountry);
+  const {
+    costsByMethodId: shippingCosts,
+    estimatedDaysByMethodId,
+    isLoading: isLoadingCosts,
+  } = useShippingCosts(shippingMethods, totalWeight, shippingCountry);
 
   const selectedShippingCost = shippingMethodId
     ? (shippingCosts[shippingMethodId] ?? 0)
@@ -120,8 +139,12 @@ export default function CheckoutPage() {
       return;
     }
     if (!selectedAddressId) {
-      const def = addresses.find((a) => a.isDefault) ?? addresses[0];
-      setSelectedAddressId(def.id);
+      const defaultAddress = addresses.find((a) => a.isDefault);
+      const mostRecent = [...addresses].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )[0];
+      setSelectedAddressId((defaultAddress ?? mostRecent).id);
     }
   }, [addresses, selectedAddressId]);
 
@@ -195,6 +218,27 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
     try {
       const shippingAddress = buildShippingAddress();
+      let newlyCreatedAddressId: string | undefined;
+
+      if (useNewAddress) {
+        try {
+          const saved = await createAddress({
+            recipientName: shippingAddress.recipientName,
+            phone: shippingAddress.phone,
+            street: shippingAddress.street,
+            addressLine2: shippingAddress.addressLine2,
+            city: shippingAddress.city,
+            state: shippingAddress.state,
+            country: shippingAddress.country,
+            postalCode: shippingAddress.postalCode ?? null,
+            isDefault: addresses.length === 0,
+          });
+          newlyCreatedAddressId = saved.id;
+        } catch {
+          // La commande peut tout de même être créée même si l'adresse n'a
+          // pas pu être sauvegardée pour un usage futur.
+        }
+      }
 
       const payload: OrderCreateInput = {
         items: items.map((i) => ({
@@ -202,7 +246,9 @@ export default function CheckoutPage() {
           combinationId: i.combinationId ?? undefined,
           quantity: i.quantity,
         })),
-        shippingAddressId: useNewAddress ? undefined : selectedAddressId,
+        shippingAddressId: useNewAddress
+          ? newlyCreatedAddressId
+          : selectedAddressId,
         shippingAddress,
         shippingMethodId,
         paymentMethodId: paymentMethod,
@@ -247,30 +293,47 @@ export default function CheckoutPage() {
     }
 
     setCouponResult(null);
-    validateCoupon(couponCode.trim(), {
-      onSuccess: (res) => {
-        setCouponResult({
-          valid: res.valid,
-          message: res.valid
-            ? "Code valide — il sera appliqué à la confirmation."
-            : (res.message ?? "Code invalide."),
-        });
+    validateCoupon(
+      {
+        code: couponCode.trim(),
+        items: items.map((i) => ({
+          id: String(i.productId),
+          combinationId: i.combinationId ?? undefined,
+          quantity: i.quantity,
+        })),
       },
-      onError: (err) => {
-        if (err instanceof ApiError && err.status === 401) {
-          setAuthModalMessage(
-            "Votre session a expiré. Reconnectez-vous pour vérifier ce code promo.",
-          );
-          setShowAuthModal(true);
-          return;
-        }
-        setCouponResult({
-          valid: false,
-          message:
-            err instanceof ApiError ? err.message : "Code invalide ou expiré.",
-        });
+      {
+        onSuccess: (res) => {
+          const meetsMinimum = res.preview?.meetsMinimum ?? true;
+          setCouponResult({
+            valid: meetsMinimum,
+            message: meetsMinimum
+              ? `Code valide — remise « ${res.promotion.name} » appliquée à la confirmation.`
+              : `Ce code nécessite un montant minimum de ${
+                  res.preview?.minOrderAmount != null
+                    ? formatXAF(res.preview.minOrderAmount)
+                    : "—"
+                } pour être appliqué.`,
+          });
+        },
+        onError: (err) => {
+          if (err instanceof ApiError && err.status === 401) {
+            setAuthModalMessage(
+              "Votre session a expiré. Reconnectez-vous pour vérifier ce code promo.",
+            );
+            setShowAuthModal(true);
+            return;
+          }
+          setCouponResult({
+            valid: false,
+            message:
+              err instanceof ApiError
+                ? err.message
+                : "Code invalide ou expiré.",
+          });
+        },
       },
-    });
+    );
   }
 
   return (
@@ -312,6 +375,11 @@ export default function CheckoutPage() {
                         <span>
                           {a.street}, {a.postalCode} {a.city}
                           {a.state ? `, ${a.state}` : ""} — {a.country}
+                          {a.isDefault && (
+                            <span className="ml-2 text-xs text-gray-400">
+                              (par défaut)
+                            </span>
+                          )}
                         </span>
                       </label>
                     ))}
@@ -329,6 +397,18 @@ export default function CheckoutPage() {
 
                 {useNewAddress && (
                   <div className="mt-3 space-y-3">
+                    <input
+                      placeholder="Nom du destinataire"
+                      required
+                      value={newAddress.recipientName}
+                      onChange={(e) =>
+                        setNewAddress((f) => ({
+                          ...f,
+                          recipientName: e.target.value,
+                        }))
+                      }
+                      className={inputClass}
+                    />
                     <input
                       placeholder="Rue"
                       required
@@ -380,8 +460,7 @@ export default function CheckoutPage() {
                         className={inputClass}
                       />
                       <input
-                        placeholder="Code postal"
-                        required
+                        placeholder="Code postal (optionnel)"
                         value={newAddress.postalCode}
                         onChange={(e) =>
                           setNewAddress((f) => ({
@@ -415,6 +494,8 @@ export default function CheckoutPage() {
                 <div className="space-y-2">
                   {shippingMethods.map((m) => {
                     const cost = shippingCosts[m.id];
+                    const estimatedDays =
+                      estimatedDaysByMethodId[m.id] ?? m.estimatedDays;
                     return (
                       <label
                         key={m.id}
@@ -429,17 +510,14 @@ export default function CheckoutPage() {
                             checked={shippingMethodId === m.id}
                             onChange={() => setShippingMethodId(m.id)}
                           />
-                          {m.name} — {m.estimatedDays} jour(s)
+                          {m.name} — {estimatedDays} jour(s)
                         </span>
                         {!hasShippingAddressInfo ? (
                           <span className="text-xs text-gray-400">
                             Adresse requise
                           </span>
                         ) : isLoadingCosts ? (
-                          <Loader2
-                            size={14}
-                            className="animate-spin text-gray-400"
-                          />
+                          <span className="inline-block h-3 w-16 animate-pulse rounded bg-gray-200" />
                         ) : cost === 0 ? (
                           <span className="text-xs font-medium text-green-600">
                             Livraison gratuite
@@ -538,11 +616,7 @@ export default function CheckoutPage() {
                 disabled={isValidatingCoupon || !couponCode.trim()}
                 className="shrink-0 rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
               >
-                {isValidatingCoupon ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  "Vérifier"
-                )}
+                {isValidatingCoupon ? "..." : "Vérifier"}
               </button>
             </div>
             {couponResult && (
@@ -581,20 +655,23 @@ export default function CheckoutPage() {
           </p>
 
           <button
+            ref={mainCtaRef}
             type="submit"
             disabled={isSubmitting || isCreatingOrder}
             className="mt-5 flex w-full items-center justify-center gap-2 rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
           >
-            {isSubmitting || isCreatingOrder ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Check size={16} />
-            )}
+            {isSubmitting || isCreatingOrder ? "..." : <Check size={16} />}
             Confirmer la commande
           </button>
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] lg:hidden">
+        <div
+          className={`fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] transition-transform duration-200 lg:hidden ${
+            isMainCtaVisible
+              ? "pointer-events-none translate-y-full"
+              : "translate-y-0"
+          }`}
+        >
           <div className="mb-2 flex gap-2">
             <input
               type="text"
@@ -612,11 +689,7 @@ export default function CheckoutPage() {
               disabled={isValidatingCoupon || !couponCode.trim()}
               className="shrink-0 rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
             >
-              {isValidatingCoupon ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                "Vérifier"
-              )}
+              {isValidatingCoupon ? "..." : "Vérifier"}
             </button>
           </div>
           {couponResult && (
@@ -636,11 +709,7 @@ export default function CheckoutPage() {
               disabled={isSubmitting || isCreatingOrder}
               className="flex items-center justify-center gap-2 rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
             >
-              {isSubmitting || isCreatingOrder ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Check size={16} />
-              )}
+              {isSubmitting || isCreatingOrder ? "..." : <Check size={16} />}
               Confirmer
             </button>
           </div>
