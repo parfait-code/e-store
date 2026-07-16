@@ -3,12 +3,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import Image from "next/image";
 import { ApiError } from "@/lib/api-client";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Pagination } from "@/components/Pagination";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import Image from "next/image";
 import {
   useCategoryBySlug,
   useCategoryProducts,
@@ -29,15 +28,7 @@ export function CategoryPageClient({ slug }: { slug: string }) {
     error,
   } = useCategoryProducts(slug, page);
 
-  if (isLoading && !productsData) {
-    return (
-      <div className="flex justify-center py-20">
-        <Loader2 size={24} className="animate-spin text-gray-400" />
-      </div>
-    );
-  }
-
-  if (isError || !productsData) {
+  if (isError) {
     const message =
       error instanceof ApiError ? error.message : "Catégorie introuvable.";
     return (
@@ -46,6 +37,8 @@ export function CategoryPageClient({ slug }: { slug: string }) {
       </div>
     );
   }
+
+  const categoryName = productsData?.category.name ?? category?.name ?? "";
 
   const breadcrumbItems = [
     { label: "Produits", href: "/products" },
@@ -57,7 +50,7 @@ export function CategoryPageClient({ slug }: { slug: string }) {
           },
         ]
       : []),
-    { label: productsData.category.name },
+    { label: categoryName || "…" },
   ];
 
   const hasImage = Boolean(category?.imageUrl);
@@ -70,7 +63,7 @@ export function CategoryPageClient({ slug }: { slug: string }) {
         <div className="relative mb-6 aspect-4/1 w-full overflow-hidden rounded-lg bg-gray-100">
           <Image
             src={category!.imageUrl!}
-            alt={productsData.category.name}
+            alt={categoryName}
             fill
             className="object-cover"
             sizes="(max-width: 768px) 100vw, 1200px"
@@ -78,9 +71,11 @@ export function CategoryPageClient({ slug }: { slug: string }) {
         </div>
       ) : (
         <div className="mb-6">
-          <h1 className="text-xl font-semibold">
-            {productsData.category.name}
-          </h1>
+          {categoryName ? (
+            <h1 className="text-xl font-semibold">{categoryName}</h1>
+          ) : (
+            <div className="h-6 w-48 animate-pulse rounded bg-gray-200" />
+          )}
           {category?.description && (
             <p className="mt-1 text-sm text-gray-500">{category.description}</p>
           )}
@@ -102,13 +97,17 @@ export function CategoryPageClient({ slug }: { slug: string }) {
       )}
 
       <ProductGrid
-        products={productsData.items}
+        products={productsData?.items ?? []}
         isLoading={isLoading}
-        emptyMessage={`Aucun produit dans "${productsData.category.name}" pour le moment.`}
+        emptyMessage={
+          categoryName
+            ? `Aucun produit dans "${categoryName}" pour le moment.`
+            : "Aucun produit pour le moment."
+        }
       />
       <Pagination
         page={page}
-        totalPages={productsData.totalPages}
+        totalPages={productsData?.totalPages ?? 1}
         onPageChange={setPage}
       />
     </div>

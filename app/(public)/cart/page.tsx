@@ -78,7 +78,7 @@ export default function CartPage() {
   }
 
   return (
-    <div>
+    <div className="pb-24 lg:pb-0">
       <h1 className="mb-6 text-xl font-semibold">Mon panier</h1>
 
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-3">
@@ -196,6 +196,22 @@ export default function CartPage() {
               Un compte est nécessaire pour finaliser votre commande.
             </p>
           )}
+        </div>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] lg:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-gray-500">Total</p>
+            <p className="text-base font-semibold">{formatXAF(totalAmount)}</p>
+          </div>
+          <Link
+            href={user ? "/checkout" : "/login?redirect=/checkout"}
+            className="flex items-center justify-center gap-2 rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            {user ? "Passer commande" : "Se connecter"}
+            <ArrowRight size={16} />
+          </Link>
         </div>
       </div>
     </div>

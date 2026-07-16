@@ -4,13 +4,10 @@ import { CategoryPageClient } from "../CategoryPageClient";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
-// Fetch minimal, dédié au SEO uniquement — ne peut pas réutiliser apiClient
-// (basé sur js-cookie, qui accède à `document`, indisponible en server
-// component). Route publique, aucune auth nécessaire.
 async function fetchCategoryForMetadata(slug: string) {
   try {
     const res = await fetch(`${BASE_URL}/categories/slug/${slug}`, {
-      next: { revalidate: 300 }, // aligné sur cache.default_ttl_seconds (5 min par défaut)
+      next: { revalidate: 300 },
     });
     const json = await res.json();
     if (!json.status) return null;

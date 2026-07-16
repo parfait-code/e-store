@@ -112,6 +112,8 @@ export default function CheckoutPage() {
     : 0;
   const grandTotal = totalAmount + selectedShippingCost;
 
+  const isCouponVerified = couponResult?.valid === true;
+
   useEffect(() => {
     if (addresses.length === 0) {
       setUseNewAddress(true);
@@ -204,7 +206,7 @@ export default function CheckoutPage() {
         shippingAddress,
         shippingMethodId,
         paymentMethodId: paymentMethod,
-        couponCode: couponCode || undefined,
+        couponCode: isCouponVerified ? couponCode : undefined,
       };
       const order = await createOrder(payload);
 
@@ -272,7 +274,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div>
+    <div className="pb-40 lg:pb-0">
       <h1 className="mb-6 text-xl font-semibold">Finaliser la commande</h1>
 
       <form
@@ -590,6 +592,58 @@ export default function CheckoutPage() {
             )}
             Confirmer la commande
           </button>
+        </div>
+
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] lg:hidden">
+          <div className="mb-2 flex gap-2">
+            <input
+              type="text"
+              value={couponCode}
+              onChange={(e) => {
+                setCouponCode(e.target.value.toUpperCase());
+                setCouponResult(null);
+              }}
+              placeholder="Code promo"
+              className={`${inputClass} flex-1`}
+            />
+            <button
+              type="button"
+              onClick={handleValidateCoupon}
+              disabled={isValidatingCoupon || !couponCode.trim()}
+              className="shrink-0 rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {isValidatingCoupon ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                "Vérifier"
+              )}
+            </button>
+          </div>
+          {couponResult && (
+            <p
+              className={`mb-2 text-xs ${couponResult.valid ? "text-green-600" : "text-red-600"}`}
+            >
+              {couponResult.message}
+            </p>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs text-gray-500">Total</p>
+              <p className="text-base font-semibold">{formatXAF(grandTotal)}</p>
+            </div>
+            <button
+              type="submit"
+              disabled={isSubmitting || isCreatingOrder}
+              className="flex items-center justify-center gap-2 rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+            >
+              {isSubmitting || isCreatingOrder ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Check size={16} />
+              )}
+              Confirmer
+            </button>
+          </div>
         </div>
       </form>
 

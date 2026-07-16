@@ -3,15 +3,13 @@ import { apiClient } from "@/lib/api-client";
 import type {
   Category,
   Product,
+  ProductImage,
   Paginated,
   ProductCombination,
   CategoryProductsResponse,
   CategoryRef,
 } from "@/lib/types";
 
-// Défense à la source : `?? []` ne protège que contre null/undefined, pas
-// contre une forme inattendue mais non-nulle (ex: un objet d'erreur renvoyé
-// à la place d'un tableau) — cause du crash précédent sur la home.
 function normalizePaginated<T>(
   res: Paginated<T> | null | undefined,
 ): Paginated<T> {
@@ -22,6 +20,33 @@ function normalizePaginated<T>(
     limit: res?.limit ?? 20,
     totalPages: res?.totalPages ?? 1,
   };
+}
+
+function normalizeImages(images: unknown): ProductImage[] {
+  if (!Array.isArray(images)) return [];
+  return images.map((img, i) => {
+    if (typeof img === "string") {
+      return {
+        id: `img-${i}`,
+        url: img,
+        altText: null,
+        position: i,
+        isPrimary: i === 0,
+      };
+    }
+    const raw = (img ?? {}) as Partial<ProductImage>;
+    return {
+      id: raw.id ?? `img-${i}`,
+      url: raw.url ?? "",
+      altText: raw.altText ?? null,
+      position: raw.position ?? i,
+      isPrimary: raw.isPrimary ?? i === 0,
+    };
+  });
+}
+
+function normalizeProductImages(product: Product): Product {
+  return { ...product, images: normalizeImages(product.images) };
 }
 
 export const shopCatalogApi = {
@@ -40,7 +65,9 @@ export const shopCatalogApi = {
       )
       .then((res) => ({
         ...res,
-        items: Array.isArray(res?.items) ? res.items : [],
+        items: (Array.isArray(res?.items) ? res.items : []).map(
+          normalizeProductImages,
+        ),
       })),
 
   listProducts: (
@@ -58,15 +85,13 @@ export const shopCatalogApi = {
     if (params.search) qs.set("search", params.search);
     return apiClient
       .get<Paginated<Product>>(`/product?${qs.toString()}`)
-      .then(normalizePaginated);
+      .then(normalizePaginated)
+      .then((res) => ({
+        ...res,
+        items: res.items.map(normalizeProductImages),
+      }));
   },
 
-  // À ajouter dans l'objet shopCatalogApi, après listProducts
-
-  // Pas de paramètre de tri documenté côté API (voir GUIDE §6.2) — on
-  // sur-fetch un lot plus large puis on trie par createdAt côté client.
-  // Solution temporaire en attendant un ?sort=newest ou /product/latest
-  // côté backend.
   newestProducts: (limit = 8, fetchPoolSize = 24) =>
     apiClient
       .get<Paginated<Product>>(`/product?page=1&limit=${fetchPoolSize}`)
@@ -74,6 +99,7 @@ export const shopCatalogApi = {
       .then((res) => ({
         ...res,
         items: [...res.items]
+          .map(normalizeProductImages)
           .sort(
             (a, b) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -81,7 +107,8 @@ export const shopCatalogApi = {
           .slice(0, limit),
       })),
 
-  productById: (id: string) => apiClient.get<Product>(`/product/${id}`),
+  productById: (id: string) =>
+    apiClient.get<Product>(`/product/${id}`).then(normalizeProductImages),
 
   combinations: (productId: string) =>
     apiClient
