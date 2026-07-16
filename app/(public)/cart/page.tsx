@@ -9,12 +9,53 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { QuantitySelector } from "@/components/QuantitySelector";
 import { formatXAF } from "@/lib/format";
 
+function CartRowSkeleton() {
+  return (
+    <div className="flex animate-pulse gap-4 p-4">
+      <div className="h-20 w-20 shrink-0 rounded-md bg-gray-100" />
+      <div className="flex flex-1 flex-col justify-between">
+        <div className="space-y-2">
+          <div className="h-4 w-2/5 rounded bg-gray-200" />
+          <div className="h-3 w-1/5 rounded bg-gray-100" />
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="h-8 w-24 rounded-md bg-gray-100" />
+          <div className="h-4 w-16 rounded bg-gray-200" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CartSkeleton() {
+  return (
+    <div>
+      <div className="mb-6 h-6 w-40 animate-pulse rounded bg-gray-200" />
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <CartRowSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+        <div className="animate-pulse rounded-lg border border-gray-200 bg-white p-5">
+          <div className="h-4 w-24 rounded bg-gray-200" />
+          <div className="mt-4 h-4 w-full rounded bg-gray-100" />
+          <div className="mt-6 h-4 w-full rounded bg-gray-100" />
+          <div className="mt-6 h-10 w-full rounded-md bg-gray-200" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CartPage() {
   const { items, totalAmount, updateQuantity, removeItem, isLoaded } =
     useCart();
   const { user } = useAuth();
 
-  if (!isLoaded) return null;
+  if (!isLoaded) return <CartSkeleton />;
 
   if (items.length === 0) {
     return (
@@ -40,7 +81,7 @@ export default function CartPage() {
     <div>
       <h1 className="mb-6 text-xl font-semibold">Mon panier</h1>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
             {items.map((item) => {
@@ -129,7 +170,7 @@ export default function CartPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
+        <div className="rounded-lg border border-gray-200 bg-white p-5 lg:sticky lg:top-24">
           <h2 className="mb-4 text-sm font-medium">Résumé</h2>
           <div className="flex justify-between text-sm text-gray-600">
             <span>Sous-total</span>

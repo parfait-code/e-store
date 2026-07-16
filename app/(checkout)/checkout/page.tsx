@@ -24,6 +24,33 @@ import {
 } from "@/lib/queries/shop/useCheckout";
 import { AuthRequiredModal } from "@/components/AuthRequiredModal";
 
+function AddressSectionSkeleton() {
+  return (
+    <div className="animate-pulse space-y-2">
+      <div className="h-14 rounded-md border border-gray-100 bg-gray-50" />
+      <div className="h-14 rounded-md border border-gray-100 bg-gray-50" />
+    </div>
+  );
+}
+
+function ShippingSectionSkeleton() {
+  return (
+    <div className="animate-pulse space-y-2">
+      <div className="h-12 rounded-md border border-gray-100 bg-gray-50" />
+      <div className="h-12 rounded-md border border-gray-100 bg-gray-50" />
+    </div>
+  );
+}
+
+function PaymentSectionSkeleton() {
+  return (
+    <div className="animate-pulse space-y-2">
+      <div className="h-12 rounded-md border border-gray-100 bg-gray-50" />
+      <div className="h-12 rounded-md border border-gray-100 bg-gray-50" />
+    </div>
+  );
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -84,8 +111,6 @@ export default function CheckoutPage() {
     ? (shippingCosts[shippingMethodId] ?? 0)
     : 0;
   const grandTotal = totalAmount + selectedShippingCost;
-
-  const isLoading = isLoadingAddresses || isLoadingMethods || isLoadingPayments;
 
   useEffect(() => {
     if (addresses.length === 0) {
@@ -246,9 +271,6 @@ export default function CheckoutPage() {
     });
   }
 
-  if (isLoading)
-    return <Loader2 size={24} className="animate-spin text-gray-400" />;
-
   return (
     <div>
       <h1 className="mb-6 text-xl font-semibold">Finaliser la commande</h1>
@@ -268,91 +290,109 @@ export default function CheckoutPage() {
             <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
               <MapPin size={16} /> Adresse de livraison
             </h2>
-            {addresses.length > 0 && !useNewAddress && (
-              <div className="space-y-2">
-                {addresses.map((a) => (
-                  <label
-                    key={a.id}
-                    className="flex items-start gap-2 rounded-md border border-gray-200 p-3 text-sm"
-                  >
-                    <input
-                      type="radio"
-                      checked={selectedAddressId === a.id}
-                      onChange={() => setSelectedAddressId(a.id)}
-                      className="mt-0.5"
-                    />
-                    <span>
-                      {a.street}, {a.postalCode} {a.city}
-                      {a.state ? `, ${a.state}` : ""} — {a.country}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setUseNewAddress((v) => !v)}
-              className="mt-3 text-xs font-medium text-gray-900 hover:underline"
-            >
-              {useNewAddress
-                ? "Utiliser une adresse existante"
-                : "+ Utiliser une nouvelle adresse"}
-            </button>
+            {isLoadingAddresses ? (
+              <AddressSectionSkeleton />
+            ) : (
+              <>
+                {addresses.length > 0 && !useNewAddress && (
+                  <div className="space-y-2">
+                    {addresses.map((a) => (
+                      <label
+                        key={a.id}
+                        className="flex items-start gap-2 rounded-md border border-gray-200 p-3 text-sm"
+                      >
+                        <input
+                          type="radio"
+                          checked={selectedAddressId === a.id}
+                          onChange={() => setSelectedAddressId(a.id)}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          {a.street}, {a.postalCode} {a.city}
+                          {a.state ? `, ${a.state}` : ""} — {a.country}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setUseNewAddress((v) => !v)}
+                  className="mt-3 text-xs font-medium text-gray-900 hover:underline"
+                >
+                  {useNewAddress
+                    ? "Utiliser une adresse existante"
+                    : "+ Utiliser une nouvelle adresse"}
+                </button>
 
-            {useNewAddress && (
-              <div className="mt-3 space-y-3">
-                <input
-                  placeholder="Rue"
-                  required
-                  value={newAddress.street}
-                  onChange={(e) =>
-                    setNewAddress((f) => ({ ...f, street: e.target.value }))
-                  }
-                  className={inputClass}
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    placeholder="Ville"
-                    required
-                    value={newAddress.city}
-                    onChange={(e) =>
-                      setNewAddress((f) => ({ ...f, city: e.target.value }))
-                    }
-                    className={inputClass}
-                  />
-                  <input
-                    placeholder="État / région"
-                    value={newAddress.state}
-                    onChange={(e) =>
-                      setNewAddress((f) => ({ ...f, state: e.target.value }))
-                    }
-                    className={inputClass}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    placeholder="Pays"
-                    required
-                    value={newAddress.country}
-                    onChange={(e) =>
-                      setNewAddress((f) => ({ ...f, country: e.target.value }))
-                    }
-                    className={inputClass}
-                  />
-                  <input
-                    placeholder="Code postal"
-                    required
-                    value={newAddress.postalCode}
-                    onChange={(e) =>
-                      setNewAddress((f) => ({
-                        ...f,
-                        postalCode: e.target.value,
-                      }))
-                    }
-                    className={inputClass}
-                  />
-                </div>
-              </div>
+                {useNewAddress && (
+                  <div className="mt-3 space-y-3">
+                    <input
+                      placeholder="Rue"
+                      required
+                      value={newAddress.street}
+                      onChange={(e) =>
+                        setNewAddress((f) => ({
+                          ...f,
+                          street: e.target.value,
+                        }))
+                      }
+                      className={inputClass}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        placeholder="Ville"
+                        required
+                        value={newAddress.city}
+                        onChange={(e) =>
+                          setNewAddress((f) => ({
+                            ...f,
+                            city: e.target.value,
+                          }))
+                        }
+                        className={inputClass}
+                      />
+                      <input
+                        placeholder="État / région"
+                        value={newAddress.state}
+                        onChange={(e) =>
+                          setNewAddress((f) => ({
+                            ...f,
+                            state: e.target.value,
+                          }))
+                        }
+                        className={inputClass}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        placeholder="Pays"
+                        required
+                        value={newAddress.country}
+                        onChange={(e) =>
+                          setNewAddress((f) => ({
+                            ...f,
+                            country: e.target.value,
+                          }))
+                        }
+                        className={inputClass}
+                      />
+                      <input
+                        placeholder="Code postal"
+                        required
+                        value={newAddress.postalCode}
+                        onChange={(e) =>
+                          setNewAddress((f) => ({
+                            ...f,
+                            postalCode: e.target.value,
+                          }))
+                        }
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </section>
 
@@ -360,84 +400,96 @@ export default function CheckoutPage() {
             <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
               <Truck size={16} /> Méthode de livraison
             </h2>
-            {!hasShippingAddressInfo && (
-              <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                Renseignez votre adresse de livraison ci-dessus pour voir le
-                tarif de chaque méthode.
-              </p>
+            {isLoadingMethods ? (
+              <ShippingSectionSkeleton />
+            ) : (
+              <>
+                {!hasShippingAddressInfo && (
+                  <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    Renseignez votre adresse de livraison ci-dessus pour voir le
+                    tarif de chaque méthode.
+                  </p>
+                )}
+                <div className="space-y-2">
+                  {shippingMethods.map((m) => {
+                    const cost = shippingCosts[m.id];
+                    return (
+                      <label
+                        key={m.id}
+                        className={`flex items-center justify-between rounded-md border border-gray-200 p-3 text-sm ${
+                          !hasShippingAddressInfo ? "opacity-50" : ""
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            disabled={!hasShippingAddressInfo}
+                            checked={shippingMethodId === m.id}
+                            onChange={() => setShippingMethodId(m.id)}
+                          />
+                          {m.name} — {m.estimatedDays} jour(s)
+                        </span>
+                        {!hasShippingAddressInfo ? (
+                          <span className="text-xs text-gray-400">
+                            Adresse requise
+                          </span>
+                        ) : isLoadingCosts ? (
+                          <Loader2
+                            size={14}
+                            className="animate-spin text-gray-400"
+                          />
+                        ) : cost === 0 ? (
+                          <span className="text-xs font-medium text-green-600">
+                            Livraison gratuite
+                          </span>
+                        ) : cost != null ? (
+                          <span className="text-gray-500">
+                            {formatXAF(cost)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
             )}
-            <div className="space-y-2">
-              {shippingMethods.map((m) => {
-                const cost = shippingCosts[m.id];
-                return (
-                  <label
-                    key={m.id}
-                    className={`flex items-center justify-between rounded-md border border-gray-200 p-3 text-sm ${
-                      !hasShippingAddressInfo ? "opacity-50" : ""
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        disabled={!hasShippingAddressInfo}
-                        checked={shippingMethodId === m.id}
-                        onChange={() => setShippingMethodId(m.id)}
-                      />
-                      {m.name} — {m.estimatedDays} jour(s)
-                    </span>
-                    {!hasShippingAddressInfo ? (
-                      <span className="text-xs text-gray-400">
-                        Adresse requise
-                      </span>
-                    ) : isLoadingCosts ? (
-                      <Loader2
-                        size={14}
-                        className="animate-spin text-gray-400"
-                      />
-                    ) : cost === 0 ? (
-                      <span className="text-xs font-medium text-green-600">
-                        Livraison gratuite
-                      </span>
-                    ) : cost != null ? (
-                      <span className="text-gray-500">{formatXAF(cost)}</span>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white p-4">
             <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
               <CreditCard size={16} /> Moyen de paiement
             </h2>
-            <div className="space-y-2">
-              {paymentMethods.map((m) => (
-                <label
-                  key={m.id}
-                  className={`flex items-center justify-between rounded-md border p-3 text-sm ${m.available ? "border-gray-200" : "border-gray-100 opacity-50"}`}
-                >
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      disabled={!m.available}
-                      checked={paymentMethod === m.id}
-                      onChange={() =>
-                        setPaymentMethod(m.id as PaymentMethodType)
-                      }
-                    />
-                    {m.name}
-                  </span>
-                  {!m.available && (
-                    <span className="text-xs text-gray-400">
-                      {m.message ?? "Indisponible"}
+            {isLoadingPayments ? (
+              <PaymentSectionSkeleton />
+            ) : (
+              <div className="space-y-2">
+                {paymentMethods.map((m) => (
+                  <label
+                    key={m.id}
+                    className={`flex items-center justify-between rounded-md border p-3 text-sm ${m.available ? "border-gray-200" : "border-gray-100 opacity-50"}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        disabled={!m.available}
+                        checked={paymentMethod === m.id}
+                        onChange={() =>
+                          setPaymentMethod(m.id as PaymentMethodType)
+                        }
+                      />
+                      {m.name}
                     </span>
-                  )}
-                </label>
-              ))}
-            </div>
+                    {!m.available && (
+                      <span className="text-xs text-gray-400">
+                        {m.message ?? "Indisponible"}
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
           </section>
         </div>
 

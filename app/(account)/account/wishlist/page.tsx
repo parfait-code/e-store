@@ -4,18 +4,44 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Loader2, Heart, Trash2, ImageOff, ShoppingCart } from "lucide-react";
+import { Heart, Trash2, ImageOff, ShoppingCart, Loader2 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { useCart } from "@/lib/cart/cart-context";
 import { useWishlist } from "@/lib/wishlist/wishlist-context";
+import { shopCatalogApi } from "@/lib/api/shop/catalog";
 import { formatXAF } from "@/lib/format";
+import { CombinationRequiredModal } from "@/components/CombinationRequiredModal";
 import type { Wishlist } from "@/lib/types";
+
+function WishlistCardSkeleton() {
+  return (
+    <div className="flex animate-pulse gap-4 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="h-24 w-24 shrink-0 rounded-lg bg-gray-100" />
+      <div className="flex flex-1 flex-col justify-between">
+        <div className="space-y-2">
+          <div className="h-4 w-3/5 rounded bg-gray-200" />
+          <div className="h-3 w-2/5 rounded bg-gray-100" />
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-24 rounded-md bg-gray-100" />
+          <div className="h-8 w-8 rounded-md bg-gray-100" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function WishlistPage() {
   const [wishlist, setWishlist] = useState<Wishlist | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [checkingProductId, setCheckingProductId] = useState<string | null>(
+    null,
+  );
+  const [combinationModalProductId, setCombinationModalProductId] = useState<
+    string | null
+  >(null);
   const { addItem } = useCart();
   const { toggle } = useWishlist();
 
@@ -56,8 +82,66 @@ export default function WishlistPage() {
     }
   }
 
-  if (isLoading)
-    return <Loader2 size={20} className="animate-spin text-gray-400" />;
+  async function handleAddToCart(item: Wishlist["items"][number]) {
+    const price = item.combination?.price ?? item.product.price;
+    const image = item.product.images[0]?.url;
+
+    if (item.combinationId) {
+      if (!item.combination) {
+        alert(
+          "Cette variante n'est plus disponible et ne peut plus être ajoutée au panier.",
+        );
+        return;
+      }
+      addItem({
+        productId: item.productId,
+        combinationId: item.combinationId,
+        quantity: 1,
+        name: item.product.name,
+        price,
+        image: image ?? null,
+        sku: item.combination.sku ?? "",
+      });
+      return;
+    }
+
+    setCheckingProductId(item.productId);
+    try {
+      const combinations = await shopCatalogApi.combinations(item.productId);
+      const requiresChoice = combinations.some((c) => c.isActive);
+      if (requiresChoice) {
+        setCombinationModalProductId(item.productId);
+        return;
+      }
+      addItem({
+        productId: item.productId,
+        combinationId: null,
+        quantity: 1,
+        name: item.product.name,
+        price,
+        image: image ?? null,
+        sku: "",
+      });
+    } catch {
+      setCombinationModalProductId(item.productId);
+    } finally {
+      setCheckingProductId(null);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div>
+        <h1 className="mb-6 text-xl font-semibold">Ma liste de souhaits</h1>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <WishlistCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (error)
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -77,71 +161,72 @@ export default function WishlistPage() {
           <p className="text-sm">Aucun produit enregistré pour l'instant.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {items.map((item) => {
             const price = item.combination?.price ?? item.product.price;
             const image = item.product.images[0]?.url;
+            const isChecking = checkingProductId === item.productId;
+            const isRemoving = removingId === item.productId;
+
             return (
               <div
                 key={item.id}
-                className="flex gap-3 rounded-lg border border-gray-200 bg-white p-3"
+                className="group flex gap-4 rounded-xl border border-gray-200 bg-white p-4 transition hover:shadow-md"
               >
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-gray-100">
+                <Link
+                  href={`/products/${item.productId}`}
+                  className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100"
+                >
                   {image ? (
                     <Image
                       src={image}
                       alt={item.product.name}
                       fill
-                      className="object-cover"
-                      sizes="64px"
+                      className="object-cover transition group-hover:scale-105"
+                      sizes="96px"
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center">
-                      <ImageOff size={20} className="text-gray-300" />
+                      <ImageOff size={22} className="text-gray-300" />
                     </div>
                   )}
-                </div>
-                <div className="flex flex-1 flex-col justify-between">
+                </Link>
+
+                <div className="flex min-w-0 flex-1 flex-col justify-between">
                   <div>
                     <Link
                       href={`/products/${item.productId}`}
-                      className="text-sm font-medium hover:underline"
+                      className="line-clamp-2 text-sm font-medium text-gray-900 hover:underline"
                     >
                       {item.product.name}
                     </Link>
-                    <p className="text-xs text-gray-500">{formatXAF(price)}</p>
+                    <p className="mt-1 text-sm font-semibold text-gray-900">
+                      {formatXAF(price)}
+                    </p>
                   </div>
+
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        if (item.combinationId && !item.combination) {
-                          alert(
-                            "Cette variante n'est plus disponible et ne peut plus être ajoutée au panier.",
-                          );
-                          return;
-                        }
-                        addItem({
-                          productId: item.productId,
-                          combinationId: item.combinationId,
-                          quantity: 1,
-                          name: item.product.name,
-                          price,
-                          image: image ?? null,
-                          sku: item.combination?.sku ?? "",
-                        });
-                      }}
-                      className="flex items-center gap-1 rounded-md bg-gray-900 px-2 py-1 text-xs text-white hover:bg-gray-800"
+                      onClick={() => handleAddToCart(item)}
+                      disabled={isChecking}
+                      className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-60"
                     >
-                      <ShoppingCart size={12} /> Ajouter
+                      {isChecking ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <ShoppingCart size={12} />
+                      )}
+                      Ajouter
                     </button>
                     <button
                       onClick={() =>
                         handleRemove(item.productId, item.combinationId)
                       }
-                      disabled={removingId === item.productId}
-                      className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                      disabled={isRemoving}
+                      className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      aria-label="Retirer des favoris"
                     >
-                      {removingId === item.productId ? (
+                      {isRemoving ? (
                         <Loader2 size={14} className="animate-spin" />
                       ) : (
                         <Trash2 size={14} />
@@ -154,6 +239,12 @@ export default function WishlistPage() {
           })}
         </div>
       )}
+
+      <CombinationRequiredModal
+        open={combinationModalProductId !== null}
+        productId={combinationModalProductId}
+        onClose={() => setCombinationModalProductId(null)}
+      />
     </div>
   );
 }
