@@ -1,7 +1,7 @@
 // app/(public)/products/[productId]/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { ProductGallery } from "@/components/ProductGallery";
@@ -42,11 +42,16 @@ export default function ProductDetailPage() {
   const [combinations, setCombinations] = useState<ProductCombination[]>([]);
   const [selectedCombination, setSelectedCombination] =
     useState<ProductCombination | null>(null);
+  const [quantity, setQuantity] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const mainCtaRef = useRef<HTMLDivElement>(null);
+  const [isMainCtaVisible, setIsMainCtaVisible] = useState(true);
+
   useEffect(() => {
     setSelectedCombination(null);
+    setQuantity(1);
     Promise.all([
       apiClient.get<Product>(`/product/${productId}`),
       apiClient
@@ -68,6 +73,17 @@ export default function ProductDetailPage() {
       .finally(() => setIsLoading(false));
   }, [productId]);
 
+  useEffect(() => {
+    const el = mainCtaRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsMainCtaVisible(entry.isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isLoading, product?.id]);
+
   if (isLoading) {
     return <ProductDetailSkeleton />;
   }
@@ -86,9 +102,10 @@ export default function ProductDetailPage() {
   const attributeValues = Array.isArray(product.attributeValues)
     ? product.attributeValues
     : [];
+  const showFloatingCta = !isLoading && !isMainCtaVisible;
 
   return (
-    <div className="pb-28 lg:pb-0">
+    <div className="pb-24 lg:pb-0">
       <Breadcrumb
         items={[
           ...(product.category
@@ -138,12 +155,14 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          <div className="mt-6 hidden items-center gap-3 lg:flex">
+          <div ref={mainCtaRef} className="mt-6 flex items-center gap-3">
             <div className="flex-1">
               <AddToCartButton
                 product={product}
                 selectedCombination={selectedCombination}
                 requiresCombination={requiresCombination}
+                quantity={quantity}
+                onQuantityChange={setQuantity}
               />
             </div>
             <WishlistButton
@@ -180,20 +199,20 @@ export default function ProductDetailPage() {
         <ReviewsSection productId={product.id} />
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] lg:hidden">
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <AddToCartButton
-              product={product}
-              selectedCombination={selectedCombination}
-              requiresCombination={requiresCombination}
-            />
-          </div>
-          <WishlistButton
-            productId={product.id}
-            combinationId={selectedCombination?.id ?? null}
-          />
-        </div>
+      <div
+        className={`fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] transition-transform duration-200 lg:hidden ${
+          showFloatingCta
+            ? "translate-y-0"
+            : "pointer-events-none translate-y-full"
+        }`}
+      >
+        <AddToCartButton
+          product={product}
+          selectedCombination={selectedCombination}
+          requiresCombination={requiresCombination}
+          quantity={quantity}
+          onQuantityChange={setQuantity}
+        />
       </div>
     </div>
   );

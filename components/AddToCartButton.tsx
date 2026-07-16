@@ -15,15 +15,18 @@ interface AddToCartButtonProps {
   product: Product;
   selectedCombination: ProductCombination | null;
   requiresCombination: boolean;
+  quantity: number;
+  onQuantityChange: (quantity: number) => void;
 }
 
 export function AddToCartButton({
   product,
   selectedCombination,
   requiresCombination,
+  quantity,
+  onQuantityChange,
 }: AddToCartButtonProps) {
   const { addItem } = useCart();
-  const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
 
   const stock = selectedCombination
@@ -64,7 +67,7 @@ export function AddToCartButton({
     <div className="flex items-center gap-3">
       <QuantitySelector
         quantity={quantity}
-        onChange={setQuantity}
+        onChange={onQuantityChange}
         max={stock}
       />
       <button

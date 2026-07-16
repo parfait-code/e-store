@@ -40,7 +40,7 @@ export function PromotionProductsPageClient({ slug }: { slug: string }) {
     <div>
       <Breadcrumb
         items={[
-          { label: "Promotions" },
+          { label: "Promotions", href: "/promotions" },
           { label: data.promotionName, href: `/promotions/${slug}` },
           { label: "Produits" },
         ]}

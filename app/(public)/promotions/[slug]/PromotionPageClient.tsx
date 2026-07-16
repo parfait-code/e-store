@@ -210,7 +210,10 @@ export function PromotionPageClient({ slug }: { slug: string }) {
   return (
     <div className="max-w-3xl">
       <Breadcrumb
-        items={[{ label: "Promotions" }, { label: promotion.name }]}
+        items={[
+          { label: "Promotions", href: "/promotions" },
+          { label: promotion.name },
+        ]}
       />
 
       {hasImages ? (

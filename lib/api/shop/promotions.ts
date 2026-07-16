@@ -3,8 +3,37 @@ import { apiClient } from "@/lib/api-client";
 import type {
   PromotionPublic,
   PromotionProductsResponse,
+  Product,
+  ProductImage,
   Paginated,
 } from "@/lib/types";
+
+function normalizeImages(images: unknown): ProductImage[] {
+  if (!Array.isArray(images)) return [];
+  return images.map((img, i) => {
+    if (typeof img === "string") {
+      return {
+        id: `img-${i}`,
+        url: img,
+        altText: null,
+        position: i,
+        isPrimary: i === 0,
+      };
+    }
+    const raw = (img ?? {}) as Partial<ProductImage>;
+    return {
+      id: raw.id ?? `img-${i}`,
+      url: raw.url ?? "",
+      altText: raw.altText ?? null,
+      position: raw.position ?? i,
+      isPrimary: raw.isPrimary ?? i === 0,
+    };
+  });
+}
+
+function normalizeProduct(product: Product): Product {
+  return { ...product, images: normalizeImages(product.images) };
+}
 
 export const shopPromotionsApi = {
   active: (params: { page?: number; limit?: number; slot?: "hero" } = {}) => {
@@ -31,6 +60,8 @@ export const shopPromotionsApi = {
       .get<PromotionProductsResponse>(`/promotions/slug/${slug}/products`)
       .then((res) => ({
         ...res,
-        products: Array.isArray(res?.products) ? res.products : [],
+        products: (Array.isArray(res?.products) ? res.products : []).map(
+          normalizeProduct,
+        ),
       })),
 };
