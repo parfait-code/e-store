@@ -37,8 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const { syncToServer: syncCartToServer } = useCart();
-  const { syncToServer: syncWishlistToServer, resetToGuest: resetWishlist } =
-    useWishlist();
+  const { syncToServer: syncWishlistToServer, resetToGuest } = useWishlist();
 
   useEffect(() => {
     const rawUser = Cookies.get(USER_COOKIE);
@@ -72,16 +71,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await syncCartToServer();
     await syncWishlistToServer();
 
-    if (redirectTo) router.push(redirectTo);
-    else if (data.user.role === "ADMIN") router.push("/admin/dashboard");
-    else router.push("/");
+    router.push(redirectTo || "/account");
   }
 
   function logout() {
     Cookies.remove(TOKEN_COOKIE);
     Cookies.remove(USER_COOKIE);
     setUser(null);
-    resetWishlist();
+    resetToGuest();
     router.push("/login");
   }
 
