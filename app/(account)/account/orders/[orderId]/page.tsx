@@ -643,7 +643,7 @@ export default function OrderDetailPage() {
     country?: string;
     postalCode?: string;
   };
-  const itemsCount = items.reduce((sum, i) => sum + i.quantity, 0);
+  const itemsCount = items.length;
 
   return (
     <div className="max-w-5xl">
@@ -720,18 +720,12 @@ export default function OrderDetailPage() {
                 <span>Sous-total</span>
                 <span>{formatXAF(order.totalAmount)}</span>
               </div>
-              {order.discountedAmount !== null && (
-                <div className="flex justify-between text-green-600">
-                  <span>Remise appliquée</span>
-                  <span>
-                    -{formatXAF(order.totalAmount - order.discountedAmount)}
-                  </span>
-                </div>
-              )}
               <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold">
                 <span>Total</span>
                 <span>
-                  {formatXAF(order.discountedAmount ?? order.totalAmount)}
+                  {order.discountedAmount !== null
+                    ? formatXAF(order.discountedAmount)
+                    : formatXAF(order.totalAmount)}
                 </span>
               </div>
             </div>

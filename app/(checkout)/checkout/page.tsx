@@ -5,6 +5,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, CreditCard, MapPin, Truck, Tag, Check } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth/auth-context";
 import { useCart } from "@/lib/cart/cart-context";
 import { formatXAF } from "@/lib/format";
 import type {
@@ -21,9 +22,11 @@ import {
   useCreateOrder,
   useCreatePayment,
 } from "@/lib/queries/shop/useCheckout";
+import { AuthRequiredModal } from "@/components/AuthRequiredModal";
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const { items, totalAmount, clearCart, isLoaded } = useCart();
 
   const { data: addresses = [], isLoading: isLoadingAddresses } =
@@ -55,6 +58,8 @@ export default function CheckoutPage() {
     message: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalMessage, setAuthModalMessage] = useState<string>();
 
   const { mutate: validateCoupon, isPending: isValidatingCoupon } =
     useValidateCoupon();
@@ -70,6 +75,7 @@ export default function CheckoutPage() {
   const shippingCountry = useNewAddress
     ? newAddress.country
     : (addresses.find((a) => a.id === selectedAddressId)?.country ?? "");
+  const hasShippingAddressInfo = Boolean(shippingCountry.trim());
 
   const { costsByMethodId: shippingCosts, isLoading: isLoadingCosts } =
     useShippingCosts(shippingMethods, totalWeight, shippingCountry);
@@ -81,7 +87,6 @@ export default function CheckoutPage() {
 
   const isLoading = isLoadingAddresses || isLoadingMethods || isLoadingPayments;
 
-  // Pré-sélection de l'adresse par défaut une fois les adresses chargées
   useEffect(() => {
     if (addresses.length === 0) {
       setUseNewAddress(true);
@@ -101,9 +106,6 @@ export default function CheckoutPage() {
 
   const inputClass =
     "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
-
-  // Remplace le calcul inline de shippingAddress par cette fonction,
-  // déclarée au niveau du composant (avant handleSubmit) :
 
   function buildShippingAddress(): OrderAddressInput {
     if (useNewAddress) {
@@ -140,8 +142,22 @@ export default function CheckoutPage() {
     e.preventDefault();
     setError(null);
 
+    if (!user) {
+      setAuthModalMessage("Connectez-vous pour finaliser votre commande.");
+      setShowAuthModal(true);
+      return;
+    }
+
     if (!useNewAddress && !selectedAddressId) {
       setError("Sélectionnez une adresse de livraison.");
+      return;
+    }
+    if (useNewAddress && !hasShippingAddressInfo) {
+      setError("Renseignez votre adresse de livraison.");
+      return;
+    }
+    if (!shippingMethodId) {
+      setError("Sélectionnez une méthode de livraison.");
       return;
     }
     if (!paymentMethod) {
@@ -161,8 +177,8 @@ export default function CheckoutPage() {
         })),
         shippingAddressId: useNewAddress ? undefined : selectedAddressId,
         shippingAddress,
-        shippingMethodId: shippingMethodId || undefined,
-        paymentMethodId: paymentMethod || undefined,
+        shippingMethodId,
+        paymentMethodId: paymentMethod,
         couponCode: couponCode || undefined,
       };
       const order = await createOrder(payload);
@@ -176,18 +192,33 @@ export default function CheckoutPage() {
       clearCart();
       router.push(`/account/orders/${order.id}`);
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
+      if (err instanceof ApiError && err.status === 401) {
+        setAuthModalMessage(
+          "Votre session a expiré. Reconnectez-vous pour finaliser votre commande.",
+        );
+        setShowAuthModal(true);
+      } else {
+        setError(
+          err instanceof ApiError
             ? err.message
-            : "Erreur lors de la création de la commande",
-      );
+            : err instanceof Error
+              ? err.message
+              : "Erreur lors de la création de la commande",
+        );
+      }
       setIsSubmitting(false);
     }
   }
+
   function handleValidateCoupon() {
     if (!couponCode.trim()) return;
+
+    if (!user) {
+      setAuthModalMessage("Connectez-vous pour vérifier un code promo.");
+      setShowAuthModal(true);
+      return;
+    }
+
     setCouponResult(null);
     validateCoupon(couponCode.trim(), {
       onSuccess: (res) => {
@@ -199,6 +230,13 @@ export default function CheckoutPage() {
         });
       },
       onError: (err) => {
+        if (err instanceof ApiError && err.status === 401) {
+          setAuthModalMessage(
+            "Votre session a expiré. Reconnectez-vous pour vérifier ce code promo.",
+          );
+          setShowAuthModal(true);
+          return;
+        }
         setCouponResult({
           valid: false,
           message:
@@ -217,7 +255,7 @@ export default function CheckoutPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="grid grid-cols-1 gap-8 lg:grid-cols-3"
+        className="grid grid-cols-1 items-start gap-8 lg:grid-cols-3"
       >
         <div className="space-y-6 lg:col-span-2">
           {error && (
@@ -322,33 +360,48 @@ export default function CheckoutPage() {
             <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
               <Truck size={16} /> Méthode de livraison
             </h2>
+            {!hasShippingAddressInfo && (
+              <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                Renseignez votre adresse de livraison ci-dessus pour voir le
+                tarif de chaque méthode.
+              </p>
+            )}
             <div className="space-y-2">
               {shippingMethods.map((m) => {
                 const cost = shippingCosts[m.id];
                 return (
                   <label
                     key={m.id}
-                    className="flex items-center justify-between rounded-md border border-gray-200 p-3 text-sm"
+                    className={`flex items-center justify-between rounded-md border border-gray-200 p-3 text-sm ${
+                      !hasShippingAddressInfo ? "opacity-50" : ""
+                    }`}
                   >
                     <span className="flex items-center gap-2">
                       <input
                         type="radio"
+                        disabled={!hasShippingAddressInfo}
                         checked={shippingMethodId === m.id}
                         onChange={() => setShippingMethodId(m.id)}
                       />
                       {m.name} — {m.estimatedDays} jour(s)
                     </span>
-                    {isLoadingCosts ? (
+                    {!hasShippingAddressInfo ? (
+                      <span className="text-xs text-gray-400">
+                        Adresse requise
+                      </span>
+                    ) : isLoadingCosts ? (
                       <Loader2
                         size={14}
                         className="animate-spin text-gray-400"
                       />
-                    ) : cost != null ? (
-                      <span className="text-gray-500">{formatXAF(cost)}</span>
-                    ) : (
+                    ) : cost === 0 ? (
                       <span className="text-xs font-medium text-green-600">
                         Livraison gratuite
                       </span>
+                    ) : cost != null ? (
+                      <span className="text-gray-500">{formatXAF(cost)}</span>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
                     )}
                   </label>
                 );
@@ -388,7 +441,7 @@ export default function CheckoutPage() {
           </section>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
+        <div className="rounded-lg border border-gray-200 bg-white p-5 lg:sticky lg:top-24">
           <h2 className="mb-4 text-sm font-medium">Résumé</h2>
           <div className="max-h-64 space-y-2 overflow-y-auto text-sm">
             {items.map((item) => (
@@ -455,11 +508,13 @@ export default function CheckoutPage() {
             <div className="flex justify-between text-gray-600">
               <span>Livraison</span>
               <span>
-                {shippingMethodId
-                  ? selectedShippingCost > 0
-                    ? formatXAF(selectedShippingCost)
-                    : "Gratuite"
-                  : "—"}
+                {!hasShippingAddressInfo
+                  ? "—"
+                  : shippingMethodId
+                    ? selectedShippingCost > 0
+                      ? formatXAF(selectedShippingCost)
+                      : "Gratuite"
+                    : "—"}
               </span>
             </div>
           </div>
@@ -485,6 +540,12 @@ export default function CheckoutPage() {
           </button>
         </div>
       </form>
+
+      <AuthRequiredModal
+        open={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        message={authModalMessage}
+      />
     </div>
   );
 }

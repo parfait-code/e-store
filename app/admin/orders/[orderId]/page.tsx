@@ -534,16 +534,18 @@ export default function OrderDetailPage() {
                 );
               })}
             </div>
-            <div className="mt-3 flex justify-end border-t border-gray-100 pt-3 text-sm">
-              <div className="text-right">
-                <p className="text-gray-500">
-                  Sous-total : {formatXAF(order.totalAmount)}
-                </p>
-                {order.discountedAmount !== null && (
-                  <p className="font-semibold">
-                    Total : {formatXAF(order.discountedAmount)}
-                  </p>
-                )}
+            <div className="mt-3 space-y-1 border-t border-gray-100 pt-3 text-sm">
+              <div className="flex justify-between text-gray-500">
+                <span>Sous-total</span>
+                <span>{formatXAF(order.totalAmount)}</span>
+              </div>
+              <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold">
+                <span>Total</span>
+                <span>
+                  {order.discountedAmount !== null
+                    ? formatXAF(order.discountedAmount)
+                    : formatXAF(order.totalAmount)}
+                </span>
               </div>
             </div>
             {order.appliedCoupon && (
