@@ -645,7 +645,6 @@ export default function OrderDetailPage() {
   };
   const itemsCount = items.length;
 
-  return (
     return (
     <div className="max-w-5xl">
       <Link
