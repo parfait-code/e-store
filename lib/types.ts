@@ -163,8 +163,6 @@ export interface ProductPricing {
   discountId: string | null;
 }
 
-// --- ProductCombination (chargé via endpoint séparé) ---
-
 export interface CombinationOptionRef {
   id: string;
   value: string;
@@ -211,8 +209,6 @@ export interface CombinationFormInput {
   isActive?: boolean;
 }
 
-// --- Product sans combinaisons (chargées séparément) ---
-
 export interface Product {
   id: string;
   sku: string;
@@ -234,8 +230,6 @@ export interface ProductWithCombinations extends Product {
   combinations: ProductCombination[];
 }
 
-// --- Endpoint séparé pour les combinaisons ---
-
 export interface ProductCombinationsResponse {
   productId: string;
   combinations: ProductCombination[];
@@ -251,7 +245,7 @@ export type PickupRequestStatus =
 export interface PickupRequest {
   id: string;
   userId: string;
-  returnId: string; // toute pickup naît d'un retour APPROVED
+  returnId: string;
   method: PickupCollectionMethod;
   addressId: string | null;
   warehouseId: string | null;
@@ -313,8 +307,6 @@ export type OrderStatus =
   | "CANCELLED"
   | "REFUNDED";
 
-// --- Adresses : recipientName devient requis, postalCode optionnel, ajout phone/addressLine2 ---
-
 export interface Address {
   id: string;
   userId: string;
@@ -325,25 +317,23 @@ export interface Address {
   city: string;
   state: string | null;
   country: string;
-  postalCode: string | null; // était `string` (requis) — maintenant optionnel
+  postalCode: string | null;
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface AddressFormInput {
-  recipientName: string; // NOUVEAU — requis, min 2 caractères
-  phone?: string; // NOUVEAU
+  recipientName: string;
+  phone?: string;
   street: string;
-  addressLine2?: string; // NOUVEAU
+  addressLine2?: string;
   city: string;
   state?: string;
   country: string;
-  postalCode: string | null; // était requis — maintenant optionnel
+  postalCode: string | null;
   isDefault?: boolean;
 }
-
-// --- Commande : shippingAddress suit le même schéma que Address, + billing, + basketId ---
 
 export interface OrderAddressInput {
   recipientName: string;
@@ -374,8 +364,6 @@ export interface InventoryGroupedProduct {
   lines?: InventoryGroupedLine[];
 }
 
-// --- Pickup requests : refonte complète du modèle ---
-
 export type PickupCollectionMethod =
   | "ORIGINAL_ADDRESS"
   | "WAREHOUSE_DROPOFF"
@@ -393,8 +381,6 @@ export interface PickupRequestStatusUpdateInput {
   status: PickupRequestStatus;
   notes?: string;
 }
-
-// --- OrderItem avec support des combinaisons ---
 
 export interface OrderItemCombinationRef {
   id: string;
@@ -423,7 +409,6 @@ export interface OrderItem {
   productSku?: string;
 }
 
-// Remplacer le champ `status: string` de l'interface Payment par :
 export type PaymentStatus =
   | "PENDING"
   | "COMPLETED"
@@ -436,7 +421,7 @@ export interface Payment {
   orderId: string;
   userId: string;
   method: string;
-  status: PaymentStatus; // était `string`
+  status: PaymentStatus;
   amount: number;
   currency: string;
   notes: string | null;
@@ -540,7 +525,6 @@ export interface Promotion {
   isActive: boolean;
   startDate: string;
   endDate: string;
-  // NOUVEAU — nécessaires pour piloter le carrousel hero de la home
   isFeaturedInHero: boolean;
   heroPosition: number | null;
   heroImages: string[];
@@ -602,8 +586,6 @@ export interface WarehouseFormInput {
   location: string;
   capacity?: number;
 }
-
-// --- Inventaire keyé par (productId, combinationId) ---
 
 export interface InventoryItem {
   id: string;
@@ -760,8 +742,6 @@ export interface ShipmentFormInput {
   estimated_delivery_at?: string;
 }
 
-// --- Basket avec support des combinaisons ---
-
 export interface Basket {
   id: string;
   userId: string;
@@ -843,8 +823,6 @@ export interface SignupFormInput {
   phone?: string;
 }
 
-// --- Cart local avec combinationId ---
-
 export interface CartCombinationValue {
   name: string;
   value: string;
@@ -889,8 +867,6 @@ export interface AddressFormInput {
   postalCode: string | null;
   isDefault?: boolean;
 }
-
-// --- Wishlist avec combinationId ---
 
 export interface WishlistItem {
   id: string;
@@ -940,11 +916,9 @@ export type PaymentMethodType =
   | "STRIPE"
   | "CINETPAY";
 
-// --- OrderCreateInput avec combinationId ---
-
 export interface OrderCreateInput {
   items?: { id: string; combinationId?: string; quantity: number }[];
-  basketId?: string; // alternative à `items`
+  basketId?: string;
   shippingAddressId?: string;
   shippingAddress: OrderAddressInput;
   billingAddressId?: string;
@@ -1001,7 +975,7 @@ export interface AddressValidateInput {
   city: string;
   state?: string;
   country: string;
-  postalCode?: string; // était `postal_code` (snake_case) — le body /address/validate est en camelCase maintenant
+  postalCode?: string;
 }
 
 export interface AddressValidateResponse {
@@ -1030,7 +1004,7 @@ export type SettingType = "STRING" | "NUMBER" | "BOOLEAN" | "JSON";
 export interface Setting {
   id: string;
   key: string;
-  value: string; // toujours une string en base, y compris pour JSON (à parser)
+  value: string;
   type: SettingType;
   category: string;
   description: string | null;
@@ -1039,6 +1013,7 @@ export interface Setting {
   createdAt: string;
   updatedAt: string;
 }
+
 export type PopupTargetType =
   | "PROMOTION"
   | "CATEGORY"
@@ -1049,7 +1024,49 @@ export type PopupTargetType =
 export type PopupDisplayFrequency =
   | "ONCE_PER_SESSION"
   | "ONCE_PER_DAY"
+  | "ONCE_EVER"
   | "ALWAYS";
+
+export type PopupAudience = "ALL" | "GUEST_ONLY" | "AUTHENTICATED_ONLY";
+
+export interface Popup {
+  id: string;
+  title: string;
+  imageUrl: string | null;
+  message: string | null;
+  isActive: boolean;
+  startDate: string | null;
+  endDate: string | null;
+  targetType: PopupTargetType;
+  targetId: string | null;
+  externalUrl: string | null;
+  ctaLabel: string | null;
+  displayFrequency: PopupDisplayFrequency;
+  audience: PopupAudience;
+  priority: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PopupWithResolvedUrl extends Popup {
+  resolvedUrl: string | null;
+}
+
+export interface PopupFormInput {
+  title: string;
+  imageUrl?: string;
+  message?: string;
+  isActive?: boolean;
+  startDate?: string;
+  endDate?: string;
+  targetType: PopupTargetType;
+  targetId?: string;
+  externalUrl?: string;
+  ctaLabel?: string;
+  displayFrequency?: PopupDisplayFrequency;
+  audience?: PopupAudience;
+  priority?: number;
+}
 
 export interface Popup {
   id: string;

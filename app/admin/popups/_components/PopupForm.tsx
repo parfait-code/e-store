@@ -9,6 +9,7 @@ import type {
   PopupFormInput,
   PopupTargetType,
   PopupDisplayFrequency,
+  PopupAudience,
   Product,
   Paginated,
 } from "@/lib/types";
@@ -58,7 +59,14 @@ const TARGET_LABELS: Record<PopupTargetType, string> = {
 const FREQUENCY_LABELS: Record<PopupDisplayFrequency, string> = {
   ONCE_PER_SESSION: "Une fois par session",
   ONCE_PER_DAY: "Une fois par jour",
+  ONCE_EVER: "Une seule fois (à vie)",
   ALWAYS: "À chaque visite",
+};
+
+const AUDIENCE_LABELS: Record<PopupAudience, string> = {
+  ALL: "Tous les visiteurs",
+  GUEST_ONLY: "Visiteurs non connectés uniquement",
+  AUTHENTICATED_ONLY: "Utilisateurs connectés uniquement",
 };
 
 function toDateTimeLocal(iso: string | null | undefined) {
@@ -187,6 +195,7 @@ export function PopupForm({
     externalUrl: initialPopup?.externalUrl ?? "",
     ctaLabel: initialPopup?.ctaLabel ?? "",
     displayFrequency: initialPopup?.displayFrequency ?? "ONCE_PER_SESSION",
+    audience: initialPopup?.audience ?? "ALL",
     priority: initialPopup?.priority ?? 0,
   });
   const [error, setError] = useState<string | null>(null);
@@ -450,6 +459,28 @@ export function PopupForm({
             className={inputClass}
           />
         </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium">Audience cible</label>
+        <select
+          value={form.audience}
+          onChange={(e) => update("audience", e.target.value as PopupAudience)}
+          className={inputClass}
+        >
+          {Object.entries(AUDIENCE_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        {form.audience !== "ALL" && (
+          <p className="mt-1 text-xs text-gray-400">
+            {form.audience === "GUEST_ONLY"
+              ? "Ce popup ne sera jamais montré à un utilisateur déjà connecté."
+              : "Ce popup ne sera montré qu'aux utilisateurs connectés."}
+          </p>
+        )}
       </div>
 
       <label className="flex items-center gap-2 text-sm font-medium">

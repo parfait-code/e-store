@@ -4,7 +4,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
-import { useActivePopups } from "@/lib/queries/shop/usePopups";
+import {
+  useActivePopups,
+  useMarkPopupSeen,
+} from "@/lib/queries/shop/usePopups";
+import { useAuth } from "@/lib/auth/auth-context";
 import { hasBeenSeen, markAsSeen } from "@/lib/popups/storage";
 import type { PopupWithResolvedUrl } from "@/lib/types";
 
@@ -13,22 +17,34 @@ function isInternalUrl(url: string) {
 }
 
 export function PopupDisplay() {
+  const { user } = useAuth();
   const { data: popups = [] } = useActivePopups();
+  const { mutate: markSeen } = useMarkPopupSeen();
   const [popupToShow, setPopupToShow] = useState<PopupWithResolvedUrl | null>(
     null,
   );
 
   useEffect(() => {
     if (popups.length === 0) return;
-    // L'API trie déjà par priorité décroissante puis createdAt décroissant —
-    // on prend le premier qui n'a pas déjà été vu selon sa fréquence.
-    const next = popups.find((p) => !hasBeenSeen(p.id, p.displayFrequency));
-    if (next) {
-      setPopupToShow(next);
-      markAsSeen(next.id, next.displayFrequency);
+
+    const audienceMatched = popups.filter((p) => {
+      if (p.audience === "GUEST_ONLY") return !user;
+      if (p.audience === "AUTHENTICATED_ONLY") return Boolean(user);
+      return true;
+    });
+
+    const next = audienceMatched.find(
+      (p) => !hasBeenSeen(p.id, p.displayFrequency),
+    );
+    if (!next) return;
+
+    setPopupToShow(next);
+    markAsSeen(next.id, next.displayFrequency);
+    if (user && next.displayFrequency === "ONCE_EVER") {
+      markSeen(next.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [popups]);
+  }, [popups, user]);
 
   if (!popupToShow) return null;
 
