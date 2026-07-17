@@ -65,8 +65,19 @@ export const queryKeys = {
       ["admin", "inventory", "list", page] as const,
     inventoryGrouped: (params: Record<string, unknown>) =>
       ["admin", "inventory", "grouped", params] as const,
-    inventoryGroupedDetail: (productId: string, page: number) =>
-      ["admin", "inventory", "grouped", productId, page] as const,
+    inventoryGroupedDetail: (
+      productId: string,
+      page: number,
+      warehouseId?: string,
+    ) =>
+      [
+        "admin",
+        "inventory",
+        "grouped",
+        productId,
+        page,
+        warehouseId ?? "all",
+      ] as const,
     inventorySearch: (keyword: string) =>
       ["admin", "inventory", "search", keyword] as const,
     productCombinations: (productId: number | string) =>

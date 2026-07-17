@@ -31,13 +31,13 @@ export const adminInventoryApi = {
     );
   },
 
-  // Remplace lowStock()/outOfStock() — vue groupée par produit
   grouped: (
     params: {
       page?: number;
       limit?: number;
       lowStock?: boolean;
       outOfStock?: boolean;
+      warehouseId?: string;
     } = {},
   ) => {
     const qs = new URLSearchParams();
@@ -45,16 +45,27 @@ export const adminInventoryApi = {
     qs.set("limit", String(params.limit ?? 20));
     if (params.lowStock) qs.set("low_stock", "true");
     if (params.outOfStock) qs.set("out_of_stock", "true");
+    if (params.warehouseId) qs.set("warehouse_id", params.warehouseId);
     return apiClient.get<Paginated<InventoryGroupedProduct>>(
       `/inventory/grouped?${qs.toString()}`,
     );
   },
 
-  // Détail par combinaison × entrepôt pour un produit, paginé
-  groupedDetail: (productId: string, page = 1, limit = 50) =>
-    apiClient.get<Paginated<InventoryItem>>(
-      `/inventory/grouped/${productId}?page=${page}&limit=${limit}`,
-    ),
+  groupedDetail: (
+    productId: string,
+    page = 1,
+    limit = 50,
+    warehouseId?: string,
+  ) => {
+    const qs = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+    if (warehouseId) qs.set("warehouse_id", warehouseId);
+    return apiClient.get<Paginated<InventoryItem>>(
+      `/inventory/grouped/${productId}?${qs.toString()}`,
+    );
+  },
 
   byId: (itemId: string) =>
     apiClient.get<InventoryItem>(`/inventory/${itemId}`),

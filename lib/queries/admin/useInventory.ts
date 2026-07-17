@@ -9,9 +9,6 @@ import {
 import { queryKeys } from "@/lib/queries/keys";
 import type { InventoryFormInput, InventoryTransferInput } from "@/lib/types";
 
-// Invalide toutes les vues d'inventaire d'un coup (liste, low-stock,
-// out-of-stock, recherche) — elles pointent vers la même donnée sous-jacente
-// mais avec des query keys différentes, donc pas de clé unique à cibler.
 function invalidateAllInventoryViews(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({
     predicate: (q) =>
@@ -31,6 +28,7 @@ export function useAdminInventoryGrouped(params: {
   page: number;
   lowStock?: boolean;
   outOfStock?: boolean;
+  warehouseId?: string;
 }) {
   return useQuery({
     queryKey: queryKeys.admin.inventoryGrouped(params),
@@ -39,17 +37,19 @@ export function useAdminInventoryGrouped(params: {
   });
 }
 
-// productId est désormais un string (Product.id: string) — le fallback
-// utilisait "0" (number) auparavant ; on bascule sur "" pour rester cohérent
-// avec le typage string partout, `enabled` empêche de toute façon l'appel
-// tant que productId est null.
 export function useAdminInventoryGroupedDetail(
   productId: string | null,
   page: number,
+  warehouseId?: string,
 ) {
   return useQuery({
-    queryKey: queryKeys.admin.inventoryGroupedDetail(productId ?? "", page),
-    queryFn: () => adminInventoryApi.groupedDetail(productId!, page),
+    queryKey: queryKeys.admin.inventoryGroupedDetail(
+      productId ?? "",
+      page,
+      warehouseId,
+    ),
+    queryFn: () =>
+      adminInventoryApi.groupedDetail(productId!, page, 50, warehouseId),
     enabled: productId !== null,
   });
 }
