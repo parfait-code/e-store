@@ -2,7 +2,6 @@
 import type { Metadata } from "next";
 import { Truck, ShieldCheck, RotateCcw, HeadphonesIcon } from "lucide-react";
 import {
-  PromotionsSection,
   CategoriesSection,
   CatalogPreviewSection,
   NewArrivalsSection,
@@ -61,7 +60,6 @@ export default function HomePage() {
         ))}
       </section>
 
-      <PromotionsSection />
       <NewArrivalsSection />
       <CategoriesSection />
       <PromotionProductsSection />

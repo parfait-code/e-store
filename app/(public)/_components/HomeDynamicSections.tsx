@@ -15,10 +15,6 @@ import {
   useActivePromotions,
   usePromotionProductsBySlug,
 } from "@/lib/queries/shop/usePromotions";
-import { useQueries } from "@tanstack/react-query";
-import { shopPromotionsApi } from "@/lib/api/shop/promotions";
-import { queryKeys } from "@/lib/queries/keys";
-import { PromotionsCarousel } from "./PromotionsCarousel";
 
 const AVATAR_COLORS = [
   "bg-rose-50 text-rose-600",
