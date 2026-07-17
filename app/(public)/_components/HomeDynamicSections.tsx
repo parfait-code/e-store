@@ -15,6 +15,9 @@ import {
   useActivePromotions,
   usePromotionProductsBySlug,
 } from "@/lib/queries/shop/usePromotions";
+import { useQueries } from "@tanstack/react-query";
+import { shopPromotionsApi } from "@/lib/api/shop/promotions";
+import { queryKeys } from "@/lib/queries/keys";
 import { PromotionsCarousel } from "./PromotionsCarousel";
 
 const AVATAR_COLORS = [
@@ -54,42 +57,70 @@ function SkeletonGrid({
   );
 }
 
-export function PromotionsSection() {
-  const { data: heroData, isLoading: isLoadingHero } = useActivePromotions({
-    slot: "hero",
-    limit: 5,
+export function PromotionProductsSection() {
+  const { data } = useActivePromotions({ limit: 10 });
+  const candidates = (data?.items ?? []).filter((p) => p.discounts.length > 0);
+
+  const productsQueries = useQueries({
+    queries: candidates.map((p) => ({
+      queryKey: queryKeys.shop.promotionProductsBySlug(p.slug),
+      queryFn: () => shopPromotionsApi.productsBySlug(p.slug),
+      retry: false,
+    })),
   });
-  const { data, isLoading, isError } = useActivePromotions();
 
-  const heroIds = new Set((heroData?.items ?? []).map((p) => p.id));
-  const safePromotions = (data?.items ?? []).filter((p) => !heroIds.has(p.id));
-  const isLoadingAny = isLoading || isLoadingHero;
+  const isLoading = productsQueries.some((q) => q.isLoading);
 
-  if (isError) {
-    return (
-      <section>
-        <h2 className="mb-4 text-xl font-semibold">Promotions en cours</h2>
-        <SectionError message="Impossible de charger les promotions pour le moment." />
-      </section>
-    );
+  let promotion: (typeof candidates)[number] | undefined;
+  let products: Awaited
+    ReturnType<typeof shopPromotionsApi.productsBySlug>
+  >["products"] = [];
+
+  for (let i = 0; i < candidates.length; i++) {
+    const q = productsQueries[i];
+    if (q.data && q.data.products.length > 0) {
+      promotion = candidates[i];
+      products = q.data.products;
+      break;
+    }
   }
 
-  if (isLoadingAny || safePromotions.length === 0) return null;
+  const countdown = useCountdown(promotion?.endDate);
+
+  if (!promotion) {
+    if (isLoading && candidates.length > 0) {
+      return (
+        <section>
+          <h2 className="mb-4 text-xl font-semibold">Offres du moment</h2>
+          <ProductGrid products={[]} isLoading />
+        </section>
+      );
+    }
+    return null;
+  }
 
   return (
     <section>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Promotions en cours</h2>
-        {safePromotions.length > 2 && (
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold">{promotion.name}</h2>
           <Link
-            href="/promotions"
-            className="flex items-center gap-1 text-sm font-medium text-gray-900 hover:underline"
+            href={`/promotions/${promotion.slug}`}
+            className="mt-1 flex items-center gap-1 text-sm font-medium text-gray-900 hover:underline"
           >
-            Voir tout <ArrowRight size={14} />
+            Voir la promotion <ArrowRight size={14} />
           </Link>
+        </div>
+        {countdown && (
+          <div className="flex items-center gap-2">
+            <CountdownBlock value={countdown.days} label="jours" />
+            <CountdownBlock value={countdown.hours} label="heures" />
+            <CountdownBlock value={countdown.minutes} label="min" />
+            <CountdownBlock value={countdown.seconds} label="sec" />
+          </div>
         )}
       </div>
-      <PromotionsCarousel promotions={safePromotions} />
+      <ProductGrid products={products} isLoading={isLoading} />
     </section>
   );
 }

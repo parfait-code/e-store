@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { ImageOff, ShoppingCart, Heart, Check, Loader2 } from "lucide-react";
 import { PriceDisplay } from "./PriceDisplay";
 import { WishlistLoginPromptModal } from "./WishlistLoginPromptModal";
+import { AuthRequiredModal } from "./AuthRequiredModal";
 import { useCart } from "@/lib/cart/cart-context";
 import { useWishlist } from "@/lib/wishlist/wishlist-context";
 import { shopCatalogApi } from "@/lib/api/shop/catalog";
@@ -35,6 +36,8 @@ export function ProductCard({ product }: { product: Product }) {
   const [isCheckingVariants, setIsCheckingVariants] = useState(false);
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showAuthExpiredModal, setShowAuthExpiredModal] = useState(false);
+  const [wishlistError, setWishlistError] = useState<string | null>(null);
 
   async function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
@@ -43,10 +46,6 @@ export function ProductCard({ product }: { product: Product }) {
 
     setIsCheckingVariants(true);
     try {
-      // Un produit avec des combinaisons actives (taille, couleur...) ne peut
-      // pas être ajouté "en un clic" sans que le client choisisse une
-      // variante — on vérifie donc avant d'ajouter, et on redirige vers la
-      // fiche produit si un choix est nécessaire.
       const combinations = await shopCatalogApi.combinations(product.id);
       const requiresChoice = combinations.some((c) => c.isActive);
 
@@ -69,9 +68,6 @@ export function ProductCard({ product }: { product: Product }) {
       setJustAddedToCart(true);
       setTimeout(() => setJustAddedToCart(false), 1500);
     } catch {
-      // En cas d'erreur réseau sur la vérification, on ne bloque pas
-      // l'utilisateur mais on l'envoie sur la fiche produit par prudence
-      // plutôt que de risquer un ajout incorrect.
       router.push(`/products/${product.id}`);
     } finally {
       setIsCheckingVariants(false);
@@ -84,15 +80,21 @@ export function ProductCard({ product }: { product: Product }) {
     if (isTogglingWishlist) return;
 
     setIsTogglingWishlist(true);
+    setWishlistError(null);
     try {
       const { added, requiresLogin } = await toggle(product.id);
       if (added && requiresLogin) setShowLoginPrompt(true);
     } catch (err) {
-      alert(
-        err instanceof ApiError
-          ? err.message
-          : "Une erreur est survenue lors de la mise à jour des favoris.",
-      );
+      if (err instanceof ApiError && err.status === 401) {
+        setShowAuthExpiredModal(true);
+      } else {
+        setWishlistError(
+          err instanceof ApiError
+            ? err.message
+            : "Une erreur est survenue lors de la mise à jour des favoris.",
+        );
+        setTimeout(() => setWishlistError(null), 3000);
+      }
     } finally {
       setIsTogglingWishlist(false);
     }
@@ -119,7 +121,6 @@ export function ProductCard({ product }: { product: Product }) {
             </div>
           )}
 
-          {/* Un seul badge de remise, plus de doublon près du prix */}
           <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
             {product.pricing?.hasDiscount && (
               <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">
@@ -150,6 +151,12 @@ export function ProductCard({ product }: { product: Product }) {
               />
             )}
           </button>
+
+          {wishlistError && (
+            <span className="absolute right-2 top-12 max-w-[85%] rounded-md bg-red-600 px-2 py-1 text-[10px] font-medium text-white shadow-sm">
+              {wishlistError}
+            </span>
+          )}
         </Link>
 
         <div className="flex flex-1 flex-col gap-1 p-3">
@@ -195,6 +202,12 @@ export function ProductCard({ product }: { product: Product }) {
       <WishlistLoginPromptModal
         open={showLoginPrompt}
         onClose={() => setShowLoginPrompt(false)}
+      />
+
+      <AuthRequiredModal
+        open={showAuthExpiredModal}
+        onClose={() => setShowAuthExpiredModal(false)}
+        message="Votre session a expiré. Connectez-vous pour ajouter ce produit à vos favoris."
       />
     </>
   );

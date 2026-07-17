@@ -16,6 +16,11 @@ const NAV_ITEMS = [
   { href: "/account/wishlist", label: "Liste de souhaits", icon: Heart },
 ];
 
+function isNavActive(pathname: string, href: string) {
+  if (href === "/account") return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function AccountLayout({
   children,
 }: {
@@ -49,10 +54,9 @@ export default function AccountLayout({
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-4 lg:gap-8">
           <aside className="lg:col-span-1">
-            {/* Mobile / tablette : tabs horizontales scrollables */}
             <nav className="-mx-4 mb-2 flex gap-2 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 lg:hidden">
               {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-                const active = pathname === href;
+                const active = isNavActive(pathname, href);
                 return (
                   <Link
                     key={href}
@@ -70,10 +74,9 @@ export default function AccountLayout({
               })}
             </nav>
 
-            {/* Desktop : sidebar verticale sticky */}
             <nav className="sticky top-20 hidden space-y-1 rounded-lg border border-gray-200 bg-white p-3 lg:block">
               {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-                const active = pathname === href;
+                const active = isNavActive(pathname, href);
                 return (
                   <Link
                     key={href}

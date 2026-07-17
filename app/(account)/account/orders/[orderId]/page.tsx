@@ -646,6 +646,7 @@ export default function OrderDetailPage() {
   const itemsCount = items.length;
 
   return (
+    return (
     <div className="max-w-5xl">
       <Link
         href="/account/orders"
@@ -681,6 +682,31 @@ export default function OrderDetailPage() {
             isCancelling={isCancelling}
           />
         </div>
+      </div>
+
+      {/* Détails déplacée en tête de page, avant les Articles */}
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 text-sm">
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-medium">
+          <Calendar size={16} /> Détails
+        </h2>
+        <dl className="space-y-1.5 text-gray-600">
+          <div className="flex justify-between">
+            <dt className="text-gray-400">Numéro</dt>
+            <dd className="font-mono text-xs">{order.id}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-gray-400">Date</dt>
+            <dd>{formatDate(order.createdAt)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-gray-400">Statut</dt>
+            <dd
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status]}`}
+            >
+              {STATUS_LABELS[order.status]}
+            </dd>
+          </div>
+        </dl>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -868,30 +894,6 @@ export default function OrderDetailPage() {
               </p>
             </div>
           )}
-
-          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
-            <h2 className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <Calendar size={16} /> Détails
-            </h2>
-            <dl className="space-y-1.5 text-gray-600">
-              <div className="flex justify-between">
-                <dt className="text-gray-400">Numéro</dt>
-                <dd className="font-mono text-xs">{order.id}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-400">Date</dt>
-                <dd>{formatDate(order.createdAt)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-400">Statut</dt>
-                <dd
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status]}`}
-                >
-                  {STATUS_LABELS[order.status]}
-                </dd>
-              </div>
-            </dl>
-          </div>
         </div>
       </div>
 
