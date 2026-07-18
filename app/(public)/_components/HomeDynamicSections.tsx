@@ -1,11 +1,13 @@
 // app/(public)/_components/HomeDynamicSections.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { ProductGrid } from "@/components/ProductGrid";
+import { ProductCard } from "@/components/ProductCard";
+import type { Product } from "@/lib/types";
 import {
   useCategories,
   useProducts,
@@ -133,8 +135,6 @@ export function CategoriesSection() {
   );
 }
 
-// --- Countdown pour la section "produits d'une promotion" ---
-
 interface CountdownValue {
   days: number;
   hours: number;
@@ -240,13 +240,75 @@ export function CatalogPreviewSection() {
       {isError ? (
         <SectionError message="Impossible de charger les produits pour le moment." />
       ) : (
-        <ProductGrid
-          products={products}
-          isLoading={isLoading}
-          emptyMessage="Aucun produit à afficher pour le moment."
-        />
+        <>
+          <ProductGrid
+            products={products}
+            isLoading={isLoading}
+            emptyMessage="Aucun produit à afficher pour le moment."
+          />
+          {!isLoading && products.length > 0 && (
+            <div className="mt-6 flex justify-center">
+              <Link
+                href="/products"
+                className="flex items-center gap-2 rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
+              >
+                Voir tous les produits <ArrowRight size={16} />
+              </Link>
+            </div>
+          )}
+        </>
       )}
     </section>
+  );
+}
+
+function NewArrivalsCarousel({ products }: { products: Product[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  function scrollByOneCard(direction: 1 | -1) {
+    const container = scrollRef.current;
+    if (!container) return;
+    const firstCard = container.firstElementChild as HTMLElement | null;
+    if (!firstCard) return;
+    const style = window.getComputedStyle(container);
+    const gap = parseFloat(style.columnGap || style.gap || "16") || 16;
+    const amount = firstCard.offsetWidth + gap;
+    container.scrollBy({ left: direction * amount, behavior: "smooth" });
+  }
+
+  return (
+    <div className="relative">
+      <div
+        ref={scrollRef}
+        className="flex gap-4 overflow-x-auto scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {products.map((p) => (
+          <div
+            key={p.id}
+            className="w-[calc(50%-8px)] shrink-0 sm:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)]"
+          >
+            <ProductCard product={p} />
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => scrollByOneCard(-1)}
+        aria-label="Produit précédent"
+        className="absolute left-0 top-1/3 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white p-2 text-gray-700 shadow-md hover:bg-gray-50"
+      >
+        <ChevronLeft size={18} />
+      </button>
+      <button
+        type="button"
+        onClick={() => scrollByOneCard(1)}
+        aria-label="Produit suivant"
+        className="absolute right-0 top-1/3 flex translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white p-2 text-gray-700 shadow-md hover:bg-gray-50"
+      >
+        <ChevronRight size={18} />
+      </button>
+    </div>
   );
 }
 
@@ -270,7 +332,15 @@ export function NewArrivalsSection() {
           Voir tout <ArrowRight size={14} />
         </Link>
       </div>
-      <ProductGrid products={products} isLoading={isLoading} />
+
+      {isLoading ? (
+        <SkeletonGrid
+          count={4}
+          className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+        />
+      ) : (
+        <NewArrivalsCarousel products={products} />
+      )}
     </section>
   );
 }

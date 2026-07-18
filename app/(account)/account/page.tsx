@@ -15,7 +15,6 @@ import {
   Coins,
   Mail,
   Phone,
-  ShieldCheck,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -29,18 +28,9 @@ import {
 } from "@/lib/queries/shop/useCheckout";
 import { useMyLoyaltyBalance } from "@/lib/queries/shop/useLoyalty";
 
-const ROLE_LABELS: Record<string, string> = {
-  USER: "Client",
-  ADMIN: "Administrateur",
-  MANAGER: "Manager",
-  SUPPORT: "Support",
-};
-
 function initials(user: User) {
   return `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase();
 }
-
-/* ---------------- Hero / carte profil ---------------- */
 
 function ProfileHero({
   user,
@@ -64,9 +54,6 @@ function ProfileHero({
             {initials(user)}
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-white/60">
-              {ROLE_LABELS[user.role] ?? user.role}
-            </p>
             <h1 className="text-xl font-semibold sm:text-2xl">
               {user.firstName} {user.lastName}
             </h1>
@@ -97,8 +84,6 @@ function ProfileHero({
     </div>
   );
 }
-
-/* ---------------- Carte "Informations personnelles" ---------------- */
 
 function ProfileInfoCard({
   user,
@@ -253,19 +238,11 @@ function ProfileInfoCard({
               {user.phone ?? "Non renseigné"}
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            <ShieldCheck size={15} className="shrink-0 text-gray-400" />
-            <span className="text-gray-700">
-              {ROLE_LABELS[user.role] ?? user.role}
-            </span>
-          </div>
         </dl>
       )}
     </div>
   );
 }
-
-/* ---------------- Formulaire d'adresse (create/edit inline) ---------------- */
 
 function AddressForm({
   initial,
@@ -484,8 +461,6 @@ function AddressForm({
   );
 }
 
-/* ---------------- Skeleton pour les adresses ---------------- */
-
 function AddressCardSkeleton() {
   return (
     <div className="animate-pulse rounded-xl border border-gray-200 p-4">
@@ -495,8 +470,6 @@ function AddressCardSkeleton() {
     </div>
   );
 }
-
-/* ---------------- Carte "Adresses" ---------------- */
 
 function AddressesCard() {
   const { data: addresses = [], isLoading, isError } = useAddresses();
@@ -644,8 +617,6 @@ function EditAddressRow({
     />
   );
 }
-
-/* ---------------- Page principale ---------------- */
 
 export default function AccountPage() {
   const { user, logout, updateUser } = useAuth();
