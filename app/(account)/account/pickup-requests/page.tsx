@@ -3,7 +3,6 @@
 
 import Link from "next/link";
 import {
-  Loader2,
   Truck,
   MapPin,
   Calendar,
@@ -29,6 +28,21 @@ const STATUS_LABELS: Record<PickupRequestStatus, string> = {
   EXPIRED: "Expirée",
 };
 
+function PickupRequestRowSkeleton() {
+  return (
+    <div className="flex items-center justify-between px-4 py-3">
+      <div>
+        <div className="flex items-center gap-2">
+          <div className="h-3.5 w-3.5 animate-pulse rounded bg-gray-200" />
+          <div className="h-4 w-40 animate-pulse rounded bg-gray-200" />
+        </div>
+        <div className="mt-1.5 h-3 w-28 animate-pulse rounded bg-gray-100" />
+      </div>
+      <div className="h-6 w-20 animate-pulse rounded-full bg-gray-200" />
+    </div>
+  );
+}
+
 export default function PickupRequestsPage() {
   const { data: requests = [], isLoading, isError } = useMyPickupRequests();
 
@@ -48,7 +62,11 @@ export default function PickupRequestsPage() {
       )}
 
       {isLoading ? (
-        <Loader2 size={20} className="animate-spin text-gray-400" />
+        <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <PickupRequestRowSkeleton key={i} />
+          ))}
+        </div>
       ) : requests.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-gray-400">
           <Truck size={32} />
