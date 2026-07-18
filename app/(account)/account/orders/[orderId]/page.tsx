@@ -70,8 +70,6 @@ const CANCELLABLE_STATUSES: OrderStatus[] = [
   "PROCESSING",
 ];
 
-/* ---------------- Menu "Plus d'actions" ---------------- */
-
 function OrderActionsMenu({
   order,
   onCancel,
@@ -131,8 +129,6 @@ function OrderActionsMenu({
     </div>
   );
 }
-
-/* ---------------- Avis produit ---------------- */
 
 function ReviewForm({
   orderItemId,
@@ -246,8 +242,6 @@ function ReviewForm({
     </form>
   );
 }
-
-/* ---------------- Demande de retour ---------------- */
 
 function ReturnRequestForm({
   order,
@@ -365,7 +359,6 @@ function ReturnRequestForm({
   );
 }
 
-/* ---------------- Ligne d'article détaillée ---------------- */
 function OrderItemRow({
   item,
   order,
@@ -395,6 +388,8 @@ function OrderItemRow({
     item.product?.name ?? item.productName ?? "Produit supprimé";
   const productSku =
     item.combination?.sku ?? item.product?.sku ?? item.productSku ?? "—";
+  // `images` n'est pas systématiquement renvoyé sur cet endpoint — repli
+  // silencieux sur l'état "pas d'image" plutôt qu'un crash.
   const image = item.product?.images?.[0]?.url;
 
   let variantEntries: [string, string][] = [];
@@ -411,6 +406,7 @@ function OrderItemRow({
   }
 
   const hasDiscount = item.discountAmount > 0;
+  const promotionName = item.discountSnapshot?.promotionName;
 
   return (
     <div className="py-4">
@@ -475,6 +471,12 @@ function OrderItemRow({
               )}
             </span>
           </div>
+
+          {hasDiscount && promotionName && (
+            <p className="mt-1 flex items-center gap-1 text-xs text-green-600">
+              <Tag size={10} /> Remise « {promotionName} »
+            </p>
+          )}
         </div>
       </div>
 
@@ -534,6 +536,15 @@ function OrderDetailSkeleton() {
         <div className="h-7 w-28 rounded-full bg-gray-200" />
       </div>
 
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
+        <div className="mb-3 h-4 w-20 rounded bg-gray-200" />
+        <div className="space-y-2">
+          <div className="h-3 w-full rounded bg-gray-100" />
+          <div className="h-3 w-full rounded bg-gray-100" />
+          <div className="h-3 w-2/3 rounded bg-gray-100" />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -550,6 +561,11 @@ function OrderDetailSkeleton() {
                 </div>
               ))}
             </div>
+            <div className="mt-4 space-y-2 border-t border-gray-100 pt-3">
+              <div className="h-3 w-full rounded bg-gray-100" />
+              <div className="h-3 w-full rounded bg-gray-100" />
+              <div className="h-4 w-2/3 rounded bg-gray-200" />
+            </div>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-4">
             <div className="mb-3 h-4 w-24 rounded bg-gray-200" />
@@ -563,8 +579,8 @@ function OrderDetailSkeleton() {
             <div className="h-16 w-full rounded bg-gray-100" />
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <div className="mb-3 h-4 w-24 rounded bg-gray-200" />
-            <div className="h-20 w-full rounded bg-gray-100" />
+            <div className="mb-3 h-4 w-32 rounded bg-gray-200" />
+            <div className="h-14 w-full rounded bg-gray-100" />
           </div>
         </div>
       </div>
@@ -645,7 +661,22 @@ export default function OrderDetailPage() {
   };
   const itemsCount = items.length;
 
-    return (
+  const shippingCost = order.shippingCost ?? 0;
+  const productsSubtotal = order.totalAmount - shippingCost;
+  const hasSavings =
+    order.discountedAmount !== null && order.discountedAmount > 0;
+
+  const shippingMethodName =
+    order.shippingMethodSnapshot?.name ?? order.shippingMethod?.name;
+  const shippingMethodDays =
+    order.shippingMethodSnapshot?.estimatedDays ??
+    order.shippingMethod?.estimatedDays;
+
+  const couponCode = order.couponSnapshot?.code ?? order.appliedCoupon?.code;
+  const couponPromotionName =
+    order.couponSnapshot?.promotionName ?? order.appliedCoupon?.promotion.name;
+
+  return (
     <div className="max-w-5xl">
       <Link
         href="/account/orders"
@@ -664,9 +695,6 @@ export default function OrderDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
-            {STATUS_LABELS[order.status]}
-          </span>
           {canReturn && (
             <button
               onClick={() => setShowReturnForm(true)}
@@ -683,7 +711,6 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Détails déplacée en tête de page, avant les Articles */}
       <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 text-sm">
         <h2 className="mb-2 flex items-center gap-2 text-sm font-medium">
           <Calendar size={16} /> Détails
@@ -742,27 +769,34 @@ export default function OrderDetailPage() {
 
             <div className="mt-3 space-y-1 border-t border-gray-100 pt-3 text-sm">
               <div className="flex justify-between text-gray-500">
-                <span>Sous-total</span>
-                <span>{formatXAF(order.totalAmount)}</span>
+                <span>Sous-total produits</span>
+                <span>{formatXAF(productsSubtotal)}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span>
+                  Livraison
+                  {shippingMethodName ? ` (${shippingMethodName})` : ""}
+                </span>
+                <span>{formatXAF(shippingCost)}</span>
               </div>
               <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold">
-                <span>Total</span>
-                <span>
-                  {order.discountedAmount !== null
-                    ? formatXAF(order.discountedAmount)
-                    : formatXAF(order.totalAmount)}
-                </span>
+                <span>Total payé</span>
+                <span>{formatXAF(order.totalAmount)}</span>
               </div>
+              {hasSavings && (
+                <p className="pt-1 text-xs text-green-600">
+                  Vous avez économisé {formatXAF(order.discountedAmount!)} sur
+                  cette commande.
+                </p>
+              )}
             </div>
 
-            {order.appliedCoupon && (
+            {couponCode && (
               <p className="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
                 <Tag size={12} />
                 Coupon appliqué :{" "}
-                <span className="font-medium">
-                  {order.appliedCoupon.code}
-                </span>{" "}
-                ({order.appliedCoupon.promotion.name})
+                <span className="font-medium">{couponCode}</span>{" "}
+                {couponPromotionName && `(${couponPromotionName})`}
               </p>
             )}
           </div>
@@ -882,14 +916,23 @@ export default function OrderDetailPage() {
             </p>
           </div>
 
-          {order.shippingMethod && (
+          {(shippingMethodName || shippingCost > 0) && (
             <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
               <h2 className="mb-2 flex items-center gap-2 text-sm font-medium">
                 <Truck size={16} /> Méthode de livraison
               </h2>
-              <p className="text-gray-600">{order.shippingMethod.name}</p>
-              <p className="text-xs text-gray-400">
-                Délai estimé : {order.shippingMethod.estimatedDays} jour(s)
+              {shippingMethodName && (
+                <p className="text-gray-600">{shippingMethodName}</p>
+              )}
+              {shippingMethodDays !== undefined && (
+                <p className="text-xs text-gray-400">
+                  Délai estimé : {shippingMethodDays} jour(s)
+                </p>
+              )}
+              <p className="mt-1 text-xs text-gray-400">
+                Coût de livraison : {formatXAF(shippingCost)}
+                {order.shippingMethodSnapshot &&
+                  ` (poids facturé : ${order.shippingMethodSnapshot.weightUsed} kg)`}
               </p>
             </div>
           )}

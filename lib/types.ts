@@ -398,12 +398,14 @@ export interface OrderItem {
   price: number;
   originalPrice: number;
   discountAmount: number;
+  discountSnapshot: OrderItemDiscountSnapshot | null;
   combination: OrderItemCombinationRef | null;
   product: {
     id: string;
     name: string;
     sku: string;
-    images: ProductImage[];
+    weight?: number;
+    images?: ProductImage[];
   } | null;
   productName?: string;
   productSku?: string;
@@ -454,6 +456,9 @@ export interface Order {
   status: OrderStatus;
   totalAmount: number;
   discountedAmount: number | null;
+  shippingCost: number;
+  shippingMethodSnapshot: ShippingMethodSnapshot | null;
+  couponSnapshot: CouponSnapshot | null;
   shippingAddressSnapshot: Record<string, unknown>;
   billingAddressSnapshot: Record<string, unknown> | null;
   items: OrderItem[];
@@ -1103,4 +1108,38 @@ export interface PopupFormInput {
   ctaLabel?: string;
   displayFrequency?: PopupDisplayFrequency;
   priority?: number;
+}
+
+export interface ShippingMethodSnapshot {
+  id: string;
+  name: string;
+  estimatedDays: number;
+  basePrice: number;
+  pricePerKg: number;
+  zones: string[];
+  weightUsed: number;
+}
+
+export interface CouponSnapshotDiscount {
+  id: string;
+  type: DiscountType;
+  value: number;
+  categoryId: string | null;
+}
+
+export interface CouponSnapshot {
+  code: string;
+  promotionId: string;
+  promotionName: string;
+  minOrderAmount: number | null;
+  discounts: CouponSnapshotDiscount[];
+}
+
+export interface OrderItemDiscountSnapshot {
+  promotionId: string | null;
+  promotionName: string | null;
+  discountId: string | null;
+  type: DiscountType | null;
+  value: number | null;
+  percentage: number | null;
 }
