@@ -4,7 +4,6 @@
 import { useEffect, useRef, useState, FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ArrowLeft,
   Loader2,
@@ -24,7 +23,6 @@ import {
   Tag,
   Hash,
   History,
-  ImageOff,
 } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
@@ -388,9 +386,6 @@ function OrderItemRow({
     item.product?.name ?? item.productName ?? "Produit supprimé";
   const productSku =
     item.combination?.sku ?? item.product?.sku ?? item.productSku ?? "—";
-  // `images` n'est pas systématiquement renvoyé sur cet endpoint — repli
-  // silencieux sur l'état "pas d'image" plutôt qu'un crash.
-  const image = item.product?.images?.[0]?.url;
 
   let variantEntries: [string, string][] = [];
 
@@ -410,21 +405,9 @@ function OrderItemRow({
 
   return (
     <div className="py-4">
-      <div className="flex gap-3">
-        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-gray-100">
-          {image ? (
-            <Image
-              src={image}
-              alt={productName}
-              fill
-              className="object-cover"
-              sizes="64px"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <ImageOff size={18} className="text-gray-300" />
-            </div>
-          )}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 rounded-md bg-gray-100 p-2">
+          <Package size={16} className="text-gray-400" />
         </div>
 
         <div className="flex-1">
@@ -552,7 +535,7 @@ function OrderDetailSkeleton() {
             <div className="space-y-4">
               {Array.from({ length: 2 }).map((_, i) => (
                 <div key={i} className="flex gap-3">
-                  <div className="h-16 w-16 shrink-0 rounded-md bg-gray-100" />
+                  <div className="h-8 w-8 shrink-0 rounded-md bg-gray-100" />
                   <div className="flex-1 space-y-2">
                     <div className="h-4 w-40 rounded bg-gray-200" />
                     <div className="h-3 w-24 rounded bg-gray-100" />
