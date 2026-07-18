@@ -17,6 +17,16 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
   REFUNDED: "bg-amber-100 text-amber-700",
 };
 
+const STATUS_LABELS: Record<OrderStatus, string> = {
+  PENDING: "En attente",
+  CONFIRMED: "Confirmée",
+  PROCESSING: "En traitement",
+  SHIPPED: "Expédiée",
+  DELIVERED: "Livrée",
+  CANCELLED: "Annulée",
+  REFUNDED: "Remboursée",
+};
+
 function OrderRowSkeleton() {
   return (
     <div className="flex items-center justify-between px-4 py-4">
@@ -80,12 +90,12 @@ export default function OrdersHistoryPage() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold">
-                  {formatXAF(order.discountedAmount ?? order.totalAmount)}
+                  {formatXAF(order.totalAmount)}
                 </span>
                 <span
                   className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[order.status]}`}
                 >
-                  {order.status}
+                  {STATUS_LABELS[order.status]}
                 </span>
                 <ChevronRight size={16} className="text-gray-300" />
               </div>
