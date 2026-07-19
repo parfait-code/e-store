@@ -94,6 +94,8 @@ export const queryKeys = {
     shippingMethods: ["admin", "shipping-methods"] as const,
     settings: (category?: string) =>
       ["admin", "settings", category ?? "all"] as const,
+    payments: (params: Record<string, unknown>) =>
+      ["admin", "payments", params] as const,
     returns: (params: Record<string, unknown>) =>
       ["admin", "returns", params] as const,
     return: (id: string) => ["admin", "return", id] as const,

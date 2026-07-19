@@ -79,9 +79,9 @@ export const adminInventoryApi = {
     apiClient.post<InventoryItem>("/inventory", payload),
 
   update: (
-    itemId: string,
-    payload: { quantity?: number; warehouse_id?: string },
-  ) => apiClient.put<InventoryItem>(`/inventory/${itemId}`, payload),
+    warehouseId: string,
+    payload: { name?: string; location?: string; capacity?: number },
+  ) => apiClient.put<Warehouse>(`/warehouses/${warehouseId}`, payload),
 
   remove: (itemId: string) => apiClient.delete(`/inventory/${itemId}`),
 

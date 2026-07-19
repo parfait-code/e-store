@@ -137,3 +137,16 @@ export function useWarehouseInventory(warehouseId: string) {
     enabled: Boolean(warehouseId),
   });
 }
+
+export function useUpdateWarehouse(warehouseId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      name?: string;
+      location?: string;
+      capacity?: number;
+    }) => adminWarehousesApi.update(warehouseId, payload),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.admin.warehouses }),
+  });
+}

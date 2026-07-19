@@ -7,6 +7,9 @@ import {
   Plus,
   Loader2,
   Trash2,
+  Pencil,
+  X,
+  Save,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
@@ -14,6 +17,7 @@ import type { WarehouseFormInput } from "@/lib/types";
 import {
   useAdminWarehouses,
   useCreateWarehouse,
+  useUpdateWarehouse,
   useDeleteWarehouse,
 } from "@/lib/queries/admin/useInventory";
 import {
@@ -109,6 +113,103 @@ function NewWarehouseForm() {
   );
 }
 
+function EditWarehouseForm({
+  warehouse,
+  onCancel,
+}: {
+  warehouse: {
+    id: string;
+    name: string;
+    location: string;
+    capacity: number | null;
+  };
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: warehouse.name,
+    location: warehouse.location,
+    capacity: warehouse.capacity,
+  });
+  const [error, setError] = useState<string | null>(null);
+  const { mutate: updateWarehouse, isPending } = useUpdateWarehouse(
+    warehouse.id,
+  );
+
+  function handleSave() {
+    setError(null);
+    updateWarehouse(
+      {
+        name: form.name,
+        location: form.location,
+        capacity: form.capacity ?? undefined,
+      },
+      {
+        onSuccess: onCancel,
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la mise à jour",
+          ),
+      },
+    );
+  }
+
+  const inputClass =
+    "w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-gray-900";
+
+  return (
+    <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <input
+        value={form.name}
+        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+        className={inputClass}
+        placeholder="Nom"
+      />
+      <input
+        value={form.location}
+        onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+        className={inputClass}
+        placeholder="Localisation"
+      />
+      <input
+        type="number"
+        min={0}
+        value={form.capacity ?? ""}
+        onChange={(e) =>
+          setForm((f) => ({
+            ...f,
+            capacity: e.target.value ? Number(e.target.value) : null,
+          }))
+        }
+        className={inputClass}
+        placeholder="Capacité (optionnel)"
+      />
+      <div className="flex gap-2 pt-1">
+        <button
+          onClick={handleSave}
+          disabled={isPending}
+          className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+        >
+          {isPending ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Save size={12} />
+          )}
+          Enregistrer
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600"
+        >
+          <X size={12} /> Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function WarehousesPage() {
   const { data: warehouses = [], isLoading, isError } = useAdminWarehouses();
   const {
@@ -118,7 +219,7 @@ export default function WarehousesPage() {
   } = useDeleteWarehouse();
   const confirm = useConfirmDialog();
   const alertDialog = useAlertDialog();
-
+  const [editingId, setEditingId] = useState<string | null>(null);
   async function handleDelete(warehouseId: string) {
     const ok = await confirm({
       title: "Supprimer l'entrepôt",
@@ -163,42 +264,58 @@ export default function WarehousesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {warehouses.map((w) => (
-            <div
-              key={w.id}
-              className="rounded-lg border border-gray-200 bg-white p-4"
-            >
-              <div className="mb-2 flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <WarehouseIcon size={16} className="text-gray-400" />
-                  <span className="font-medium">{w.name}</span>
-                </div>
-                <button
-                  onClick={() => handleDelete(w.id)}
-                  disabled={isDeleting && deletingId === w.id}
-                  className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                >
-                  {isDeleting && deletingId === w.id ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={14} />
-                  )}
-                </button>
-              </div>
-              <p className="text-sm text-gray-500">{w.location}</p>
-              {w.capacity !== null && (
-                <p className="mt-1 text-xs text-gray-400">
-                  Capacité : {w.capacity}
-                </p>
-              )}
-              <Link
-                href={`/admin/warehouses/${w.id}`}
-                className="mt-3 inline-block text-xs font-medium text-gray-900 hover:underline"
+          {warehouses.map((w) =>
+            editingId === w.id ? (
+              <EditWarehouseForm
+                key={w.id}
+                warehouse={w}
+                onCancel={() => setEditingId(null)}
+              />
+            ) : (
+              <div
+                key={w.id}
+                className="rounded-lg border border-gray-200 bg-white p-4"
               >
-                Voir l'inventaire →
-              </Link>
-            </div>
-          ))}
+                <div className="mb-2 flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <WarehouseIcon size={16} className="text-gray-400" />
+                    <span className="font-medium">{w.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setEditingId(w.id)}
+                      className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-900"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(w.id)}
+                      disabled={isDeleting && deletingId === w.id}
+                      className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    >
+                      {isDeleting && deletingId === w.id ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500">{w.location}</p>
+                {w.capacity !== null && (
+                  <p className="mt-1 text-xs text-gray-400">
+                    Capacité : {w.capacity}
+                  </p>
+                )}
+                <Link
+                  href={`/admin/warehouses/${w.id}`}
+                  className="mt-3 inline-block text-xs font-medium text-gray-900 hover:underline"
+                >
+                  Voir l'inventaire →
+                </Link>
+              </div>
+            ),
+          )}
         </div>
       )}
     </div>

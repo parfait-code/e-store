@@ -1,18 +1,28 @@
 // app/admin/payments/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, CreditCard, Pencil } from "lucide-react";
-import { apiClient, ApiError } from "@/lib/api-client";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  Pencil,
+  RefreshCw,
+} from "lucide-react";
+import { ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
-import type {
-  Payment,
-  Paginated,
-  PaymentMethodType,
-  PaymentStatus,
-} from "@/lib/types";
+import type { Payment, PaymentMethodType, PaymentStatus } from "@/lib/types";
 import { TableRowsSkeleton } from "@/components/admin/TableSkeleton";
+import {
+  useAdminPayments,
+  useUpdatePaymentStatus,
+  useReconcileCod,
+} from "@/lib/queries/admin/usePayments";
+import {
+  useConfirmDialog,
+  useAlertDialog,
+} from "@/components/admin/ModalProvider";
 
 const METHOD_OPTIONS: PaymentMethodType[] = [
   "CASH_ON_DELIVERY",
@@ -37,8 +47,11 @@ const STATUS_STYLES: Record<PaymentStatus, string> = {
   CANCELLED: "bg-gray-200 text-gray-500",
 };
 
+// Restriction documentée (API_GUIDE_ADMIN.md §11) : un admin ne peut faire
+// évoluer manuellement un paiement que vers REFUNDED. Les autres transitions
+// sont exclusivement automatiques (cycle de vie commande/retour).
 const ALLOWED_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
-  PENDING: ["COMPLETED", "FAILED", "CANCELLED"],
+  PENDING: [],
   COMPLETED: ["REFUNDED"],
   FAILED: [],
   REFUNDED: [],
@@ -48,34 +61,30 @@ const ALLOWED_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
 function ChangeStatusModal({
   payment,
   onClose,
-  onUpdated,
 }: {
   payment: Payment;
   onClose: () => void;
-  onUpdated: (p: Payment) => void;
 }) {
   const options = ALLOWED_TRANSITIONS[payment.status];
   const [status, setStatus] = useState<PaymentStatus>(options[0]);
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { mutate: updateStatus, isPending: isSaving } =
+    useUpdatePaymentStatus();
 
-  async function handleConfirm() {
-    setIsSaving(true);
+  function handleConfirm() {
     setError(null);
-    try {
-      const updated = await apiClient.put<Payment>(
-        `/payments/${payment.id}/status`,
-        { status },
-      );
-      onUpdated(updated);
-      onClose();
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Erreur lors de la mise à jour",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+    updateStatus(
+      { paymentId: payment.id, payload: { status } },
+      {
+        onSuccess: onClose,
+        onError: (err) =>
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Erreur lors de la mise à jour",
+          ),
+      },
+    );
   }
 
   return (
@@ -124,46 +133,28 @@ function ChangeStatusModal({
 }
 
 export default function PaymentsPage() {
-  const [payments, setPayments] = useState<Payment[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<PaymentStatus | "">("");
   const [method, setMethod] = useState("");
   const [orderIdInput, setOrderIdInput] = useState("");
   const [orderId, setOrderId] = useState("");
   const [statusEditPayment, setStatusEditPayment] = useState<Payment | null>(
     null,
   );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirmDialog();
+  const alertDialog = useAlertDialog();
 
-  const fetchPayments = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    const params = new URLSearchParams({ page: String(page), limit: "20" });
-    if (status) params.set("status", status);
-    if (method) params.set("method", method);
-    if (orderId) params.set("order_id", orderId);
+  const { data, isLoading, isError } = useAdminPayments({
+    page,
+    status,
+    method,
+    orderId,
+  });
+  const payments = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
-    apiClient
-      .get<Paginated<Payment>>(`/payments?${params.toString()}`)
-      .then((res) => {
-        setPayments(res.items ?? []);
-        setTotalPages(res.totalPages);
-        setTotal(res.total);
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [page, status, method, orderId]);
-
-  useEffect(() => {
-    fetchPayments();
-  }, [fetchPayments]);
+  const { mutate: reconcileCod, isPending: isReconciling } = useReconcileCod();
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -171,14 +162,44 @@ export default function PaymentsPage() {
     setOrderId(orderIdInput.trim());
   }
 
+  async function handleReconcile() {
+    const ok = await confirm({
+      title: "Réconcilier les paiements COD",
+      message:
+        "Rattraper les commandes restées en attente alors qu'un paiement à la livraison a déjà été enregistré (échec de synchro) ?",
+    });
+    if (!ok) return;
+    reconcileCod(undefined, {
+      onSuccess: (res) =>
+        alertDialog(`${res.reconciledCount} commande(s) réconciliée(s).`),
+      onError: (err) =>
+        alertDialog(
+          err instanceof ApiError ? err.message : "Erreur lors de l'opération",
+        ),
+    });
+  }
+
   const selectClass =
     "rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold">Paiements</h1>
-        <p className="text-sm text-gray-500">{total} paiement(s)</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Paiements</h1>
+          <p className="text-sm text-gray-500">{total} paiement(s)</p>
+        </div>
+        <button
+          onClick={handleReconcile}
+          disabled={isReconciling}
+          className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+        >
+          <RefreshCw
+            size={16}
+            className={isReconciling ? "animate-spin" : ""}
+          />
+          Réconcilier les paiements COD
+        </button>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-3">
@@ -194,7 +215,7 @@ export default function PaymentsPage() {
         <select
           value={status}
           onChange={(e) => {
-            setStatus(e.target.value);
+            setStatus(e.target.value as PaymentStatus | "");
             setPage(1);
           }}
           className={selectClass}
@@ -223,9 +244,9 @@ export default function PaymentsPage() {
         </select>
       </div>
 
-      {error && (
+      {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          Erreur de chargement
         </div>
       )}
 
@@ -335,11 +356,6 @@ export default function PaymentsPage() {
         <ChangeStatusModal
           payment={statusEditPayment}
           onClose={() => setStatusEditPayment(null)}
-          onUpdated={(updated) =>
-            setPayments((prev) =>
-              prev.map((x) => (x.id === updated.id ? updated : x)),
-            )
-          }
         />
       )}
     </div>
