@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { apiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import { ProductGallery } from "@/components/ProductGallery";
 import { VariantSelector } from "@/components/VariantSelector";
 import { AddToCartButton } from "@/components/AddToCartButton";
@@ -12,7 +12,11 @@ import { QuantitySelector } from "@/components/QuantitySelector";
 import { PriceDisplay } from "@/components/PriceDisplay";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { ReviewsSection } from "@/components/ReviewsSection";
-import type { Product, ProductCombination } from "@/lib/types";
+import {
+  useProduct,
+  useProductCombinations,
+} from "@/lib/queries/shop/useCatalog";
+import type { ProductCombination } from "@/lib/types";
 
 function ProductDetailSkeleton() {
   return (
@@ -39,40 +43,39 @@ function ProductDetailSkeleton() {
 
 export default function ProductDetailPage() {
   const { productId } = useParams<{ productId: string }>();
-  const [product, setProduct] = useState<Product | null>(null);
-  const [combinations, setCombinations] = useState<ProductCombination[]>([]);
   const [selectedCombination, setSelectedCombination] =
     useState<ProductCombination | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  const {
+    data: product,
+    isLoading: isLoadingProduct,
+    isError: isProductError,
+    error: productError,
+  } = useProduct(productId);
+  const { data: combinations = [], isLoading: isLoadingCombinations } =
+    useProductCombinations(productId);
+
+  const isLoading = isLoadingProduct || isLoadingCombinations;
 
   const mainCtaRef = useRef<HTMLDivElement>(null);
   const [isMainCtaVisible, setIsMainCtaVisible] = useState(true);
 
+  // Réinitialise la sélection à chaque changement de produit.
   useEffect(() => {
     setSelectedCombination(null);
     setQuantity(1);
-    Promise.all([
-      apiClient.get<Product>(`/product/${productId}`),
-      apiClient
-        .get<ProductCombination[]>(`/product/${productId}/combinations`)
-        .then((res) => (Array.isArray(res) ? res : []))
-        .catch(() => []),
-    ])
-      .then(([p, combos]) => {
-        setProduct(p);
-        const active = combos.filter((c) => c.isActive);
-        setCombinations(combos);
-        if (active.length === 1) setSelectedCombination(active[0]);
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError ? err.message : "Erreur de chargement",
-        ),
-      )
-      .finally(() => setIsLoading(false));
   }, [productId]);
+
+  // Présélectionne automatiquement l'unique combinaison active, une fois
+  // les deux requêtes arrivées (ne se redéclenche pas sur un simple
+  // refetch en arrière-plan, seulement au premier chargement du produit).
+  useEffect(() => {
+    if (isLoading) return;
+    const active = combinations.filter((c) => c.isActive);
+    if (active.length === 1) setSelectedCombination(active[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId, isLoading]);
 
   useEffect(() => {
     const el = mainCtaRef.current;
@@ -89,10 +92,12 @@ export default function ProductDetailPage() {
     return <ProductDetailSkeleton />;
   }
 
-  if (error || !product) {
+  if (isProductError || !product) {
     return (
       <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? "Produit introuvable."}
+        {productError instanceof ApiError
+          ? productError.message
+          : "Produit introuvable."}
       </div>
     );
   }

@@ -167,7 +167,7 @@ export default function CheckoutPage() {
         city: newAddress.city,
         state: newAddress.state || undefined,
         country: newAddress.country,
-        postalCode: newAddress.postalCode || null,
+        postalCode: newAddress.postalCode || undefined,
       };
     }
 
@@ -184,7 +184,7 @@ export default function CheckoutPage() {
       city: a.city,
       state: a.state ?? undefined,
       country: a.country,
-      postalCode: a.postalCode ?? null,
+      postalCode: a.postalCode ?? undefined,
     };
   }
 
@@ -230,7 +230,7 @@ export default function CheckoutPage() {
             city: shippingAddress.city,
             state: shippingAddress.state,
             country: shippingAddress.country,
-            postalCode: shippingAddress.postalCode ?? null,
+            postalCode: shippingAddress.postalCode,
             isDefault: addresses.length === 0,
           });
           newlyCreatedAddressId = saved.id;

@@ -65,13 +65,13 @@ export default function AdminLayout({
 
   return (
     <ModalProvider>
-      <div className="flex min-h-screen">
-        <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
-          <div className="border-b border-gray-200 px-6 py-5">
+      <div className="flex h-screen overflow-hidden">
+        <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
+          <div className="shrink-0 border-b border-gray-200 px-6 py-5">
             <span className="text-lg font-semibold">Admin</span>
           </div>
 
-          <nav className="flex-1 space-y-1 px-3 py-4">
+          <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
             {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
               const active = pathname.startsWith(href);
               return (
@@ -91,7 +91,7 @@ export default function AdminLayout({
             })}
           </nav>
 
-          <div className="border-t border-gray-200 p-3">
+          <div className="shrink-0 border-t border-gray-200 p-3">
             <div className="mb-2 px-3 text-sm">
               <p className="font-medium">
                 {user?.firstName} {user?.lastName}
@@ -108,7 +108,9 @@ export default function AdminLayout({
           </div>
         </aside>
 
-        <main className="flex-1 bg-gray-50 p-8">{children}</main>
+        <main className="h-screen flex-1 overflow-y-auto bg-gray-50 p-8">
+          {children}
+        </main>
       </div>
     </ModalProvider>
   );

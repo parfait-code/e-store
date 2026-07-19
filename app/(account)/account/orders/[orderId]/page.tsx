@@ -249,17 +249,17 @@ function ReturnRequestForm({
   onClose: () => void;
 }) {
   const [reason, setReason] = useState("");
-  const [selected, setSelected] = useState<Record<string, number>>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const { mutate: createReturn, isPending: isSubmitting } = useCreateReturn(
     order.id,
   );
 
-  function toggleItem(itemId: string, maxQty: number) {
+  function toggleItem(itemId: string) {
     setSelected((prev) => {
-      const next = { ...prev };
-      if (itemId in next) delete next[itemId];
-      else next[itemId] = maxQty;
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
       return next;
     });
   }
@@ -267,9 +267,8 @@ function ReturnRequestForm({
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const items = Object.entries(selected).map(([order_item_id, quantity]) => ({
+    const items = Array.from(selected).map((order_item_id) => ({
       order_item_id,
-      quantity,
     }));
     if (items.length === 0) {
       setError("Sélectionnez au moins un article à retourner.");
@@ -319,14 +318,18 @@ function ReturnRequestForm({
                 >
                   <input
                     type="checkbox"
-                    checked={item.id in selected}
-                    onChange={() => toggleItem(item.id, item.quantity)}
+                    checked={selected.has(item.id)}
+                    onChange={() => toggleItem(item.id)}
                   />
                   {productName} (qté {item.quantity})
                 </label>
               );
             })}
           </div>
+          <p className="text-xs text-gray-400">
+            Un article coché est retourné dans sa quantité complète — les
+            retours partiels ne sont pas pris en charge par l'API.
+          </p>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">
               Raison

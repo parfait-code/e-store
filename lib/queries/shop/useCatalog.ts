@@ -4,6 +4,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { shopCatalogApi } from "@/lib/api/shop/catalog";
 import { queryKeys } from "@/lib/queries/keys";
+import type { ProductSortOption } from "@/lib/types";
 
 export function useCategories() {
   return useQuery({
@@ -21,11 +22,23 @@ export function useCategoryBySlug(slug: string) {
   });
 }
 
-// NOUVEAU — produits paginés d'une catégorie (et ses descendantes) par slug
-export function useCategoryProducts(slug: string, page: number, limit = 24) {
+// Produits paginés d'une catégorie (et ses descendantes) par slug
+export function useCategoryProducts(
+  slug: string,
+  page: number,
+  limit = 24,
+  filters: {
+    search?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    tags?: string[];
+    sort?: ProductSortOption;
+  } = {},
+) {
   return useQuery({
-    queryKey: queryKeys.shop.categoryProducts(slug, page),
-    queryFn: () => shopCatalogApi.productsByCategorySlug(slug, page, limit),
+    queryKey: queryKeys.shop.categoryProducts(slug, page, filters),
+    queryFn: () =>
+      shopCatalogApi.productsByCategorySlug(slug, page, limit, filters),
     enabled: Boolean(slug),
     placeholderData: (prev) => prev,
   });
@@ -35,7 +48,11 @@ export function useProducts(params: {
   page: number;
   categoryId?: string;
   search?: string;
-  limit?: number; // NOUVEAU — nécessaire pour la home (étape 10)
+  limit?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  tags?: string[];
+  sort?: ProductSortOption;
 }) {
   return useQuery({
     queryKey: queryKeys.shop.products(params),
@@ -48,7 +65,7 @@ export function useNewestProducts(limit = 8) {
   return useQuery({
     queryKey: queryKeys.shop.newestProducts(limit),
     queryFn: () => shopCatalogApi.newestProducts(limit),
-    staleTime: 5 * 60 * 1000, // pas besoin de re-fetch agressif pour ce bloc
+    staleTime: 5 * 60 * 1000,
   });
 }
 

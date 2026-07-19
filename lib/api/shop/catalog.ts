@@ -8,6 +8,7 @@ import type {
   ProductCombination,
   CategoryProductsResponse,
   CategoryRef,
+  ProductSortOption,
 } from "@/lib/types";
 
 function normalizePaginated<T>(
@@ -98,17 +99,41 @@ export const shopCatalogApi = {
   categoryBySlug: (slug: string) =>
     apiClient.get<Category>(`/categories/slug/${slug}`),
 
-  productsByCategorySlug: (slug: string, page = 1, limit = 24) =>
-    apiClient
+  productsByCategorySlug: (
+    slug: string,
+    page = 1,
+    limit = 24,
+    filters: {
+      search?: string;
+      minPrice?: number;
+      maxPrice?: number;
+      tags?: string[];
+      sort?: ProductSortOption;
+    } = {},
+  ) => {
+    const qs = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+    if (filters.search) qs.set("search", filters.search);
+    if (filters.minPrice !== undefined)
+      qs.set("minPrice", String(filters.minPrice));
+    if (filters.maxPrice !== undefined)
+      qs.set("maxPrice", String(filters.maxPrice));
+    if (filters.tags && filters.tags.length > 0)
+      qs.set("tags", filters.tags.join(","));
+    if (filters.sort) qs.set("sort", filters.sort);
+    return apiClient
       .get<CategoryProductsResponse>(
-        `/categories/slug/${slug}/products?page=${page}&limit=${limit}`,
+        `/categories/slug/${slug}/products?${qs.toString()}`,
       )
       .then((res) => ({
         ...res,
         items: (Array.isArray(res?.items) ? res.items : []).map(
           normalizeProductImages,
         ),
-      })),
+      }));
+  },
 
   listProducts: (
     params: {
@@ -116,6 +141,10 @@ export const shopCatalogApi = {
       limit?: number;
       categoryId?: string;
       search?: string;
+      minPrice?: number;
+      maxPrice?: number;
+      tags?: string[];
+      sort?: ProductSortOption;
     } = {},
   ) => {
     const qs = new URLSearchParams();
@@ -123,6 +152,13 @@ export const shopCatalogApi = {
     if (params.limit) qs.set("limit", String(params.limit));
     if (params.categoryId) qs.set("categoryId", params.categoryId);
     if (params.search) qs.set("search", params.search);
+    if (params.minPrice !== undefined)
+      qs.set("minPrice", String(params.minPrice));
+    if (params.maxPrice !== undefined)
+      qs.set("maxPrice", String(params.maxPrice));
+    if (params.tags && params.tags.length > 0)
+      qs.set("tags", params.tags.join(","));
+    if (params.sort) qs.set("sort", params.sort);
     return apiClient
       .get<Paginated<Product>>(`/product?${qs.toString()}`)
       .then(normalizePaginated)

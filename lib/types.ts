@@ -226,6 +226,14 @@ export interface Product {
   updatedAt: string;
 }
 
+export type ProductSortOption =
+  | "newest"
+  | "oldest"
+  | "price_asc"
+  | "price_desc"
+  | "name_asc"
+  | "name_desc";
+
 export interface ProductWithCombinations extends Product {
   combinations: ProductCombination[];
 }
@@ -331,7 +339,7 @@ export interface AddressFormInput {
   city: string;
   state?: string;
   country: string;
-  postalCode: string | null;
+  postalCode?: string;
   isDefault?: boolean;
 }
 
@@ -343,7 +351,7 @@ export interface OrderAddressInput {
   city: string;
   state?: string;
   country: string;
-  postalCode: string | null;
+  postalCode?: string;
 }
 
 export interface InventoryGroupedLine {
@@ -776,6 +784,8 @@ export interface ProductReviewsResponse {
   reviews: ProductReview[];
 }
 
+export type Review = ProductReview;
+
 export interface PromotionPublic {
   id: string;
   name: string;
@@ -864,15 +874,6 @@ export interface CartContextValue {
   isLoaded: boolean;
 }
 
-export interface AddressFormInput {
-  street: string;
-  city: string;
-  state?: string;
-  country: string;
-  postalCode: string | null;
-  isDefault?: boolean;
-}
-
 export interface WishlistItem {
   id: string;
   productId: string;
@@ -904,7 +905,7 @@ export interface ReturnCreateInput {
   order_id: string;
   reason: string;
   notes?: string;
-  items: { order_item_id: string; quantity: number; condition?: string }[];
+  items: { order_item_id: string; condition?: string }[];
 }
 
 export interface PaymentMethodOption {

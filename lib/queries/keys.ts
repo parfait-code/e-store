@@ -4,8 +4,12 @@ export const queryKeys = {
     categories: ["shop", "categories"] as const,
     categoryBySlug: (slug: string) =>
       ["shop", "categories", "slug", slug] as const,
-    categoryProducts: (slug: string, page: number) =>
-      ["shop", "categories", "slug", slug, "products", page] as const,
+    categoryProducts: (
+      slug: string,
+      page: number,
+      filters: Record<string, unknown> = {},
+    ) =>
+      ["shop", "categories", "slug", slug, "products", page, filters] as const,
     products: (params: Record<string, unknown>) =>
       ["shop", "products", params] as const,
     product: (id: string | number) => ["shop", "product", id] as const,

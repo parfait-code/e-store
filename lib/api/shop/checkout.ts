@@ -31,7 +31,7 @@ export const shopCheckoutApi = {
     }),
 
   listShippingMethods: () =>
-    apiClient.get<ShippingMethod[]>("/shipping-methods?active=true"),
+    apiClient.get<ShippingMethod[]>("/shipping-methods"),
 
   calculateShippingCost: (
     shippingMethodId: string,
