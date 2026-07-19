@@ -20,12 +20,14 @@ import {
   LayoutGrid,
   Database,
   Settings2,
+  Save
 } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import type { Setting, SettingType } from "@/lib/types";
 import {
   useAdminSettings,
   useUpdateSetting,
+  useUpdateSettingsBulk,
 } from "@/lib/queries/admin/useSettings";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -269,6 +271,56 @@ function SettingCard({ setting }: { setting: Setting }) {
           </code>
         </div>
       )}
+    </div>
+  );
+}
+
+function SaveCategoryButton({
+  settings,
+  drafts,
+}: {
+  settings: Setting[];
+  drafts: Record<string, string>;
+}) {
+  const { mutate: saveBulk, isPending } = useUpdateSettingsBulk();
+  const [error, setError] = useState<string | null>(null);
+
+  const changed = settings.filter(
+    (s) => drafts[s.key] !== undefined && drafts[s.key] !== s.value,
+  );
+
+  if (changed.length === 0) return null;
+
+  function handleSave() {
+    setError(null);
+    try {
+      const payload = changed.map((s) => ({
+        key: s.key,
+        value: serializeForSave(s, drafts[s.key]),
+      }));
+      saveBulk(payload, {
+        onError: () => setError("Erreur lors de l'enregistrement groupé."),
+      });
+    } catch {
+      setError("Une des valeurs JSON est invalide.");
+    }
+  }
+
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <button
+        onClick={handleSave}
+        disabled={isPending}
+        className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+      >
+        {isPending ? (
+          <Loader2 size={12} className="animate-spin" />
+        ) : (
+          <Save size={12} />
+        )}
+        Enregistrer {changed.length} modification(s) de cette catégorie
+      </button>
+      {error && <span className="text-xs text-red-600">{error}</span>}
     </div>
   );
 }

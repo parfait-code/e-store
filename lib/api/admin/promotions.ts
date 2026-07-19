@@ -43,6 +43,14 @@ export const adminPromotionsApi = {
       .then(normalize);
   },
 
+  affectedProducts: (id: string) =>
+    apiClient.get<{
+      promotionId: string;
+      promotionName: string;
+      count: number;
+      products: import("@/lib/types").Product[];
+    }>(`/promotions/${id}/products`),
+
   toggle: (id: string) =>
     apiClient.patch<Promotion>(`/promotions/${id}/toggle`),
 

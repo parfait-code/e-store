@@ -17,6 +17,14 @@ export function useAdminPromotions(params: {
   });
 }
 
+export function useAdminPromotionAffectedProducts(promotionId: string) {
+  return useQuery({
+    queryKey: ["admin", "promotion", promotionId, "products"],
+    queryFn: () => adminPromotionsApi.affectedProducts(promotionId),
+    enabled: Boolean(promotionId),
+  });
+}
+
 export function useTogglePromotion() {
   const qc = useQueryClient();
   return useMutation({

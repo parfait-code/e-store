@@ -11,14 +11,14 @@ import { PromotionImages } from "./PromotionImages";
 import { PromotionHeroSettings } from "./PromotionHeroSettings";
 import { PromotionDiscounts } from "./PromotionDiscounts";
 import { PromotionCoupons } from "./PromotionCoupons";
+import { PromotionAffectedProducts } from "./PromotionAffectedProducts";
 
-// NOUVEAU : étape "hero" ajoutée après "images" — elle dépend des images
-// déjà uploadées, donc placée juste après cette étape dans le flux.
 const STEPS: StepDefinition[] = [
   { id: "info", label: "Informations" },
   { id: "images", label: "Images" },
   { id: "hero", label: "Carrousel accueil" },
   { id: "discounts", label: "Remises" },
+  { id: "products", label: "Produits affectés" },
   { id: "coupons", label: "Coupons" },
 ];
 
@@ -97,6 +97,9 @@ export function PromotionWizard({
         )}
         {stepId === "discounts" && promotion && (
           <PromotionDiscounts promotion={promotion} onUpdated={setPromotion} />
+        )}
+        {stepId === "products" && promotion && (
+          <PromotionAffectedProducts promotionId={promotion.id} />
         )}
         {stepId === "coupons" && promotion && (
           <PromotionCoupons promotion={promotion} onUpdated={setPromotion} />

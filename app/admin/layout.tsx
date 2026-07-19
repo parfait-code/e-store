@@ -21,6 +21,7 @@ import {
   CreditCard,
   SlidersHorizontal,
   MessageSquarePlus,
+  Star,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ModalProvider } from "@/components/admin/ModalProvider";
@@ -49,6 +50,7 @@ const NAV_ITEMS = [
     icon: PackageCheck,
   },
   { href: "/admin/returns", label: "Retours", icon: RotateCcw },
+  { href: "/admin/reviews", label: "Avis clients", icon: Star },
   { href: "/admin/loyalty", label: "Fidélité", icon: Coins },
   { href: "/admin/settings", label: "Paramètres", icon: SlidersHorizontal },
 ];

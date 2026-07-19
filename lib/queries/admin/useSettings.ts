@@ -29,3 +29,20 @@ export function useUpdateSetting() {
     },
   });
 }
+
+export function useUpdateSettingsBulk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: { key: string; value: unknown }[]) =>
+      adminSettingsApi.updateBulk(settings),
+    onSuccess: (updated: Setting[]) => {
+      qc.setQueriesData<Setting[] | undefined>(
+        {
+          predicate: (q) =>
+            q.queryKey[0] === "admin" && q.queryKey[1] === "settings",
+        },
+        (prev) => prev?.map((s) => updated.find((u) => u.key === s.key) ?? s),
+      );
+    },
+  });
+}
