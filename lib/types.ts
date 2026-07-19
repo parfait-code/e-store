@@ -687,6 +687,7 @@ export interface ReturnRequest {
 export interface ReturnStatusUpdateInput {
   status: ReturnStatus;
   notes?: string;
+  pickup_deadline?: string;
 }
 
 export type LoyaltyTransactionType =

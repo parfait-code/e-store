@@ -29,15 +29,32 @@ const STATUS_STYLES: Record<ReturnStatus, string> = {
 function StatusUpdateForm({ returnRequest }: { returnRequest: ReturnRequest }) {
   const [status, setStatus] = useState<ReturnStatus>(returnRequest.status);
   const [notes, setNotes] = useState(returnRequest.notes ?? "");
+  const [pickupDeadline, setPickupDeadline] = useState("");
   const [error, setError] = useState<string | null>(null);
   const { mutate: updateStatus, isPending: isSubmitting } =
     useUpdateReturnStatus(returnRequest.id);
 
+  const requiresDeadline = status === "APPROVED";
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (requiresDeadline && !pickupDeadline) {
+      setError(
+        "La date limite de collecte est requise pour approuver un retour.",
+      );
+      return;
+    }
+
     updateStatus(
-      { status, notes: notes || undefined },
+      {
+        status,
+        notes: notes || undefined,
+        pickup_deadline: requiresDeadline
+          ? new Date(pickupDeadline).toISOString()
+          : undefined,
+      },
       {
         onError: (err) =>
           setError(
@@ -79,6 +96,26 @@ function StatusUpdateForm({ returnRequest }: { returnRequest: ReturnRequest }) {
           ))}
         </select>
       </div>
+
+      {requiresDeadline && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Date limite de collecte <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="datetime-local"
+            required
+            value={pickupDeadline}
+            onChange={(e) => setPickupDeadline(e.target.value)}
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            Requise pour approuver le retour — déclenche automatiquement la
+            création de la demande d'enlèvement (pickup request).
+          </p>
+        </div>
+      )}
+
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">
           Notes (optionnel)
