@@ -14,6 +14,9 @@ import {
   Save,
   ExternalLink,
   AlertTriangle,
+  MapPin,
+  Tag,
+  User as UserIcon,
 } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
@@ -457,12 +460,34 @@ export default function OrderDetailPage() {
     : [];
 
   const shipping = order.shippingAddressSnapshot as {
+    recipientName?: string;
+    phone?: string;
     street?: string;
+    addressLine2?: string;
     city?: string;
     state?: string;
     country?: string;
     postalCode?: string;
   };
+
+  // totalAmount est le SEUL montant réellement payé (sous-total remisé +
+  // shippingCost). discountedAmount n'est qu'une économie informative — ne
+  // jamais l'afficher comme un "total" alternatif.
+  const shippingCost = order.shippingCost ?? 0;
+  const productsSubtotal = order.totalAmount - shippingCost;
+  const hasSavings =
+    order.discountedAmount !== null && order.discountedAmount > 0;
+
+  // Préférer les snapshots figés (fidèles au moment de la commande) aux
+  // entités actuelles, qui peuvent avoir changé ou été supprimées depuis.
+  const shippingMethodName =
+    order.shippingMethodSnapshot?.name ?? order.shippingMethod?.name;
+  const shippingMethodDays =
+    order.shippingMethodSnapshot?.estimatedDays ??
+    order.shippingMethod?.estimatedDays;
+  const couponCode = order.couponSnapshot?.code ?? order.appliedCoupon?.code;
+  const couponPromotionName =
+    order.couponSnapshot?.promotionName ?? order.appliedCoupon?.promotion.name;
 
   return (
     <div className="max-w-4xl">
@@ -504,6 +529,8 @@ export default function OrderDetailPage() {
                   item.product?.sku ??
                   item.productSku ??
                   "—";
+                const hasItemDiscount = item.discountAmount > 0;
+                const promotionName = item.discountSnapshot?.promotionName;
                 return (
                   <div
                     key={item.id}
@@ -521,12 +548,19 @@ export default function OrderDetailPage() {
                             .join(" · ")}
                         </p>
                       )}
+                      {hasItemDiscount && promotionName && (
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-green-600">
+                          <Tag size={10} /> Remise « {promotionName} »
+                        </p>
+                      )}
                     </div>
                     <div className="text-right text-sm">
-                      <p>{formatXAF(item.price * item.quantity)}</p>
-                      {item.discountAmount > 0 && (
-                        <p className="text-xs text-green-600">
-                          -{formatXAF(item.discountAmount)}
+                      <p className="font-medium">
+                        {formatXAF(item.price * item.quantity)}
+                      </p>
+                      {hasItemDiscount && (
+                        <p className="text-xs text-gray-400 line-through">
+                          {formatXAF(item.originalPrice * item.quantity)}
                         </p>
                       )}
                     </div>
@@ -536,23 +570,33 @@ export default function OrderDetailPage() {
             </div>
             <div className="mt-3 space-y-1 border-t border-gray-100 pt-3 text-sm">
               <div className="flex justify-between text-gray-500">
-                <span>Sous-total</span>
-                <span>{formatXAF(order.totalAmount)}</span>
+                <span>Sous-total produits</span>
+                <span>{formatXAF(productsSubtotal)}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span>
+                  Livraison
+                  {shippingMethodName ? ` (${shippingMethodName})` : ""}
+                </span>
+                <span>{formatXAF(shippingCost)}</span>
               </div>
               <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold">
-                <span>Total</span>
-                <span>
-                  {order.discountedAmount !== null
-                    ? formatXAF(order.discountedAmount)
-                    : formatXAF(order.totalAmount)}
-                </span>
+                <span>Total payé</span>
+                <span>{formatXAF(order.totalAmount)}</span>
               </div>
+              {hasSavings && (
+                <p className="pt-1 text-xs text-green-600">
+                  Le client a économisé {formatXAF(order.discountedAmount!)} sur
+                  cette commande.
+                </p>
+              )}
             </div>
-            {order.appliedCoupon && (
-              <p className="mt-2 text-xs text-gray-500">
+            {couponCode && (
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                <Tag size={12} />
                 Coupon appliqué :{" "}
-                <span className="font-medium">{order.appliedCoupon.code}</span>{" "}
-                ({order.appliedCoupon.promotion.name})
+                <span className="font-medium">{couponCode}</span>{" "}
+                {couponPromotionName && `(${couponPromotionName})`}
               </p>
             )}
           </div>
@@ -620,24 +664,61 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
-              <Truck size={16} /> Adresse de livraison
+          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
+            <h2 className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <MapPin size={16} /> Adresse de livraison
             </h2>
-            <p className="text-sm text-gray-600">
+            {shipping?.recipientName && (
+              <p className="font-medium text-gray-900">
+                {shipping.recipientName}
+              </p>
+            )}
+            {shipping?.phone && (
+              <p className="text-gray-500">{shipping.phone}</p>
+            )}
+            <p className="mt-1 text-gray-600">
               {shipping?.street}
+              {shipping?.addressLine2 ? `, ${shipping.addressLine2}` : ""}
               <br />
-              {shipping?.postalCode} {shipping?.city}
-              {shipping?.state ? `, ${shipping?.state}` : ""}
+              {shipping?.postalCode ? `${shipping.postalCode} ` : ""}
+              {shipping?.city}
+              {shipping?.state ? `, ${shipping.state}` : ""}
               <br />
               {shipping?.country}
             </p>
-            {order.shippingMethod && (
-              <p className="mt-2 text-xs text-gray-500">
-                {order.shippingMethod.name} ·{" "}
-                {order.shippingMethod.estimatedDays} jours
+          </div>
+
+          {(shippingMethodName || shippingCost > 0) && (
+            <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
+              <h2 className="mb-2 flex items-center gap-2 text-sm font-medium">
+                <Truck size={16} /> Méthode de livraison
+              </h2>
+              {shippingMethodName && (
+                <p className="text-gray-600">{shippingMethodName}</p>
+              )}
+              {shippingMethodDays !== undefined && (
+                <p className="text-xs text-gray-400">
+                  Délai estimé : {shippingMethodDays} jour(s)
+                </p>
+              )}
+              <p className="mt-1 text-xs text-gray-400">
+                Coût de livraison : {formatXAF(shippingCost)}
+                {order.shippingMethodSnapshot &&
+                  ` (poids facturé : ${order.shippingMethodSnapshot.weightUsed} kg)`}
               </p>
-            )}
+            </div>
+          )}
+
+          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
+            <h2 className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <UserIcon size={16} /> Client
+            </h2>
+            <Link
+              href={`/admin/users/${order.userId}`}
+              className="font-medium text-gray-900 hover:underline"
+            >
+              Voir la fiche client →
+            </Link>
           </div>
 
           <LinkedShipmentCard

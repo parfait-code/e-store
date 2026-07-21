@@ -28,10 +28,17 @@ function NewShipmentForm() {
     width: 0,
     height: 0,
   });
+  const [shippingMethodName, setShippingMethodName] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPrefilling, setIsPrefilling] = useState(Boolean(orderIdFromQuery));
   const { mutate: createShipment, isPending: isSubmitting } =
     useCreateShipment();
+
+  // Champs verrouillés lorsque l'expédition est rattachée à une commande :
+  // ils proviennent de données calculées côté commande, pas d'une saisie libre.
+  const isLockedByOrder = Boolean(orderIdFromQuery);
 
   // Préremplissage ponctuel à partir de la commande liée : ce n'est pas une
   // donnée affichée/mise en cache (elle sert uniquement à initialiser le
@@ -78,6 +85,19 @@ function NewShipmentForm() {
           0,
         );
 
+        // Méthode de livraison choisie par le client à la commande — sert à
+        // afficher son nom et à préremplir la date de livraison estimée
+        // (aujourd'hui + estimatedDays).
+        const method = order.shippingMethod;
+        setShippingMethodName(method?.name ?? null);
+
+        let estimatedDeliveryDate: string | undefined;
+        if (method?.estimatedDays !== undefined) {
+          const target = new Date();
+          target.setDate(target.getDate() + method.estimatedDays);
+          estimatedDeliveryDate = target.toISOString().slice(0, 10);
+        }
+
         setForm((prev) => ({
           ...prev,
           recipient_name: user
@@ -89,6 +109,8 @@ function NewShipmentForm() {
               : prev.recipient_address,
           weight:
             totalWeight > 0 ? Number(totalWeight.toFixed(2)) : prev.weight,
+          estimated_delivery_at:
+            estimatedDeliveryDate ?? prev.estimated_delivery_at,
         }));
       })
       .catch(() => {
@@ -129,6 +151,8 @@ function NewShipmentForm() {
 
   const inputClass =
     "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
+  const lockedInputClass =
+    "w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 outline-none cursor-not-allowed";
 
   return (
     <div className="max-w-2xl">
@@ -148,15 +172,25 @@ function NewShipmentForm() {
         )}
 
         {form.order_id && (
-          <p className="flex items-center gap-2 text-sm text-gray-500">
-            Rattachée à la commande{" "}
-            <span className="font-medium">#{form.order_id.slice(0, 8)}</span>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+            <span>
+              Rattachée à la commande{" "}
+              <span className="font-medium">#{form.order_id.slice(0, 8)}</span>
+            </span>
+            {shippingMethodName && (
+              <span className="flex items-center gap-1 text-xs text-gray-400">
+                · Méthode de livraison :{" "}
+                <span className="font-medium text-gray-600">
+                  {shippingMethodName}
+                </span>
+              </span>
+            )}
             {isPrefilling && (
               <span className="flex items-center gap-1 text-xs text-gray-400">
                 <Loader2 size={12} className="animate-spin" /> Préremplissage...
               </span>
             )}
-          </p>
+          </div>
         )}
 
         <div className="grid grid-cols-2 gap-4">
@@ -179,9 +213,11 @@ function NewShipmentForm() {
             <input
               type="text"
               required
+              readOnly={isLockedByOrder}
+              disabled={isLockedByOrder}
               value={form.recipient_name}
               onChange={(e) => update("recipient_name", e.target.value)}
-              className={inputClass}
+              className={isLockedByOrder ? lockedInputClass : inputClass}
             />
           </div>
         </div>
@@ -206,9 +242,11 @@ function NewShipmentForm() {
             <textarea
               required
               rows={2}
+              readOnly={isLockedByOrder}
+              disabled={isLockedByOrder}
               value={form.recipient_address}
               onChange={(e) => update("recipient_address", e.target.value)}
-              className={inputClass}
+              className={isLockedByOrder ? lockedInputClass : inputClass}
             />
           </div>
         </div>
@@ -223,14 +261,16 @@ function NewShipmentForm() {
               required
               min={0}
               step="0.01"
+              readOnly={isLockedByOrder}
+              disabled={isLockedByOrder}
               value={form.weight}
               onChange={(e) => update("weight", Number(e.target.value))}
-              className={inputClass}
+              className={isLockedByOrder ? lockedInputClass : inputClass}
             />
             {form.order_id && (
               <p className="mt-1 text-xs text-gray-400">
                 Calculé automatiquement à partir des produits de la commande —
-                modifiable si besoin.
+                non modifiable.
               </p>
             )}
           </div>
@@ -244,6 +284,12 @@ function NewShipmentForm() {
               onChange={(e) => update("estimated_delivery_at", e.target.value)}
               className={inputClass}
             />
+            {form.order_id && shippingMethodName && (
+              <p className="mt-1 text-xs text-gray-400">
+                Préremplie selon le délai estimé de « {shippingMethodName} » —
+                modifiable si besoin.
+              </p>
+            )}
           </div>
         </div>
 

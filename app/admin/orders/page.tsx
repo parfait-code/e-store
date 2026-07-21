@@ -163,7 +163,7 @@ export default function OrdersPage() {
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
               <th className="px-4 py-3">Commande</th>
-              <th className="px-4 py-3">Client (userId)</th>
+              <th className="px-4 py-3">Client</th>
               <th className="px-4 py-3">Articles</th>
               <th className="px-4 py-3">Total</th>
               <th className="px-4 py-3">Statut</th>
@@ -184,46 +184,63 @@ export default function OrdersPage() {
                 </td>
               </tr>
             ) : (
-              orders.map((order) => (
-                <tr
-                  key={order.id}
-                  className="border-b border-gray-100 last:border-0"
-                >
-                  <td className="px-4 py-3 font-medium">
-                    #{order.id.slice(0, 8)}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">{order.userId}</td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {order.items.length}
-                  </td>
-                  <td className="px-4 py-3">
-                    {formatXAF(order.discountedAmount ?? order.totalAmount)}
-                    {order.discountedAmount !== null && (
-                      <span className="ml-1 text-xs text-gray-400 line-through">
+              orders.map((order) => {
+                // totalAmount est le SEUL montant réellement payé (produits
+                // remisés + livraison) — discountedAmount n'est qu'une
+                // économie informative, jamais un montant à afficher comme
+                // "total" ni à soustraire d'un prix "original".
+                const hasSavings =
+                  order.discountedAmount !== null && order.discountedAmount > 0;
+                return (
+                  <tr
+                    key={order.id}
+                    className="border-b border-gray-100 last:border-0"
+                  >
+                    <td className="px-4 py-3 font-medium">
+                      #{order.id.slice(0, 8)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      <Link
+                        href={`/admin/users/${order.userId}`}
+                        className="hover:underline"
+                      >
+                        #{order.userId.slice(0, 8)}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {order.items.length}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium">
                         {formatXAF(order.totalAmount)}
+                      </div>
+                      {hasSavings && (
+                        <div className="text-xs text-green-600">
+                          Économie : {formatXAF(order.discountedAmount!)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[order.status]}`}
+                      >
+                        {STATUS_LABELS[order.status]}
                       </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[order.status]}`}
-                    >
-                      {STATUS_LABELS[order.status]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {formatDate(order.createdAt)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/admin/orders/${order.id}`}
-                      className="flex items-center justify-end rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                    >
-                      <Eye size={16} />
-                    </Link>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {formatDate(order.createdAt)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/admin/orders/${order.id}`}
+                        className="flex items-center justify-end rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                      >
+                        <Eye size={16} />
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
