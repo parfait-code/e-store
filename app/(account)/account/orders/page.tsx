@@ -1,11 +1,23 @@
 // app/(account)/account/orders/page.tsx
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Package, ChevronRight } from "lucide-react";
 import { formatXAF, formatDate } from "@/lib/format";
 import type { OrderStatus } from "@/lib/types";
 import { useMyOrders } from "@/lib/queries/shop/useOrders";
+import { Pagination } from "@/components/Pagination";
+
+const STATUS_OPTIONS: OrderStatus[] = [
+  "PENDING",
+  "CONFIRMED",
+  "PROCESSING",
+  "SHIPPED",
+  "DELIVERED",
+  "CANCELLED",
+  "REFUNDED",
+];
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
   PENDING: "bg-gray-100 text-gray-600",
@@ -47,12 +59,33 @@ function OrderRowSkeleton() {
 }
 
 export default function OrdersHistoryPage() {
-  const { data, isLoading, isError } = useMyOrders();
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState<OrderStatus | "">("");
+
+  const { data, isLoading, isError } = useMyOrders({ page, status });
   const orders = data?.items ?? [];
+  const totalPages = data?.totalPages ?? 1;
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-semibold">Mes commandes</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">Mes commandes</h1>
+        <select
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value as OrderStatus | "");
+            setPage(1);
+          }}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+        >
+          <option value="">Tous les statuts</option>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {isError && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -60,7 +93,7 @@ export default function OrdersHistoryPage() {
         </div>
       )}
 
-      {isLoading ? (
+      {isLoading && !data ? (
         <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
           {Array.from({ length: 5 }).map((_, i) => (
             <OrderRowSkeleton key={i} />
@@ -68,40 +101,51 @@ export default function OrdersHistoryPage() {
         </div>
       ) : orders.length === 0 ? (
         <p className="text-sm text-gray-400">
-          Vous n'avez pas encore passé de commande.
+          {status
+            ? "Aucune commande avec ce statut."
+            : "Vous n'avez pas encore passé de commande."}
         </p>
       ) : (
-        <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
-          {orders.map((order) => (
-            <Link
-              key={order.id}
-              href={`/account/orders/${order.id}`}
-              className="flex items-center justify-between px-4 py-4 hover:bg-gray-50"
-            >
-              <div className="flex items-center gap-3">
-                <Package size={16} className="text-gray-400" />
-                <div>
-                  <p className="text-sm font-medium">#{order.id.slice(0, 8)}</p>
-                  <p className="text-xs text-gray-500">
-                    {formatDate(order.createdAt)} · {order.items.length}{" "}
-                    article(s)
-                  </p>
+        <>
+          <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+            {orders.map((order) => (
+              <Link
+                key={order.id}
+                href={`/account/orders/${order.id}`}
+                className="flex items-center justify-between px-4 py-4 hover:bg-gray-50"
+              >
+                <div className="flex items-center gap-3">
+                  <Package size={16} className="text-gray-400" />
+                  <div>
+                    <p className="text-sm font-medium">
+                      #{order.id.slice(0, 8)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {formatDate(order.createdAt)} · {order.items.length}{" "}
+                      article(s)
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold">
-                  {formatXAF(order.totalAmount)}
-                </span>
-                <span
-                  className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[order.status]}`}
-                >
-                  {STATUS_LABELS[order.status]}
-                </span>
-                <ChevronRight size={16} className="text-gray-300" />
-              </div>
-            </Link>
-          ))}
-        </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold">
+                    {formatXAF(order.totalAmount)}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[order.status]}`}
+                  >
+                    {STATUS_LABELS[order.status]}
+                  </span>
+                  <ChevronRight size={16} className="text-gray-300" />
+                </div>
+              </Link>
+            ))}
+          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </>
       )}
     </div>
   );

@@ -14,6 +14,7 @@ import { apiClient, ApiError } from "@/lib/api-client";
 import type { AuthResponse, User } from "@/lib/types";
 import { useCart } from "@/lib/cart/cart-context";
 import { useWishlist } from "@/lib/wishlist/wishlist-context";
+import { shopUserApi } from "@/lib/api/shop/user";
 
 interface AuthContextValue {
   user: User | null;
@@ -41,15 +42,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const rawUser = Cookies.get(USER_COOKIE);
-    if (rawUser) {
-      try {
-        setUser(JSON.parse(rawUser));
-      } catch {
-        Cookies.remove(USER_COOKIE);
-        Cookies.remove(TOKEN_COOKIE);
-      }
+    if (!rawUser) {
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+    try {
+      setUser(JSON.parse(rawUser));
+    } catch {
+      Cookies.remove(USER_COOKIE);
+      Cookies.remove(TOKEN_COOKIE);
+      setIsLoading(false);
+      return;
+    }
+
+    // Le cookie peut être périmé (rôle changé, compte suspendu...) — on
+    // rafraîchit silencieusement depuis l'API sans bloquer l'affichage
+    // initial (déjà peuplé de manière optimiste depuis le cookie ci-dessus).
+    shopUserApi
+      .me()
+      .then((fresh) => {
+        setUser(fresh);
+        Cookies.set(USER_COOKIE, JSON.stringify(fresh), {
+          expires: 7,
+          sameSite: "lax",
+        });
+      })
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) {
+          Cookies.remove(USER_COOKIE);
+          Cookies.remove(TOKEN_COOKIE);
+          setUser(null);
+        }
+        // autres erreurs (réseau...) : on garde l'état optimiste du cookie
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   async function login(

@@ -1,72 +1,86 @@
 // app/(public)/search/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { apiClient } from "@/lib/api-client";
+import { useProducts } from "@/lib/queries/shop/useCatalog";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Pagination } from "@/components/Pagination";
-import type { Product, Paginated } from "@/lib/types";
+import {
+  ProductFilters,
+  type ProductFiltersValue,
+} from "@/components/ProductFilters";
 
 function SearchPageContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
+  const tagFromUrl = searchParams.get("tag");
 
-  const [products, setProducts] = useState<Product[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const fetchResults = useCallback(() => {
-    if (!query) {
-      setProducts([]);
-      setTotal(0);
-      return;
-    }
-    setIsLoading(true);
-    const params = new URLSearchParams({
-      page: String(page),
-      limit: "24",
-      search: query,
-    });
-    apiClient
-      .get<Paginated<Product>>(`/product?${params.toString()}`)
-      .then((res) => {
-        setProducts(res.items ?? []);
-        setTotalPages(res.totalPages);
-        setTotal(res.total);
-      })
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, [query, page]);
+  const [filters, setFilters] = useState<ProductFiltersValue>({
+    tags: tagFromUrl ? [tagFromUrl] : [],
+    sort: "newest",
+  });
 
   useEffect(() => {
     setPage(1);
-  }, [query]);
+  }, [query, tagFromUrl]);
 
-  useEffect(() => {
-    fetchResults();
-  }, [fetchResults]);
+  const hasCriteria = Boolean(query) || filters.tags.length > 0;
+
+  const { data, isLoading } = useProducts({
+    page,
+    search: query || undefined,
+    minPrice: filters.minPrice,
+    maxPrice: filters.maxPrice,
+    tags: filters.tags.length > 0 ? filters.tags : undefined,
+    sort: filters.sort,
+  });
+
+  const products = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+
+  function updateFilters(next: ProductFiltersValue) {
+    setFilters(next);
+    setPage(1);
+  }
 
   return (
     <div>
-      {query ? (
+      {hasCriteria ? (
         <>
           <p className="mb-4 text-sm text-gray-500">
-            {total} résultat(s) pour «{" "}
-            <span className="font-medium text-gray-900">{query}</span> »
+            {total} résultat(s)
+            {query && (
+              <>
+                {" "}
+                pour «{" "}
+                <span className="font-medium text-gray-900">{query}</span> »
+              </>
+            )}
           </p>
-          <ProductGrid
-            products={products}
-            isLoading={isLoading}
-            emptyMessage={`Aucun produit ne correspond à "${query}".`}
-          />
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-          />
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
+            <div className="md:col-span-1">
+              <ProductFilters value={filters} onChange={updateFilters} />
+            </div>
+            <div className="md:col-span-3">
+              <ProductGrid
+                products={products}
+                isLoading={isLoading}
+                emptyMessage={
+                  query
+                    ? `Aucun produit ne correspond à "${query}".`
+                    : "Aucun produit ne correspond à ces critères."
+                }
+              />
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+              />
+            </div>
+          </div>
         </>
       ) : (
         <p className="text-sm text-gray-400">

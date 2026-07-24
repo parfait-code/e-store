@@ -417,6 +417,12 @@ export interface OrderItem {
   } | null;
   productName?: string;
   productSku?: string;
+  reviews: {
+    id: string;
+    rating: number;
+    comment: string | null;
+    createdAt: string;
+  }[]; // 🆕
 }
 
 export type PaymentStatus =
@@ -783,6 +789,9 @@ export interface ProductReviewsResponse {
   average_rating: number;
   total_reviews: number;
   reviews: ProductReview[];
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export type Review = ProductReview;

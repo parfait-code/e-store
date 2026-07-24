@@ -16,7 +16,3 @@ export const adminSettingsApi = {
   updateBulk: (settings: { key: string; value: unknown }[]) =>
     apiClient.patch<Setting[]>("/settings", { settings }),
 };
-
-export const publicSettingsApi = {
-  list: () => apiClient.get<Setting[]>("/settings/public", { auth: false }),
-};

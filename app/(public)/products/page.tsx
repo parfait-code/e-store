@@ -3,26 +3,42 @@
 
 import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
-import { useCategories } from "@/lib/queries/shop/useCatalog";
-import { useProducts } from "@/lib/queries/shop/useCatalog";
+import { useCategories, useProducts } from "@/lib/queries/shop/useCatalog";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Pagination } from "@/components/Pagination";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import {
+  ProductFilters,
+  type ProductFiltersValue,
+} from "@/components/ProductFilters";
 
 export default function ProductsPage() {
   const [categoryId, setCategoryId] = useState("");
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<ProductFiltersValue>({
+    tags: [],
+    sort: "newest",
+  });
 
   const { data: categories = [] } = useCategories();
   const { data, isLoading } = useProducts({
     page,
     categoryId: categoryId || undefined,
+    minPrice: filters.minPrice,
+    maxPrice: filters.maxPrice,
+    tags: filters.tags.length > 0 ? filters.tags : undefined,
+    sort: filters.sort,
   });
 
   const products = data?.items ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
+
+  function updateFilters(next: ProductFiltersValue) {
+    setFilters(next);
+    setPage(1);
+  }
 
   return (
     <div>
@@ -46,24 +62,30 @@ export default function ProductsPage() {
       </div>
 
       {showFilters && (
-        <div className="mb-6">
-          <select
-            value={categoryId}
-            onChange={(e) => {
-              setCategoryId(e.target.value);
-              setPage(1);
-            }}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 sm:w-64"
-          >
-            <option value="">Toutes les catégories</option>
-            {categories
-              .filter((c) => c.parentId === null)
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-          </select>
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              Catégorie
+            </label>
+            <select
+              value={categoryId}
+              onChange={(e) => {
+                setCategoryId(e.target.value);
+                setPage(1);
+              }}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+            >
+              <option value="">Toutes les catégories</option>
+              {categories
+                .filter((c) => c.parentId === null)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <ProductFilters value={filters} onChange={updateFilters} />
         </div>
       )}
 

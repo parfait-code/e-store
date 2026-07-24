@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import { formatXAF, formatDate } from "@/lib/format";
+import { ReviewFormModal } from "@/components/ReviewFormModal";
 import type {
   Order,
   OrderStatus,
@@ -328,7 +329,7 @@ function ReturnRequestForm({
           </div>
           <p className="text-xs text-gray-400">
             Un article coché est retourné dans sa quantité complète — les
-            retours partiels ne sont pas pris en charge par l'API.
+            retours partiels ne sont pas pris en charge par l&apos;PI.
           </p>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -505,6 +506,16 @@ function OrderItemRow({
             <Star size={12} /> Laisser un avis
           </button>
         ))}
+
+      <ReviewFormModal
+        open={reviewingItem !== null}
+        orderItemId={reviewingItem?.id ?? ""}
+        productId={reviewingItem?.productId ?? ""}
+        productName={
+          reviewingItem?.product?.name ?? reviewingItem?.productName ?? ""
+        }
+        onClose={() => setReviewingItem(null)}
+      />
     </div>
   );
 }

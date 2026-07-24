@@ -4,12 +4,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { shopOrdersApi } from "@/lib/api/shop/orders";
 import { queryKeys } from "@/lib/queries/keys";
-import type { ReturnCreateInput, ReviewCreateInput } from "@/lib/types";
+import type {
+  ReturnCreateInput,
+  ReviewCreateInput,
+  OrderStatus,
+} from "@/lib/types";
 
-export function useMyOrders() {
+export function useMyOrders(
+  params: { page?: number; status?: OrderStatus | "" } = {},
+) {
   return useQuery({
-    queryKey: queryKeys.shop.orders({ limit: 50 }),
-    queryFn: () => shopOrdersApi.list(50),
+    queryKey: queryKeys.shop.orders(params),
+    queryFn: () => shopOrdersApi.list({ ...params, limit: 10 }),
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -55,9 +62,13 @@ export function useCreateReturn(orderId: string) {
 }
 
 export function useCreateReview() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: ReviewCreateInput) =>
       shopOrdersApi.createReview(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["shop", "orders"] });
+    },
   });
 }
 

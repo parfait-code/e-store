@@ -4,10 +4,15 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { SlidersHorizontal } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Pagination } from "@/components/Pagination";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import {
+  ProductFilters,
+  type ProductFiltersValue,
+} from "@/components/ProductFilters";
 import {
   useCategoryBySlug,
   useCategoryProducts,
@@ -15,6 +20,11 @@ import {
 
 export function CategoryPageClient({ slug }: { slug: string }) {
   const [page, setPage] = useState(1);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<ProductFiltersValue>({
+    tags: [],
+    sort: "newest",
+  });
 
   useEffect(() => {
     setPage(1);
@@ -26,7 +36,17 @@ export function CategoryPageClient({ slug }: { slug: string }) {
     isLoading,
     isError,
     error,
-  } = useCategoryProducts(slug, page);
+  } = useCategoryProducts(slug, page, 24, {
+    minPrice: filters.minPrice,
+    maxPrice: filters.maxPrice,
+    tags: filters.tags.length > 0 ? filters.tags : undefined,
+    sort: filters.sort,
+  });
+
+  function updateFilters(next: ProductFiltersValue) {
+    setFilters(next);
+    setPage(1);
+  }
 
   if (isError) {
     const message =
@@ -96,20 +116,42 @@ export function CategoryPageClient({ slug }: { slug: string }) {
         </div>
       )}
 
-      <ProductGrid
-        products={productsData?.items ?? []}
-        isLoading={isLoading}
-        emptyMessage={
-          categoryName
-            ? `Aucun produit dans "${categoryName}" pour le moment.`
-            : "Aucun produit pour le moment."
-        }
-      />
-      <Pagination
-        page={page}
-        totalPages={productsData?.totalPages ?? 1}
-        onPageChange={setPage}
-      />
+      <div className="mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          aria-expanded={showFilters}
+          className="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          <SlidersHorizontal size={16} /> Filtrer
+        </button>
+      </div>
+
+      <div
+        className={showFilters ? "grid grid-cols-1 gap-6 md:grid-cols-4" : ""}
+      >
+        {showFilters && (
+          <div className="md:col-span-1">
+            <ProductFilters value={filters} onChange={updateFilters} />
+          </div>
+        )}
+        <div className={showFilters ? "md:col-span-3" : ""}>
+          <ProductGrid
+            products={productsData?.items ?? []}
+            isLoading={isLoading}
+            emptyMessage={
+              categoryName
+                ? `Aucun produit dans "${categoryName}" pour le moment.`
+                : "Aucun produit pour le moment."
+            }
+          />
+          <Pagination
+            page={page}
+            totalPages={productsData?.totalPages ?? 1}
+            onPageChange={setPage}
+          />
+        </div>
+      </div>
     </div>
   );
 }

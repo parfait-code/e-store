@@ -22,8 +22,10 @@ import {
   useValidateCoupon,
   useCreateOrder,
   useCreatePayment,
+  useValidateAddress,
 } from "@/lib/queries/shop/useCheckout";
 import { AuthRequiredModal } from "@/components/AuthRequiredModal";
+import { CountrySelect } from "@/components/CountrySelect";
 
 function AddressSectionSkeleton() {
   return (
@@ -132,6 +134,13 @@ export default function CheckoutPage() {
   const grandTotal = totalAmount + selectedShippingCost;
 
   const isCouponVerified = couponResult?.valid === true;
+
+  const { mutate: validateAddress, isPending: isValidatingAddress } =
+    useValidateAddress();
+  const [addressValidation, setAddressValidation] = useState<{
+    valid: boolean;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     if (addresses.length === 0) {
@@ -447,16 +456,13 @@ export default function CheckoutPage() {
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <input
-                        placeholder="Pays"
-                        required
+                      <CountrySelect
                         value={newAddress.country}
-                        onChange={(e) =>
-                          setNewAddress((f) => ({
-                            ...f,
-                            country: e.target.value,
-                          }))
-                        }
+                        onChange={(v) => {
+                          setNewAddress((f) => ({ ...f, country: v }));
+                          setAddressValidation(null);
+                        }}
+                        required
                         className={inputClass}
                       />
                       <input
@@ -471,6 +477,51 @@ export default function CheckoutPage() {
                         className={inputClass}
                       />
                     </div>
+                    {useNewAddress && hasShippingAddressInfo && (
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddressValidation(null);
+                            validateAddress(
+                              {
+                                recipientName: newAddress.recipientName,
+                                phone: newAddress.phone || undefined,
+                                street: newAddress.street,
+                                addressLine2:
+                                  newAddress.addressLine2 || undefined,
+                                city: newAddress.city,
+                                state: newAddress.state || undefined,
+                                country: newAddress.country,
+                                postalCode: newAddress.postalCode || undefined,
+                              },
+                              {
+                                onSuccess: (res) =>
+                                  setAddressValidation({
+                                    valid: res.valid,
+                                    message: res.valid
+                                      ? "Adresse reconnue."
+                                      : "Adresse non reconnue — vous pouvez tout de même continuer.",
+                                  }),
+                              },
+                            );
+                          }}
+                          disabled={isValidatingAddress}
+                          className="text-xs font-medium text-gray-900 hover:underline disabled:opacity-50"
+                        >
+                          {isValidatingAddress
+                            ? "Vérification..."
+                            : "Vérifier l'adresse"}
+                        </button>
+                        {addressValidation && (
+                          <p
+                            className={`mt-1 text-xs ${addressValidation.valid ? "text-green-600" : "text-amber-600"}`}
+                          >
+                            {addressValidation.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </>
