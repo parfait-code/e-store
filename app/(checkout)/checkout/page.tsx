@@ -65,6 +65,7 @@ export default function CheckoutPage() {
     useShippingMethods();
   const { data: paymentMethods = [], isLoading: isLoadingPayments } =
     usePaymentMethods();
+
   const [newAddress, setNewAddress] = useState({
     recipientName: "",
     phone: "",
@@ -76,6 +77,12 @@ export default function CheckoutPage() {
     postalCode: "",
   });
   const [useNewAddress, setUseNewAddress] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+  const [addressValidation, setAddressValidation] = useState<{
+    valid: boolean;
+    message: string;
+  } | null>(null);
+
   const [shippingMethodId, setShippingMethodId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType | "">(
     "",
@@ -88,6 +95,7 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalMessage, setAuthModalMessage] = useState<string>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { mutate: validateCoupon, isPending: isValidatingCoupon } =
     useValidateCoupon();
@@ -95,7 +103,8 @@ export default function CheckoutPage() {
     useCreateOrder();
   const { mutateAsync: createPayment } = useCreatePayment();
   const { mutateAsync: createAddress } = useCreateAddress();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: validateAddress, isPending: isValidatingAddress } =
+    useValidateAddress();
 
   const mainCtaRef = useRef<HTMLButtonElement>(null);
   const [isMainCtaVisible, setIsMainCtaVisible] = useState(true);
@@ -110,6 +119,22 @@ export default function CheckoutPage() {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (isLoaded && items.length === 0 && !isSubmitting) {
+      router.push("/cart");
+    }
+  }, [isLoaded, items.length, isSubmitting, router]);
+
+  // --- Dérivations liées à l'adresse (ordre important : tout ce qui suit
+  // dépend de `addresses`, donc doit être calculé après le hook ci-dessus) ---
+  const defaultAddress = addresses.find((a) => a.isDefault);
+  const mostRecentAddress = [...addresses].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )[0];
+  const effectiveAddressId =
+    selectedAddressId || (defaultAddress ?? mostRecentAddress)?.id || "";
+  const showNewAddressForm = useNewAddress || addresses.length === 0;
 
   const totalWeight = items.reduce(
     (sum, i) => sum + (i.weight ?? 0) * i.quantity,
@@ -132,28 +157,6 @@ export default function CheckoutPage() {
   const grandTotal = totalAmount + selectedShippingCost;
 
   const isCouponVerified = couponResult?.valid === true;
-
-  const { mutate: validateAddress, isPending: isValidatingAddress } =
-    useValidateAddress();
-  const [addressValidation, setAddressValidation] = useState<{
-    valid: boolean;
-    message: string;
-  } | null>(null);
-  const [selectedAddressId, setSelectedAddressId] = useState("");
-
-  const defaultAddress = addresses.find((a) => a.isDefault);
-  const mostRecentAddress = [...addresses].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  )[0];
-  const effectiveAddressId =
-    selectedAddressId || (defaultAddress ?? mostRecentAddress)?.id || "";
-  const showNewAddressForm = useNewAddress || addresses.length === 0;
-
-  useEffect(() => {
-    if (isLoaded && items.length === 0 && !isSubmitting) {
-      router.push("/cart");
-    }
-  }, [isLoaded, items.length, isSubmitting, router]);
 
   const inputClass =
     "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
@@ -269,8 +272,6 @@ export default function CheckoutPage() {
 
       clearCart();
       router.push(`/account/orders/${order.id}`);
-      // Pas de setIsSubmitting(false) ici : on quitte la page, inutile de
-      // redéclencher un rendu juste avant la navigation.
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setAuthModalMessage(
@@ -477,7 +478,7 @@ export default function CheckoutPage() {
                         className={inputClass}
                       />
                     </div>
-                    {useNewAddress && hasShippingAddressInfo && (
+                    {hasShippingAddressInfo && (
                       <div className="mt-2">
                         <button
                           type="button"
