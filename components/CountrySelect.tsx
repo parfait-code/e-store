@@ -1,7 +1,10 @@
 // components/CountrySelect.tsx
 "use client";
 
-import { useSupportedCountries } from "@/lib/queries/shop/useSettings";
+import {
+  usePublicSettings,
+  useSupportedCountries,
+} from "@/lib/queries/shop/useSettings";
 
 interface CountrySelectProps {
   value: string;
@@ -11,7 +14,7 @@ interface CountrySelectProps {
 }
 
 function CountrySelectSkeleton({ className }: { className: string }) {
-  return <div className={`${className} h-[38px] animate-pulse bg-gray-100`} />;
+  return <div className={`${className} h-9.5 animate-pulse bg-gray-100`} />;
 }
 
 export function CountrySelect({
@@ -20,7 +23,12 @@ export function CountrySelect({
   required,
   className,
 }: CountrySelectProps) {
+  const { isLoading } = usePublicSettings();
   const countries = useSupportedCountries();
+
+  if (isLoading) {
+    return <CountrySelectSkeleton className={className} />;
+  }
 
   if (countries.length === 0) {
     return (

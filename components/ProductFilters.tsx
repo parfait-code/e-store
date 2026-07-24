@@ -1,7 +1,7 @@
 // components/ProductFilters.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react"; // useEffect retiré
 import { SlidersHorizontal, X } from "lucide-react";
 import { useShopTags } from "@/lib/queries/shop/useTags";
 import type { ProductSortOption } from "@/lib/types";
@@ -46,10 +46,16 @@ export function ProductFilters({
   const [minInput, setMinInput] = useState(value.minPrice?.toString() ?? "");
   const [maxInput, setMaxInput] = useState(value.maxPrice?.toString() ?? "");
 
-  useEffect(() => {
+  // Resynchronise les champs texte quand `value` change depuis l'extérieur
+  // (ex: réinitialisation), ajusté pendant le rendu plutôt que via un effet.
+  const [prevMin, setPrevMin] = useState(value.minPrice);
+  const [prevMax, setPrevMax] = useState(value.maxPrice);
+  if (value.minPrice !== prevMin || value.maxPrice !== prevMax) {
+    setPrevMin(value.minPrice);
+    setPrevMax(value.maxPrice);
     setMinInput(value.minPrice?.toString() ?? "");
     setMaxInput(value.maxPrice?.toString() ?? "");
-  }, [value.minPrice, value.maxPrice]);
+  }
 
   function toggleTag(slug: string) {
     const next = value.tags.includes(slug)

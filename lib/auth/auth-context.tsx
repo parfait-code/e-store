@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const rawUser = Cookies.get(USER_COOKIE);
     if (!rawUser) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture
       setIsLoading(false);
       return;
     }
@@ -55,9 +56,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Le cookie peut être périmé (rôle changé, compte suspendu...) — on
-    // rafraîchit silencieusement depuis l'API sans bloquer l'affichage
-    // initial (déjà peuplé de manière optimiste depuis le cookie ci-dessus).
     shopUserApi
       .me()
       .then((fresh) => {
@@ -73,7 +71,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           Cookies.remove(TOKEN_COOKIE);
           setUser(null);
         }
-        // autres erreurs (réseau...) : on garde l'état optimiste du cookie
       })
       .finally(() => setIsLoading(false));
   }, []);

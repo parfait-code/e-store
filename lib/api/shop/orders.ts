@@ -2,6 +2,7 @@
 import { apiClient } from "@/lib/api-client";
 import type {
   Order,
+  OrderStatus,
   Paginated,
   ReturnRequest,
   ReturnCreateInput,
@@ -10,8 +11,15 @@ import type {
 } from "@/lib/types";
 
 export const shopOrdersApi = {
-  list: (limit = 50) =>
-    apiClient.get<Paginated<Order>>(`/orders?limit=${limit}`),
+  list: (
+    params: { page?: number; limit?: number; status?: OrderStatus | "" } = {},
+  ) => {
+    const qs = new URLSearchParams();
+    qs.set("page", String(params.page ?? 1));
+    qs.set("limit", String(params.limit ?? 50));
+    if (params.status) qs.set("status", params.status);
+    return apiClient.get<Paginated<Order>>(`/orders?${qs.toString()}`);
+  },
 
   byId: (orderId: string) => apiClient.get<Order>(`/orders/${orderId}`),
 

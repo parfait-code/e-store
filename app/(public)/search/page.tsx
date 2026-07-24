@@ -1,7 +1,7 @@
 // app/(public)/search/page.tsx
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useState, Suspense } from "react"; // useEffect retiré
 import { useSearchParams } from "next/navigation";
 import { useProducts } from "@/lib/queries/shop/useCatalog";
 import { ProductGrid } from "@/components/ProductGrid";
@@ -22,9 +22,14 @@ function SearchPageContent() {
     sort: "newest",
   });
 
-  useEffect(() => {
+  // Réinitialise la pagination quand la recherche (q ou tag) change, ajusté
+  // pendant le rendu plutôt que via un effet.
+  const criteriaKey = `${query}|${tagFromUrl ?? ""}`;
+  const [prevCriteriaKey, setPrevCriteriaKey] = useState(criteriaKey);
+  if (criteriaKey !== prevCriteriaKey) {
+    setPrevCriteriaKey(criteriaKey);
     setPage(1);
-  }, [query, tagFromUrl]);
+  }
 
   const hasCriteria = Boolean(query) || filters.tags.length > 0;
 

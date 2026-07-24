@@ -65,8 +65,6 @@ export default function CheckoutPage() {
     useShippingMethods();
   const { data: paymentMethods = [], isLoading: isLoadingPayments } =
     usePaymentMethods();
-
-  const [selectedAddressId, setSelectedAddressId] = useState("");
   const [newAddress, setNewAddress] = useState({
     recipientName: "",
     phone: "",
@@ -117,9 +115,9 @@ export default function CheckoutPage() {
     (sum, i) => sum + (i.weight ?? 0) * i.quantity,
     0,
   );
-  const shippingCountry = useNewAddress
+  const shippingCountry = showNewAddressForm
     ? newAddress.country
-    : (addresses.find((a) => a.id === selectedAddressId)?.country ?? "");
+    : (addresses.find((a) => a.id === effectiveAddressId)?.country ?? "");
   const hasShippingAddressInfo = Boolean(shippingCountry.trim());
 
   const {
@@ -141,21 +139,15 @@ export default function CheckoutPage() {
     valid: boolean;
     message: string;
   } | null>(null);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
 
-  useEffect(() => {
-    if (addresses.length === 0) {
-      setUseNewAddress(true);
-      return;
-    }
-    if (!selectedAddressId) {
-      const defaultAddress = addresses.find((a) => a.isDefault);
-      const mostRecent = [...addresses].sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      )[0];
-      setSelectedAddressId((defaultAddress ?? mostRecent).id);
-    }
-  }, [addresses, selectedAddressId]);
+  const defaultAddress = addresses.find((a) => a.isDefault);
+  const mostRecentAddress = [...addresses].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )[0];
+  const effectiveAddressId =
+    selectedAddressId || (defaultAddress ?? mostRecentAddress)?.id || "";
+  const showNewAddressForm = useNewAddress || addresses.length === 0;
 
   useEffect(() => {
     if (isLoaded && items.length === 0 && !isSubmitting) {
@@ -167,7 +159,7 @@ export default function CheckoutPage() {
     "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900";
 
   function buildShippingAddress(): OrderAddressInput {
-    if (useNewAddress) {
+    if (showNewAddressForm) {
       return {
         recipientName: newAddress.recipientName,
         phone: newAddress.phone || undefined,
@@ -180,7 +172,7 @@ export default function CheckoutPage() {
       };
     }
 
-    const a = addresses.find((x) => x.id === selectedAddressId);
+    const a = addresses.find((x) => x.id === effectiveAddressId);
     if (!a) {
       throw new Error("Adresse sélectionnée introuvable.");
     }
@@ -368,7 +360,7 @@ export default function CheckoutPage() {
               <AddressSectionSkeleton />
             ) : (
               <>
-                {addresses.length > 0 && !useNewAddress && (
+                {addresses.length > 0 && !showNewAddressForm && (
                   <div className="space-y-2">
                     {addresses.map((a) => (
                       <label
@@ -377,7 +369,7 @@ export default function CheckoutPage() {
                       >
                         <input
                           type="radio"
-                          checked={selectedAddressId === a.id}
+                          checked={effectiveAddressId === a.id}
                           onChange={() => setSelectedAddressId(a.id)}
                           className="mt-0.5"
                         />
@@ -394,15 +386,17 @@ export default function CheckoutPage() {
                     ))}
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setUseNewAddress((v) => !v)}
-                  className="mt-3 text-xs font-medium text-gray-900 hover:underline"
-                >
-                  {useNewAddress
-                    ? "Utiliser une adresse existante"
-                    : "+ Utiliser une nouvelle adresse"}
-                </button>
+                {addresses.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setUseNewAddress((v) => !v)}
+                    className="mt-3 text-xs font-medium text-gray-900 hover:underline"
+                  >
+                    {showNewAddressForm
+                      ? "Utiliser une adresse existante"
+                      : "+ Utiliser une nouvelle adresse"}
+                  </button>
+                )}
 
                 {useNewAddress && (
                   <div className="mt-3 space-y-3">

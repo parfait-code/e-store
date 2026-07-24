@@ -1,7 +1,7 @@
 // app/(public)/categories/[slug]/CategoryPageClient.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react"; // useEffect retiré, plus utilisé
 import Link from "next/link";
 import Image from "next/image";
 import { SlidersHorizontal } from "lucide-react";
@@ -26,9 +26,14 @@ export function CategoryPageClient({ slug }: { slug: string }) {
     sort: "newest",
   });
 
-  useEffect(() => {
+  // Réinitialise la pagination quand on change de catégorie, sans passer par
+  // un effet : on compare le slug courant à celui du dernier rendu et on
+  // ajuste l'état directement (pattern recommandé par React pour ce cas).
+  const [prevSlug, setPrevSlug] = useState(slug);
+  if (slug !== prevSlug) {
+    setPrevSlug(slug);
     setPage(1);
-  }, [slug]);
+  }
 
   const { data: category } = useCategoryBySlug(slug);
   const {
