@@ -199,11 +199,11 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!useNewAddress && !selectedAddressId) {
+    if (!showNewAddressForm && !effectiveAddressId) {
       setError("Sélectionnez une adresse de livraison.");
       return;
     }
-    if (useNewAddress && !hasShippingAddressInfo) {
+    if (showNewAddressForm && !hasShippingAddressInfo) {
       setError("Renseignez votre adresse de livraison.");
       return;
     }
@@ -217,11 +217,13 @@ export default function CheckoutPage() {
     }
 
     setIsSubmitting(true);
+    setError(null);
+
     try {
       const shippingAddress = buildShippingAddress();
       let newlyCreatedAddressId: string | undefined;
 
-      if (useNewAddress) {
+      if (showNewAddressForm) {
         try {
           const saved = await createAddress({
             recipientName: shippingAddress.recipientName,
@@ -247,24 +249,28 @@ export default function CheckoutPage() {
           combinationId: i.combinationId ?? undefined,
           quantity: i.quantity,
         })),
-        shippingAddressId: useNewAddress
+        shippingAddressId: showNewAddressForm
           ? newlyCreatedAddressId
-          : selectedAddressId,
+          : effectiveAddressId,
         shippingAddress,
         shippingMethodId,
         paymentMethodId: paymentMethod,
         couponCode: isCouponVerified ? couponCode : undefined,
       };
+
       const order = await createOrder(payload);
 
       try {
         await createPayment({ order_id: order.id, method: paymentMethod });
       } catch {
-        // La commande existe déjà même si le paiement échoue
+        // La commande existe déjà même si l'enregistrement du paiement échoue
+        // — l'utilisateur pourra retenter depuis le détail de la commande.
       }
 
       clearCart();
       router.push(`/account/orders/${order.id}`);
+      // Pas de setIsSubmitting(false) ici : on quitte la page, inutile de
+      // redéclencher un rendu juste avant la navigation.
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setAuthModalMessage(
